@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:15
+    container_name: orkestr-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: orkestr
+    volumes:
+      - orkestr-db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - orkestr-network
+
+volumes:
+  orkestr-db-data:
+
+networks:
+  orkestr-network:
+    driver: bridge
