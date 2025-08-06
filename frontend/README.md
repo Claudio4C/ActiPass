@@ -1,69 +1,137 @@
-# React + TypeScript + Vite
+# 🚀 Frontend – SaaS Assos
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Frontend moderne pour le projet **SaaS Assos**, basé sur React, TypeScript, Vite, TailwindCSS et une configuration stricte d'ESLint & Prettier pour garantir un code propre et cohérent.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## 📦 Stack utilisée
 
-## Expanding the ESLint configuration
+- ⚛️ [React 19](https://react.dev/)
+- ⚡ [Vite](https://vitejs.dev/)
+- 🔷 [TypeScript](https://www.typescriptlang.org/)
+- 🎨 [TailwindCSS](https://tailwindcss.com/)
+- 🧹 [ESLint](https://eslint.org/) + [Prettier](https://prettier.io/)
+- 🛡️ [Husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/okonet/lint-staged) (hooks Git)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+---
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 🧪 Scripts disponibles
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+```bash
+# Lancer le serveur de dev avec HMR
+npm run dev
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Build de production
+npm run build
+
+# Linting (ESLint)
+npm run lint
+
+# Lint + auto-fix
+npm run lint:fix
+
+# Formater le code (Prettier)
+npm run format
+
+# Vérifier que le format est bon
+npm run format:check
+
+# Lint + format check (pré-commit)
+npm run check
+
+# Preview du build
+npm run preview
+
+# Installer Husky (après npm install)
+npm run prepare
+```
+## ▶️ Exemple d’utilisation
+
+### Cloner le repo et installer les dépendances :
+
+```bash
+git clone <url>
+cd frontend
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### Lancer le serveur de développement :
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+
+> ⚠️ Assure-toi que le backend est aussi lancé si nécessaire.
+
+---
+
+## 🧪 Qualité & vérifications
+
+### Avant chaque commit :
+
+- `lint` + `prettier` sont **automatiquement appliqués** grâce à `husky` + `lint-staged`.
+
+### Vérification manuelle :
+
+```bash
+npm run check
+```
+
+Cela exécute :
+
+- `eslint` (analyse de code)
+- `prettier --check` (formatage)
+
+### Pour corriger automatiquement :
+
+```bash
+npm run lint:fix
+npm run format
+```
+
+---
+
+## 📦 Créer une build de production
+
+```bash
+npm run build
+```
+
+Cela compile le projet TypeScript + Vite pour la production.
+---
+
+## ✅ Qualité de code
+
+- Les erreurs de linting bloquent les commits grâce à `husky` + `lint-staged`.
+- Formatage automatique à chaque commit.
+- Support complet de TypeScript et JSX avec `eslint-plugin-react` et `@typescript-eslint`.
+
+---
+
+## 📁 Arborescence
+
+```
+frontend/
+├── src/
+│   ├── assets/
+│   ├── components/
+│   ├── hooks/
+│   ├── pages/
+│   ├── types/
+│   ├── utils/
+│   ├── App.tsx
+│   ├── main.tsx
+├── eslint.config.ts
+├── .prettierrc
+├── tsconfig.json
+├── README.md
+├── vite.config.ts
+└── package.json
+```
+
+---
+
+## 📣 Auteurs
+
+> Développé par Kyllian & Claudio 2 passionés de sport et de tech.  
+> Code propre, scalable, et prêt pour la production. 💪
