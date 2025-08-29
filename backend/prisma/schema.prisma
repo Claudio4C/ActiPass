@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -9,73 +9,63 @@ datasource db {
 }
 
 model User {
-  id                String     @id @default(uuid())
-  email             String     @unique
-  password          String
-  firstname         String
-  lastname          String
-  phone             String?
-  birthdate         DateTime?
-  gender            Gender
-  avatar_url        String?
-  username          String     @unique
-  is_email_verified Boolean    @default(false)
-  last_login_at     DateTime?
-  status            UserStatus @default(pending)
-  created_at        DateTime   @default(now())
-  updated_at        DateTime   @updatedAt
-  deleted_at        DateTime?
-
-  memberships             Membership[]
-  privateCoursesAsTutor   PrivateCourse[] @relation("TutorCourses")
-  privateCoursesAsStudent PrivateCourse[] @relation("StudentCourses")
-  events_created          Event[]         @relation("EventCreatedBy")
-  documents_uploaded      Document[]
-  documents_validated     Document[]      @relation("DocumentValidatedBy")
-  organisations_created   Organisation[]
-  listings_created        Listing[]
-
-  payments_made           Payment[] @relation("PaymentsMade")
-  payments_created_manual Payment[] @relation("PaymentsCreated")
-
-  attendances        Attendance[] @relation("UserAttendances") // présences de l'utilisateur
-  attendancesChecked Attendance[] @relation("AttendanceCheckedBy") // présences validées par l'utilisateur (checker)
-
-  availabilitySlots   AvailabilitySlot[] @relation("UserAvailabilitySlots") // créneaux liés à user_id
-  availabilityCreated AvailabilitySlot[] @relation("AvailabilityCreatedBy") // créneaux créés par l'utilisateur (created_by)
-
-  subscriptions Subscription[]
-  Invoice       Invoice[]
-  Penalty       Penalty[]
-  ConflictCheck ConflictCheck[]
+  id                         String             @id @default(uuid())
+  email                      String             @unique
+  password                   String
+  firstname                  String
+  lastname                   String
+  phone                      String?
+  birthdate                  DateTime?
+  gender                     Gender
+  avatar_url                 String?
+  username                   String             @unique
+  is_email_verified          Boolean            @default(false)
+  last_login_at              DateTime?
+  status                     UserStatus         @default(pending)
+  created_at                 DateTime           @default(now())
+  updated_at                 DateTime           @updatedAt
+  deleted_at                 DateTime?
+  email_verification_expires DateTime?
+  email_verification_token   String?            @unique
+  failed_login_attempts      Int                @default(0)
+  locked_until               DateTime?
+  password_reset_expires     DateTime?
+  password_reset_token       String?            @unique
+  refresh_token_hash         String?
+  two_factor_enabled         Boolean            @default(false)
+  two_factor_secret          String?
+  attendancesChecked         Attendance[]       @relation("AttendanceCheckedBy")
+  attendances                Attendance[]       @relation("UserAttendances")
+  availabilityCreated        AvailabilitySlot[] @relation("AvailabilityCreatedBy")
+  availabilitySlots          AvailabilitySlot[] @relation("UserAvailabilitySlots")
+  ConflictCheck              ConflictCheck[]
+  documents_uploaded         Document[]
+  documents_validated        Document[]         @relation("DocumentValidatedBy")
+  events_created             Event[]            @relation("EventCreatedBy")
+  Invoice                    Invoice[]
+  listings_created           Listing[]
+  memberships                Membership[]
+  organisations_created      Organisation[]
+  payments_created_manual    Payment[]          @relation("PaymentsCreated")
+  payments_made              Payment[]          @relation("PaymentsMade")
+  Penalty                    Penalty[]
+  privateCoursesAsStudent    PrivateCourse[]    @relation("StudentCourses")
+  privateCoursesAsTutor      PrivateCourse[]    @relation("TutorCourses")
+  subscriptions              Subscription[]
 
   @@map("users")
 }
 
-enum Gender {
-  male
-  female
-  prefer_not_to_say
-}
-
-enum UserStatus {
-  active
-  suspended
-  pending
-}
-
 model Role {
-  id          String    @id @default(uuid())
+  id          String       @id @default(uuid())
   name        String
-  slug        String    @unique
+  slug        String       @unique
   description String?
-  is_default  Boolean   @default(false)
-  level       Int // Plus le niveau est bas, plus le rôle est élevé (ex: admin = 1)
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
+  is_default  Boolean      @default(false)
+  level       Int
+  created_at  DateTime     @default(now())
   deleted_at  DateTime?
-
-  // Relations
+  updated_at  DateTime     @updatedAt
   memberships Membership[]
 
   @@map("roles")
@@ -98,19 +88,439 @@ model Membership {
   docs_status        MembershipDocsStatus    @default(missing)
   payment_status     MembershipPaymentStatus @default(not_paid)
   created_at         DateTime                @default(now())
-  updated_at         DateTime                @updatedAt
   deleted_at         DateTime?
-
-  // Relations
-  user         User          @relation(fields: [user_id], references: [id])
-  organisation Organisation  @relation(fields: [organisation_id], references: [id])
-  role         Role          @relation(fields: [role_id], references: [id])
-  Reservation  Reservation[]
-  Invoice      Invoice[]
+  updated_at         DateTime                @updatedAt
+  Invoice            Invoice[]
+  organisation       Organisation            @relation(fields: [organisation_id], references: [id])
+  role               Role                    @relation(fields: [role_id], references: [id])
+  user               User                    @relation(fields: [user_id], references: [id])
+  Reservation        Reservation[]
 
   @@index([user_id, organisation_id])
   @@index([user_id, status])
   @@map("memberships")
+}
+
+model Organisation {
+  id            String                 @id @default(uuid())
+  name          String
+  slug          String                 @unique
+  description   String?
+  logo_url      String?
+  type          OrganisationType
+  address       String?
+  city          String?
+  zip_code      String?
+  country       String?
+  latitude      Float?
+  longitude     Float?
+  email         String?
+  phone         String?
+  website_url   String?
+  member_limit  Int?
+  is_public     Boolean                @default(true)
+  status        OrganisationStatus     @default(active)
+  created_by_id String
+  created_at    DateTime               @default(now())
+  updated_at    DateTime               @updatedAt
+  deleted_at    DateTime?
+  document      Document[]
+  events        Event[]
+  Invoice       Invoice[]
+  listings      Listing[]
+  memberships   Membership[]
+  categories    OrganisationCategory[]
+  created_by    User                   @relation(fields: [created_by_id], references: [id])
+  Payment       Payment[]
+  plans         Plan[]
+  subscriptions Subscription[]
+
+  @@map("organisations")
+}
+
+model Category {
+  id                 String                 @id @default(uuid())
+  name               String
+  type               CategoryType
+  description        String?
+  icon               String?
+  color              String?
+  parent_category_id String?
+  is_active          Boolean                @default(true)
+  sort_order         Int                    @default(0)
+  created_at         DateTime               @default(now())
+  updated_at         DateTime               @updatedAt
+  deleted_at         DateTime?
+  parent_category    Category?              @relation("CategoryToParent", fields: [parent_category_id], references: [id])
+  subcategories      Category[]             @relation("CategoryToParent")
+  events             EventCategory[]
+  listings           ListingCategory[]
+  organisationLinks  OrganisationCategory[]
+
+  @@index([type, is_active])
+  @@map("categories")
+}
+
+model EventCategory {
+  event_id    String
+  category_id String
+  category    Category @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  event       Event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
+
+  @@id([event_id, category_id])
+  @@map("event_categories")
+}
+
+model ListingCategory {
+  listing_id  String
+  category_id String
+  category    Category @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  listing     Listing  @relation(fields: [listing_id], references: [id], onDelete: Cascade)
+
+  @@id([listing_id, category_id])
+  @@map("listing_categories")
+}
+
+model OrganisationCategory {
+  organisation_id String
+  category_id     String
+  category        Category     @relation(fields: [category_id], references: [id])
+  organisation    Organisation @relation(fields: [organisation_id], references: [id])
+
+  @@id([organisation_id, category_id])
+  @@map("organisation_categories")
+}
+
+model Event {
+  id                    String             @id @default(uuid())
+  organisation_id       String
+  linked_listing_id     String?
+  title                 String
+  description           String?
+  event_type            EventType
+  start_time            DateTime
+  end_time              DateTime
+  location              String?
+  created_by_id         String
+  visibility            EventVisibility
+  capacity              Int?
+  registration_required Boolean            @default(false)
+  price                 Float              @default(0)
+  is_recurring          Boolean            @default(false)
+  recurrence_pattern    String?
+  status                EventStatus        @default(draft)
+  cover_url             String?
+  created_at            DateTime           @default(now())
+  updated_at            DateTime           @updatedAt
+  deleted_at            DateTime?
+  Attendance            Attendance[]
+  AvailabilitySlot      AvailabilitySlot[]
+  EventCategory         EventCategory[]
+  created_by            User               @relation("EventCreatedBy", fields: [created_by_id], references: [id])
+  linked_listing        Listing?           @relation(fields: [linked_listing_id], references: [id])
+  organisation          Organisation       @relation(fields: [organisation_id], references: [id])
+  Invoice               Invoice[]
+  Reservation           Reservation[]
+
+  @@index([organisation_id, start_time])
+  @@index([start_time, end_time, status])
+  @@map("events")
+}
+
+model Listing {
+  id               String            @id @default(uuid())
+  user_id          String
+  organisation_id  String?
+  title            String
+  description      String?
+  price_per_hour   Float
+  session_duration Int
+  is_online        Boolean           @default(false)
+  visibility       ListingVisibility @default(public)
+  available_from   DateTime?
+  available_to     DateTime?
+  languages        String[]
+  specialities     String[]
+  created_at       DateTime          @default(now())
+  updated_at       DateTime          @updatedAt
+  deleted_at       DateTime?
+  events           Event[]
+  ListingCategory  ListingCategory[]
+  organisation     Organisation?     @relation(fields: [organisation_id], references: [id])
+  user             User              @relation(fields: [user_id], references: [id])
+  privateCourses   PrivateCourse[]
+
+  @@index([user_id, visibility])
+  @@map("listings")
+}
+
+model PrivateCourse {
+  id         String              @id @default(uuid())
+  tutor_id   String
+  student_id String
+  listing_id String
+  start_time DateTime
+  end_time   DateTime
+  location   String
+  status     PrivateCourseStatus @default(pending)
+  notes      String?
+  rating     Float?
+  created_at DateTime            @default(now())
+  updated_at DateTime            @updatedAt
+  deleted_at DateTime?
+  paymentId  String?
+  Invoice    Invoice[]
+  Penalty    Penalty[]
+  listing    Listing             @relation(fields: [listing_id], references: [id])
+  payment    Payment?            @relation(fields: [paymentId], references: [id])
+  student    User                @relation("StudentCourses", fields: [student_id], references: [id])
+  tutor      User                @relation("TutorCourses", fields: [tutor_id], references: [id])
+
+  @@index([tutor_id, status])
+  @@index([student_id, status])
+  @@map("private_courses")
+}
+
+model Document {
+  id               String         @id @default(uuid())
+  user_id          String
+  organisation_id  String?
+  type             DocumentType
+  url              String
+  doc_key          String
+  file_name        String
+  file_type        String
+  status           DocumentStatus @default(pending)
+  comment          String?
+  expiration_date  DateTime?
+  uploaded_at      DateTime       @default(now())
+  validated_by_id  String?
+  last_reviewed_at DateTime?
+  deleted_at       DateTime?
+  organisation     Organisation?  @relation(fields: [organisation_id], references: [id])
+  user             User           @relation(fields: [user_id], references: [id])
+  validated_by     User?          @relation("DocumentValidatedBy", fields: [validated_by_id], references: [id])
+
+  @@index([user_id, type, status])
+  @@map("documents")
+}
+
+model Reservation {
+  id            String            @id @default(uuid())
+  membership_id String
+  event_id      String
+  status        ReservationStatus @default(pending)
+  payment_id    String?
+  note          String?
+  rating        Float?
+  created_at    DateTime          @default(now())
+  updated_at    DateTime          @updatedAt
+  deleted_at    DateTime?
+  event         Event             @relation(fields: [event_id], references: [id])
+  membership    Membership        @relation(fields: [membership_id], references: [id])
+
+  @@unique([membership_id, event_id])
+  @@index([event_id, status])
+  @@map("reservations")
+}
+
+model Payment {
+  id              String            @id @default(uuid())
+  user_id         String
+  organisation_id String?
+  amount          Decimal
+  currency        String            @default("EUR")
+  payment_type    PaymentType
+  status          PaymentStatus
+  transaction_id  String?
+  method_details  Json?
+  created_by_id   String?
+  notes           String?
+  payment_date    DateTime?
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+  target_id       String
+  target_type     PaymentTargetType
+  purpose         PaymentPurpose
+  created_by      User?             @relation("PaymentsCreated", fields: [created_by_id], references: [id])
+  organisation    Organisation?     @relation(fields: [organisation_id], references: [id])
+  user            User              @relation("PaymentsMade", fields: [user_id], references: [id])
+  PrivateCourse   PrivateCourse[]
+
+  @@index([target_type, target_id])
+  @@index([user_id, target_type])
+  @@index([organisation_id, target_type])
+  @@index([status, target_type])
+  @@index([created_at])
+  @@map("payments")
+}
+
+model Plan {
+  id                String         @id @default(uuid())
+  organisation_id   String
+  name              String
+  slug              String         @unique
+  description       String?
+  price             Decimal
+  duration_days     Int
+  max_sessions      Int?
+  recurrence        Recurrence     @default(none)
+  is_visible        Boolean        @default(true)
+  stripe_product_id String?
+  target_audience   TargetAudience
+  created_at        DateTime       @default(now())
+  updated_at        DateTime       @updatedAt
+  deleted_at        DateTime?
+  organisation      Organisation   @relation(fields: [organisation_id], references: [id])
+  subscriptions     Subscription[]
+
+  @@index([organisation_id, is_visible])
+  @@map("plans")
+}
+
+model Subscription {
+  id                     String             @id @default(uuid())
+  user_id                String
+  plan_id                String
+  organisation_id        String
+  status                 SubscriptionStatus @default(active)
+  start_date             DateTime
+  end_date               DateTime
+  remaining_sessions     Int?
+  stripe_subscription_id String?
+  is_recurring           Boolean            @default(true)
+  cancelled_at           DateTime?
+  created_at             DateTime           @default(now())
+  updated_at             DateTime           @updatedAt
+  deleted_at             DateTime?
+  Invoice                Invoice[]
+  organisation           Organisation       @relation(fields: [organisation_id], references: [id])
+  plan                   Plan               @relation(fields: [plan_id], references: [id])
+  user                   User               @relation(fields: [user_id], references: [id])
+
+  @@index([user_id, status])
+  @@index([organisation_id, status])
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id                String         @id @default(uuid())
+  invoice_number    String         @unique
+  user_id           String
+  organisation_id   String?
+  membership_id     String?
+  subscription_id   String?
+  event_id          String?
+  private_course_id String?
+  total_amount      Decimal
+  currency          String         @default("EUR")
+  issued_at         DateTime       @default(now())
+  due_date          DateTime?
+  status            InvoiceStatus  @default(pending)
+  notes             String?
+  created_at        DateTime       @default(now())
+  deleted_at        DateTime?
+  updated_at        DateTime       @updatedAt
+  event             Event?         @relation(fields: [event_id], references: [id])
+  membership        Membership?    @relation(fields: [membership_id], references: [id])
+  organisation      Organisation?  @relation(fields: [organisation_id], references: [id])
+  private_course    PrivateCourse? @relation(fields: [private_course_id], references: [id])
+  subscription      Subscription?  @relation(fields: [subscription_id], references: [id])
+  user              User           @relation(fields: [user_id], references: [id])
+
+  @@index([user_id, status])
+  @@index([organisation_id, status])
+  @@map("invoices")
+}
+
+model Attendance {
+  id                String           @id @default(uuid())
+  user_id           String
+  event_id          String
+  status            AttendanceStatus @default(present)
+  checked_in_by     String?
+  performance_notes String?
+  score             Decimal?         @db.Decimal(5, 2)
+  type              AttendanceType   @default(manual)
+  comment           String?
+  created_at        DateTime         @default(now())
+  checker           User?            @relation("AttendanceCheckedBy", fields: [checked_in_by], references: [id])
+  event             Event            @relation(fields: [event_id], references: [id])
+  user              User             @relation("UserAttendances", fields: [user_id], references: [id])
+
+  @@unique([user_id, event_id])
+  @@index([event_id, status])
+  @@map("attendances")
+}
+
+model AvailabilitySlot {
+  id           String           @id @default(uuid())
+  user_id      String
+  visibility   Visibility       @default(private)
+  comment      String?
+  created_by   String
+  created_at   DateTime         @default(now())
+  day_of_week  Int
+  deleted_at   DateTime?
+  end_time     String
+  eventId      String?
+  is_recurring Boolean          @default(true)
+  slot_type    AvailabilityType
+  start_time   String
+  updated_at   DateTime         @updatedAt
+  valid_from   DateTime         @default(now())
+  valid_until  DateTime?
+  creator      User             @relation("AvailabilityCreatedBy", fields: [created_by], references: [id])
+  Event        Event?           @relation(fields: [eventId], references: [id])
+  user         User             @relation("UserAvailabilitySlots", fields: [user_id], references: [id])
+
+  @@index([user_id, day_of_week, slot_type])
+  @@map("availability_slots")
+}
+
+model ConflictCheck {
+  id         String   @id @default(uuid())
+  user_id    String
+  start_time DateTime
+  end_time   DateTime
+  event_type String
+  event_id   String?
+  priority   Int      @default(1)
+  created_at DateTime @default(now())
+  user       User     @relation(fields: [user_id], references: [id])
+
+  @@index([user_id, start_time, end_time])
+  @@map("conflict_checks")
+}
+
+model Penalty {
+  id                String         @id @default(uuid())
+  user_id           String
+  type              PenaltyType
+  related_course_id String?
+  description       String
+  points            Int
+  issued_at         DateTime       @default(now())
+  resolved          Boolean        @default(false)
+  amount            Decimal?
+  related_course    PrivateCourse? @relation(fields: [related_course_id], references: [id])
+  user              User           @relation(fields: [user_id], references: [id])
+
+  @@index([user_id, resolved])
+  @@map("penalties")
+}
+
+enum Gender {
+  male
+  female
+  prefer_not_to_say
+}
+
+enum UserStatus {
+  active
+  suspended
+  pending
+  locked
 }
 
 enum MembershipStatus {
@@ -132,45 +542,6 @@ enum MembershipPaymentStatus {
   overdue
 }
 
-model Organisation {
-  id            String             @id @default(uuid())
-  name          String
-  slug          String             @unique
-  description   String?
-  logo_url      String?
-  type          OrganisationType
-  address       String?
-  city          String?
-  zip_code      String?
-  country       String?
-  latitude      Float?
-  longitude     Float?
-  email         String?
-  phone         String?
-  website_url   String?
-  member_limit  Int? // facultatif : permet de limiter combien de membres actifs une structure peut avoir
-  is_public     Boolean            @default(true)
-  status        OrganisationStatus @default(active)
-  created_by_id String
-  created_at    DateTime           @default(now())
-  updated_at    DateTime           @updatedAt
-  deleted_at    DateTime?
-
-  // Relations
-  created_by    User                   @relation(fields: [created_by_id], references: [id])
-  memberships   Membership[]
-  events        Event[]
-  document      Document[]
-  categories    OrganisationCategory[]
-  listings      Listing[]
-  Payment       Payment[]
-  plans         Plan[]
-  subscriptions Subscription[]
-  Invoice       Invoice[]
-
-  @@map("organisations")
-}
-
 enum OrganisationType {
   sport
   culture
@@ -185,30 +556,6 @@ enum OrganisationStatus {
   pending_validation
 }
 
-model Category {
-  id                 String       @id @default(uuid())
-  name               String
-  type               CategoryType
-  description        String?
-  icon               String? // Icône pour l'UI
-  color              String? // Couleur hex pour l'UI
-  parent_category_id String?
-  is_active          Boolean      @default(true)
-  sort_order         Int          @default(0)
-  created_at         DateTime     @default(now())
-  updated_at         DateTime     @updatedAt
-  deleted_at         DateTime?
-
-  parent_category   Category?              @relation("CategoryToParent", fields: [parent_category_id], references: [id])
-  subcategories     Category[]             @relation("CategoryToParent")
-  organisationLinks OrganisationCategory[]
-  events            EventCategory[]
-  listings          ListingCategory[]
-
-  @@index([type, is_active])
-  @@map("categories")
-}
-
 enum CategoryType {
   sport
   wellbeing
@@ -218,77 +565,6 @@ enum CategoryType {
   languages
   career
   other
-}
-
-model EventCategory {
-  event_id    String
-  category_id String
-
-  event    Event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
-  category Category @relation(fields: [category_id], references: [id], onDelete: Cascade)
-
-  @@id([event_id, category_id])
-  @@map("event_categories")
-}
-
-model ListingCategory {
-  listing_id  String
-  category_id String
-
-  listing  Listing  @relation(fields: [listing_id], references: [id], onDelete: Cascade)
-  category Category @relation(fields: [category_id], references: [id], onDelete: Cascade)
-
-  @@id([listing_id, category_id])
-  @@map("listing_categories")
-}
-
-model OrganisationCategory {
-  organisation_id String
-  category_id     String
-
-  organisation Organisation @relation(fields: [organisation_id], references: [id])
-  category     Category     @relation(fields: [category_id], references: [id])
-
-  @@id([organisation_id, category_id])
-  @@map("organisation_categories")
-}
-
-model Event {
-  id                    String          @id @default(uuid())
-  organisation_id       String
-  linked_listing_id     String? // nullable, FK vers listings (à créer ou déjà existant)
-  title                 String
-  description           String?
-  event_type            EventType
-  start_time            DateTime
-  end_time              DateTime
-  location              String?
-  created_by_id         String
-  visibility            EventVisibility
-  capacity              Int?
-  registration_required Boolean         @default(false)
-  price                 Float           @default(0)
-  is_recurring          Boolean         @default(false)
-  recurrence_pattern    String?
-  status                EventStatus     @default(draft)
-  cover_url             String?
-  created_at            DateTime        @default(now())
-  updated_at            DateTime        @updatedAt
-  deleted_at            DateTime?
-
-  // Relations
-  organisation     Organisation       @relation(fields: [organisation_id], references: [id])
-  linked_listing   Listing?           @relation(fields: [linked_listing_id], references: [id])
-  created_by       User               @relation("EventCreatedBy", fields: [created_by_id], references: [id])
-  Reservation      Reservation[]
-  Invoice          Invoice[]
-  Attendance       Attendance[]
-  AvailabilitySlot AvailabilitySlot[]
-  EventCategory    EventCategory[]
-
-  @@index([organisation_id, start_time])
-  @@index([start_time, end_time, status])
-  @@map("events")
 }
 
 enum EventType {
@@ -311,67 +587,9 @@ enum EventStatus {
   cancelled
 }
 
-model Listing {
-  id               String            @id @default(uuid())
-  user_id          String
-  organisation_id  String? // nullable, si lié à un club
-  title            String
-  description      String?
-  price_per_hour   Float
-  session_duration Int // en minutes
-  is_online        Boolean           @default(false)
-  visibility       ListingVisibility @default(public)
-  available_from   DateTime? // plage horaire début (tu as noté "time" mais Prisma gère DateTime)
-  available_to     DateTime? // plage horaire fin
-  languages        String[] // tableau de langues, ex: ["fr", "en"]
-  specialities     String[] // ex: ["jiu-jitsu", "stress management"]
-  created_at       DateTime          @default(now())
-  updated_at       DateTime          @updatedAt
-  deleted_at       DateTime?
-
-  // Relations
-  user            User              @relation(fields: [user_id], references: [id])
-  organisation    Organisation?     @relation(fields: [organisation_id], references: [id])
-  events          Event[]
-  privateCourses  PrivateCourse[]
-  ListingCategory ListingCategory[]
-
-  @@index([user_id, visibility])
-  @@map("listings")
-}
-
 enum ListingVisibility {
   public
   hidden
-}
-
-model PrivateCourse {
-  id         String              @id @default(uuid())
-  tutor_id   String
-  student_id String
-  listing_id String
-  start_time DateTime
-  end_time   DateTime
-  location   String
-  status     PrivateCourseStatus @default(pending)
-  notes      String?
-  payment    Payment?            @relation(fields: [paymentId], references: [id])
-  rating     Float? // note par l’élève, nullable          
-  created_at DateTime            @default(now())
-  updated_at DateTime            @updatedAt
-  deleted_at DateTime?
-
-  // Relations
-  tutor     User      @relation("TutorCourses", fields: [tutor_id], references: [id])
-  student   User      @relation("StudentCourses", fields: [student_id], references: [id])
-  listing   Listing   @relation(fields: [listing_id], references: [id])
-  Invoice   Invoice[]
-  Penalty   Penalty[]
-  paymentId String?
-
-  @@index([tutor_id, status])
-  @@index([student_id, status])
-  @@map("private_courses")
 }
 
 enum PrivateCourseStatus {
@@ -379,32 +597,6 @@ enum PrivateCourseStatus {
   confirmed
   cancelled
   completed
-}
-
-model Document {
-  id               String         @id @default(uuid())
-  user_id          String
-  organisation_id  String?
-  type             DocumentType
-  url              String
-  doc_key          String
-  file_name        String
-  file_type        String // ex: pdf, jpg
-  status           DocumentStatus @default(pending)
-  comment          String?
-  expiration_date  DateTime?
-  uploaded_at      DateTime       @default(now())
-  validated_by_id  String?
-  last_reviewed_at DateTime?
-  deleted_at       DateTime?
-
-  // Relations
-  user         User          @relation(fields: [user_id], references: [id])
-  organisation Organisation? @relation(fields: [organisation_id], references: [id])
-  validated_by User?         @relation("DocumentValidatedBy", fields: [validated_by_id], references: [id])
-
-  @@index([user_id, type, status])
-  @@map("documents")
 }
 
 enum DocumentType {
@@ -420,91 +612,38 @@ enum DocumentStatus {
   rejected
 }
 
-model Reservation {
-  id            String            @id @default(uuid())
-  membership_id String // Permet de savoir sous quelle asso il a réservé
-  event_id      String
-  status        ReservationStatus @default(pending)
-  payment_id    String? // Paiement associé s'il y a
-  note          String?
-  rating        Float?
-  created_at    DateTime          @default(now())
-  updated_at    DateTime          @updatedAt
-  deleted_at    DateTime?
-
-  // Relations
-  membership Membership @relation(fields: [membership_id], references: [id])
-  event      Event      @relation(fields: [event_id], references: [id])
-
-  @@unique([membership_id, event_id])
-  @@index([event_id, status])
-  @@map("reservations")
-}
-
 enum ReservationStatus {
-  pending // Réservation en attente (place non confirmée)
-  confirmed // Place réservée
-  cancelled // Annulée par le membre ou un admin
-  attended // Présent à l’événement
-  missed // Absent sans annulation
-}
-
-model Payment {
-  id              String            @id @default(uuid())
-  user_id         String
-  organisation_id String?
-  amount          Decimal
-  currency        String            @default("EUR")
-  target_type     PaymentTargetType
-  target_id       String
-  purpose         PaymentPurpose
-  payment_type    PaymentType
-  status          PaymentStatus
-  transaction_id  String?
-  method_details  Json?
-  created_by_id   String?
-  notes           String?
-  payment_date    DateTime?
-  created_at      DateTime          @default(now())
-  updated_at      DateTime          @updatedAt
-
-  user          User            @relation("PaymentsMade", fields: [user_id], references: [id])
-  organisation  Organisation?   @relation(fields: [organisation_id], references: [id])
-  created_by    User?           @relation("PaymentsCreated", fields: [created_by_id], references: [id])
-  PrivateCourse PrivateCourse[]
-
-  @@index([target_type, target_id])
-  @@index([user_id, target_type])
-  @@index([organisation_id, target_type])
-  @@index([status, target_type])
-  @@index([created_at])
-  @@map("payments")
+  pending
+  confirmed
+  cancelled
+  attended
+  missed
 }
 
 enum PaymentTargetType {
-  membership // Paiement d'adhésion
-  event // Paiement d'événement
-  private_course // Paiement cours privé
-  subscription // Paiement abonnement
-  penalty // Paiement d'amende/pénalité
-  invoice // Paiement de facture
-  plan // Paiement de plan/abonnement
-  manual // Paiement libre/divers
+  membership
+  event
+  private_course
+  subscription
+  penalty
+  invoice
+  plan
+  manual
 }
 
 enum PaymentPurpose {
-  membership_fee // Cotisation annuelle
-  event_participation // Participation à un événement
-  private_lesson // Cours particulier
-  subscription_fee // Abonnement mensuel/annuel
-  penalty_fee // Amende/pénalité
-  equipment_rental // Location matériel
-  registration_fee // Frais d'inscription
-  late_fee // Frais de retard
-  cancellation_fee // Frais d'annulation
-  refund // Remboursement
-  discount // Remise/réduction
-  deposit // Acompte/caution
+  membership_fee
+  event_participation
+  private_lesson
+  subscription_fee
+  penalty_fee
+  equipment_rental
+  registration_fee
+  late_fee
+  cancellation_fee
+  refund
+  discount
+  deposit
   other
 }
 
@@ -513,8 +652,8 @@ enum PaymentType {
   cash
   transfer
   cheque
-  paypal
   other
+  paypal
 }
 
 enum PaymentStatus {
@@ -523,30 +662,6 @@ enum PaymentStatus {
   failed
   refunded
   cancelled
-}
-
-model Plan {
-  id                String         @id @default(uuid())
-  organisation_id   String
-  name              String
-  slug              String         @unique
-  description       String?
-  price             Decimal
-  duration_days     Int
-  max_sessions      Int?
-  recurrence        Recurrence     @default(none)
-  is_visible        Boolean        @default(true)
-  stripe_product_id String?
-  target_audience   TargetAudience
-  created_at        DateTime       @default(now())
-  updated_at        DateTime       @updatedAt
-  deleted_at        DateTime?
-
-  organisation  Organisation   @relation(fields: [organisation_id], references: [id])
-  subscriptions Subscription[]
-
-  @@index([organisation_id, is_visible])
-  @@map("plans")
 }
 
 enum Recurrence {
@@ -562,32 +677,6 @@ enum TargetAudience {
   tutor
 }
 
-model Subscription {
-  id                     String             @id @default(uuid())
-  user_id                String
-  plan_id                String
-  organisation_id        String
-  status                 SubscriptionStatus @default(active)
-  start_date             DateTime
-  end_date               DateTime
-  remaining_sessions     Int?
-  stripe_subscription_id String?
-  is_recurring           Boolean            @default(true)
-  cancelled_at           DateTime?
-  created_at             DateTime           @default(now())
-  updated_at             DateTime           @updatedAt
-  deleted_at             DateTime?
-
-  user         User         @relation(fields: [user_id], references: [id])
-  plan         Plan         @relation(fields: [plan_id], references: [id])
-  organisation Organisation @relation(fields: [organisation_id], references: [id])
-  Invoice      Invoice[]
-
-  @@index([user_id, status])
-  @@index([organisation_id, status])
-  @@map("subscriptions")
-}
-
 enum SubscriptionStatus {
   active
   paused
@@ -595,64 +684,11 @@ enum SubscriptionStatus {
   expired
 }
 
-model Invoice {
-  id                String        @id @default(uuid())
-  invoice_number    String        @unique // numéro unique de facture, ex: INV-2025-0001
-  user_id           String
-  organisation_id   String? // si liée à une organisation
-  membership_id     String? // si liée à une adhésion
-  subscription_id   String? // si liée à un abonnement
-  event_id          String? // si liée à un événement
-  private_course_id String? // si liée à un cours privé
-  total_amount      Decimal
-  currency          String        @default("EUR")
-  issued_at         DateTime      @default(now())
-  due_date          DateTime?
-  status            InvoiceStatus @default(pending) // pending, paid, overdue, cancelled
-  notes             String?
-  created_at        DateTime      @default(now())
-  updated_at        DateTime      @updatedAt
-  deleted_at        DateTime?
-
-  // Relations
-  user           User           @relation(fields: [user_id], references: [id])
-  organisation   Organisation?  @relation(fields: [organisation_id], references: [id])
-  membership     Membership?    @relation(fields: [membership_id], references: [id])
-  subscription   Subscription?  @relation(fields: [subscription_id], references: [id])
-  event          Event?         @relation(fields: [event_id], references: [id])
-  private_course PrivateCourse? @relation(fields: [private_course_id], references: [id])
-
-  @@index([user_id, status])
-  @@index([organisation_id, status])
-  @@map("invoices")
-}
-
 enum InvoiceStatus {
   pending
   paid
   overdue
   cancelled
-}
-
-model Attendance {
-  id                String           @id @default(uuid())
-  user_id           String
-  event_id          String
-  status            AttendanceStatus @default(present)
-  checked_in_by     String? // Validée par un autre utilisateur (coach/admin)
-  performance_notes String?
-  score             Decimal?         @db.Decimal(5, 2)
-  type              AttendanceType   @default(manual)
-  comment           String?
-  created_at        DateTime         @default(now())
-
-  user    User  @relation("UserAttendances", fields: [user_id], references: [id])
-  event   Event @relation(fields: [event_id], references: [id])
-  checker User? @relation("AttendanceCheckedBy", fields: [checked_in_by], references: [id])
-
-  @@unique([user_id, event_id])
-  @@index([event_id, status])
-  @@map("attendances")
 }
 
 enum AttendanceStatus {
@@ -668,77 +704,17 @@ enum AttendanceType {
   auto
 }
 
-model AvailabilitySlot {
-  id           String           @id @default(uuid())
-  user_id      String
-  day_of_week  Int // 0-6 (Dimanche à Samedi)
-  start_time   String // Format "HH:mm" ex: "14:30"
-  end_time     String // Format "HH:mm" ex: "16:00"
-  slot_type    AvailabilityType
-  is_recurring Boolean          @default(true)
-  valid_from   DateTime         @default(now())
-  valid_until  DateTime? // Optionnel pour limiter dans le temps
-  created_by   String
-  visibility   Visibility       @default(private)
-  comment      String?
-  created_at   DateTime         @default(now())
-  updated_at   DateTime         @updatedAt
-  deleted_at   DateTime?
-
-  user    User    @relation("UserAvailabilitySlots", fields: [user_id], references: [id])
-  creator User    @relation("AvailabilityCreatedBy", fields: [created_by], references: [id])
-  Event   Event?  @relation(fields: [eventId], references: [id])
-  eventId String?
-
-  @@index([user_id, day_of_week, slot_type])
-  @@map("availability_slots")
-}
-
 enum AvailabilityType {
-  available // Créneaux libres
-  busy // Créneaux occupés
-  preferred // Créneaux préférés
-  blackout // Créneaux interdits
+  available
+  busy
+  preferred
+  blackout
 }
 
 enum Visibility {
   private
   user_only
   public
-}
-
-model ConflictCheck {
-  id         String   @id @default(uuid())
-  user_id    String
-  start_time DateTime
-  end_time   DateTime
-  event_type String // "event", "private_course", "personal"
-  event_id   String? // ID de l'événement/cours concerné
-  priority   Int      @default(1) // 1=haute, 2=moyenne, 3=basse
-  created_at DateTime @default(now())
-
-  user User @relation(fields: [user_id], references: [id])
-
-  @@index([user_id, start_time, end_time])
-  @@map("conflict_checks")
-}
-
-model Penalty {
-  id                String      @id @default(uuid())
-  user_id           String
-  type              PenaltyType
-  related_course_id String? // FK vers private_courses
-  description       String
-  amount            Decimal?
-  points            Int
-  resolved          Boolean     @default(false)
-  issued_at         DateTime    @default(now())
-
-  user           User           @relation(fields: [user_id], references: [id])
-  related_course PrivateCourse? @relation(fields: [related_course_id], references: [id])
-
-  @@index([user_id, resolved])
-  @@map("penalties")
 }
 
 enum PenaltyType {
