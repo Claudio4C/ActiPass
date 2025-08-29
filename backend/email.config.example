@@ -1,0 +1,22 @@
+# Email Configuration Example
+# Copy this to your .env file
+
+# Email Provider (choose one)
+EMAIL_PROVIDER="resend" # Options: resend, sendgrid, gmail, console
+EMAIL_FROM="noreply@saasassos.com"
+
+# Resend (Recommended - Free tier: 100 emails/day)
+# Sign up at: https://resend.com
+RESEND_API_KEY="your_resend_api_key_here"
+
+# SendGrid (Alternative)
+# Sign up at: https://sendgrid.com
+SENDGRID_API_KEY="your_sendgrid_api_key_here"
+
+# Gmail (Alternative - requires app password)
+# Enable 2FA and generate app password
+GMAIL_USER="your_gmail@gmail.com"
+GMAIL_APP_PASSWORD="your_gmail_app_password"
+
+# Frontend URL for email links
+FRONTEND_URL="http://localhost:5173"
