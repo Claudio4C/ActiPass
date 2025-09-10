@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 import {
   Injectable,
   UnauthorizedException,
@@ -218,6 +217,9 @@ export class AuthService {
         email_verification_expires: null,
       },
     });
+
+    // Envoyer l'email de bienvenue après vérification
+    await this.emailService.sendWelcomeEmail(user.email, user.firstname);
 
     return { message: 'Email verified successfully' };
   }
