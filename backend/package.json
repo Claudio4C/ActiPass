@@ -12,6 +12,9 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
+    "dev": "nest start --watch",
+    "dev:club": "ts-node scripts/dev-spaces.ts club",
+    "dev:municipality": "ts-node scripts/dev-spaces.ts municipality",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -19,7 +22,11 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:security": "jest --testPathPattern=auth/security --verbose",
-    "test:email": "ts-node src/email/test-email.ts"
+    "test:email": "ts-node src/email/test-email.ts",
+    "test:system": "ts-node scripts/test-system-final.ts",
+    "db:migrate": "npx prisma migrate dev",
+    "db:seed": "ts-node prisma/seed-roles-permissions.ts",
+    "db:reset": "npx prisma migrate reset && npm run db:seed"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
