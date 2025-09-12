@@ -28,7 +28,7 @@ export class PermissionsService {
     const userMemberships = await this.prisma.membership.findMany({
       where: {
         user_id: userId,
-        status: 'active',
+        left_at: null, // Actif si left_at est null
         ...(organisationId && { organisation_id: organisationId }),
       },
       include: {
@@ -72,7 +72,7 @@ export class PermissionsService {
     const userMemberships = await this.prisma.membership.findMany({
       where: {
         user_id: userId,
-        status: 'active',
+        left_at: null, // Actif si left_at est null
         role: {
           space: space,
         },
@@ -114,7 +114,7 @@ export class PermissionsService {
     const userMemberships = await this.prisma.membership.findMany({
       where: {
         user_id: userId,
-        status: 'active',
+        left_at: null, // Actif si left_at est null
         ...(organisationId && { organisation_id: organisationId }),
       },
       include: {
@@ -152,7 +152,7 @@ export class PermissionsService {
       where: {
         user_id: userId,
         organisation_id: organisationId,
-        status: 'active',
+        left_at: null, // Actif si left_at est null
       },
       include: {
         role: true,

@@ -246,6 +246,43 @@ async function seedRolesAndPermissions() {
       scope: 'global',
     },
 
+    // 6.7.1 Gestion des Organisations
+    {
+      name: 'Lire les organisations',
+      slug: 'organisation:read',
+      resource: 'organisation',
+      action: 'read',
+      scope: 'organisation',
+    },
+    {
+      name: 'Créer des organisations',
+      slug: 'organisation:create',
+      resource: 'organisation',
+      action: 'create',
+      scope: 'global',
+    },
+    {
+      name: 'Modifier les organisations',
+      slug: 'organisation:update',
+      resource: 'organisation',
+      action: 'update',
+      scope: 'own',
+    },
+    {
+      name: 'Supprimer les organisations',
+      slug: 'organisation:delete',
+      resource: 'organisation',
+      action: 'delete',
+      scope: 'own',
+    },
+    {
+      name: 'Gérer les organisations',
+      slug: 'organisation:manage',
+      resource: 'organisation',
+      action: 'manage',
+      scope: 'own',
+    },
+
     // 6.8 Reporting & Exports
     {
       name: 'Consulter les rapports',
@@ -339,6 +376,7 @@ async function seedRolesAndPermissions() {
         'role:assign',
         'auth:manage',
         'audit:read',
+        'organisation:*',
       ],
     },
     {
