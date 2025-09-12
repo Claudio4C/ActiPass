@@ -1,17 +1,21 @@
 import { Controller, Get, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
 import { Request } from 'express';
 
-import { RequireManage } from '../auth/decorators/permissions.decorator';
+import { SuperAdminOrPermissions } from '../auth/decorators/super-admin-or-permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { PermissionsGuard } from '../auth/guards/permissions.guard';
+import { SuperAdminOrPermissionsGuard } from '../auth/guards/super-admin-or-permissions.guard';
+import { SuperAdminService } from '../auth/super-admin.service';
 
 import { UpdateUserDto } from './dto';
 import { UsersService } from './users.service';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, SuperAdminOrPermissionsGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly superAdminService: SuperAdminService
+  ) {}
 
   /**
    * Récupérer mon profil
@@ -62,10 +66,10 @@ export class UsersController {
   }
 
   /**
-   * Récupérer un utilisateur spécifique (admin seulement)
+   * Récupérer un utilisateur spécifique (Super Admin ou admin seulement)
    */
   @Get(':id')
-  @RequireManage('user', 'organisation')
+  @SuperAdminOrPermissions('user', 'read', 'organisation')
   async getUser(@Param('id') id: string, @Req() req: Request) {
     const userId = req.user?.['sub'] as string;
     if (!userId) {
@@ -75,10 +79,10 @@ export class UsersController {
   }
 
   /**
-   * Modifier un utilisateur (admin seulement)
+   * Modifier un utilisateur (Super Admin ou admin seulement)
    */
   @Put(':id')
-  @RequireManage('user', 'organisation')
+  @SuperAdminOrPermissions('user', 'update', 'organisation')
   async updateUser(
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserDto,
@@ -92,10 +96,10 @@ export class UsersController {
   }
 
   /**
-   * Supprimer un utilisateur (admin seulement)
+   * Supprimer un utilisateur (Super Admin ou admin seulement)
    */
   @Delete(':id')
-  @RequireManage('user', 'organisation')
+  @SuperAdminOrPermissions('user', 'delete', 'organisation')
   async deleteUser(@Param('id') id: string, @Req() req: Request) {
     const userId = req.user?.['sub'] as string;
     if (!userId) {
@@ -105,10 +109,10 @@ export class UsersController {
   }
 
   /**
-   * Récupérer les permissions d'un utilisateur (admin seulement)
+   * Récupérer les permissions d'un utilisateur (Super Admin ou admin seulement)
    */
   @Get(':id/permissions')
-  @RequireManage('user', 'organisation')
+  @SuperAdminOrPermissions('user', 'read', 'organisation')
   async getUserPermissions(@Param('id') id: string, @Req() req: Request) {
     const userId = req.user?.['sub'] as string;
     if (!userId) {

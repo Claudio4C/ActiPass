@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 
+import { SuperAdminService } from '../auth/super-admin.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { User, SafeUser } from '../types/user.types';
 
@@ -7,7 +8,10 @@ import { UpdateUserDto } from './dto';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly superAdminService: SuperAdminService
+  ) {}
 
   async findById(id: string): Promise<User | null> {
     return this.prisma.user.findUnique({
@@ -183,21 +187,26 @@ export class UsersService {
    * Récupérer un utilisateur spécifique (admin)
    */
   async getUser(userId: string, requesterId: string) {
-    // Vérifier que le demandeur a le droit de voir cet utilisateur
-    const requesterMembership = await this.prisma.membership.findFirst({
-      where: {
-        user_id: requesterId,
-        left_at: null,
-        role: {
-          type: {
-            in: ['club_owner', 'municipal_manager'] as ('club_owner' | 'municipal_manager')[],
+    // Vérifier si le demandeur est Super Admin
+    const isSuperAdmin = await this.superAdminService.isSuperAdmin(requesterId);
+
+    if (!isSuperAdmin) {
+      // Vérifier que le demandeur a le droit de voir cet utilisateur
+      const requesterMembership = await this.prisma.membership.findFirst({
+        where: {
+          user_id: requesterId,
+          left_at: null,
+          role: {
+            type: {
+              in: ['club_owner', 'municipal_manager'] as ('club_owner' | 'municipal_manager')[],
+            },
           },
         },
-      },
-    });
+      });
 
-    if (!requesterMembership) {
-      throw new ForbiddenException("Vous n'avez pas le droit de voir cet utilisateur");
+      if (!requesterMembership) {
+        throw new ForbiddenException("Vous n'avez pas le droit de voir cet utilisateur");
+      }
     }
 
     const user = await this.prisma.user.findUnique({
@@ -247,21 +256,26 @@ export class UsersService {
    * Modifier un utilisateur (admin)
    */
   async updateUser(userId: string, updateUserDto: UpdateUserDto, requesterId: string) {
-    // Vérifier que le demandeur a le droit de modifier cet utilisateur
-    const requesterMembership = await this.prisma.membership.findFirst({
-      where: {
-        user_id: requesterId,
-        left_at: null,
-        role: {
-          type: {
-            in: ['club_owner', 'municipal_manager'] as ('club_owner' | 'municipal_manager')[],
+    // Vérifier si le demandeur est Super Admin
+    const isSuperAdmin = await this.superAdminService.isSuperAdmin(requesterId);
+
+    if (!isSuperAdmin) {
+      // Vérifier que le demandeur a le droit de modifier cet utilisateur
+      const requesterMembership = await this.prisma.membership.findFirst({
+        where: {
+          user_id: requesterId,
+          left_at: null,
+          role: {
+            type: {
+              in: ['club_owner', 'municipal_manager'] as ('club_owner' | 'municipal_manager')[],
+            },
           },
         },
-      },
-    });
+      });
 
-    if (!requesterMembership) {
-      throw new ForbiddenException("Vous n'avez pas le droit de modifier cet utilisateur");
+      if (!requesterMembership) {
+        throw new ForbiddenException("Vous n'avez pas le droit de modifier cet utilisateur");
+      }
     }
 
     const user = await this.prisma.user.findUnique({
@@ -287,21 +301,26 @@ export class UsersService {
    * Supprimer un utilisateur (admin)
    */
   async deleteUser(userId: string, requesterId: string) {
-    // Vérifier que le demandeur a le droit de supprimer cet utilisateur
-    const requesterMembership = await this.prisma.membership.findFirst({
-      where: {
-        user_id: requesterId,
-        left_at: null,
-        role: {
-          type: {
-            in: ['club_owner', 'municipal_manager'] as ('club_owner' | 'municipal_manager')[],
+    // Vérifier si le demandeur est Super Admin
+    const isSuperAdmin = await this.superAdminService.isSuperAdmin(requesterId);
+
+    if (!isSuperAdmin) {
+      // Vérifier que le demandeur a le droit de supprimer cet utilisateur
+      const requesterMembership = await this.prisma.membership.findFirst({
+        where: {
+          user_id: requesterId,
+          left_at: null,
+          role: {
+            type: {
+              in: ['club_owner', 'municipal_manager'] as ('club_owner' | 'municipal_manager')[],
+            },
           },
         },
-      },
-    });
+      });
 
-    if (!requesterMembership) {
-      throw new ForbiddenException("Vous n'avez pas le droit de supprimer cet utilisateur");
+      if (!requesterMembership) {
+        throw new ForbiddenException("Vous n'avez pas le droit de supprimer cet utilisateur");
+      }
     }
 
     const user = await this.prisma.user.findUnique({
