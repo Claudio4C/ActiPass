@@ -8,8 +8,11 @@ import { EmailModule } from '../email/email.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { UsersModule } from '../users/users.module';
 
+import { ABACService } from './abac.service';
+import { AuditService } from './audit.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { PermissionsService } from './permissions.service';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
@@ -44,7 +47,15 @@ import { LocalStrategy } from './strategies/local.strategy';
     PrismaModule,
   ],
   controllers: [AuthController],
-  providers: [AuthService, LocalStrategy, JwtStrategy, JwtRefreshStrategy],
-  exports: [AuthService],
+  providers: [
+    AuthService,
+    ABACService,
+    AuditService,
+    PermissionsService,
+    LocalStrategy,
+    JwtStrategy,
+    JwtRefreshStrategy,
+  ],
+  exports: [AuthService, ABACService, AuditService, PermissionsService],
 })
 export class AuthModule {}

@@ -16,7 +16,7 @@ interface PermissionRequirement extends PermissionCheck {
 }
 
 interface AuthenticatedUser {
-  id: string;
+  sub: string;
   email: string;
   [key: string]: unknown;
 }
@@ -45,7 +45,7 @@ export class PermissionsGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<RequestWithUser>();
     const user = request.user;
 
-    if (!user || !user.id) {
+    if (!user || !user.sub) {
       throw new UnauthorizedException('User not authenticated');
     }
 
@@ -55,7 +55,7 @@ export class PermissionsGuard implements CanActivate {
     // Vérifier chaque permission requise
     for (const permission of requiredPermissions) {
       const hasPermission = await this.permissionsService.hasPermission(
-        user.id,
+        user.sub,
         permission,
         organisationId
       );
@@ -64,7 +64,7 @@ export class PermissionsGuard implements CanActivate {
         // Si une permission spécifique à un espace est requise, vérifier dans cet espace
         if (permission.space) {
           const hasPermissionInSpace = await this.permissionsService.hasPermissionInSpace(
-            user.id,
+            user.sub,
             permission,
             permission.space,
             organisationId
