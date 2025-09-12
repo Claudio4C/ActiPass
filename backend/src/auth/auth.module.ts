@@ -12,10 +12,13 @@ import { ABACService } from './abac.service';
 import { AuditService } from './audit.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { SuperAdminOrPermissionsGuard } from './guards/super-admin-or-permissions.guard';
 import { PermissionsService } from './permissions.service';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalStrategy } from './strategies/local.strategy';
+import { SuperAdminController } from './super-admin.controller';
+import { SuperAdminService } from './super-admin.service';
 
 @Module({
   imports: [
@@ -46,16 +49,25 @@ import { LocalStrategy } from './strategies/local.strategy';
     EmailModule,
     PrismaModule,
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, SuperAdminController],
   providers: [
     AuthService,
     ABACService,
     AuditService,
     PermissionsService,
+    SuperAdminService,
+    SuperAdminOrPermissionsGuard,
     LocalStrategy,
     JwtStrategy,
     JwtRefreshStrategy,
   ],
-  exports: [AuthService, ABACService, AuditService, PermissionsService],
+  exports: [
+    AuthService,
+    ABACService,
+    AuditService,
+    PermissionsService,
+    SuperAdminService,
+    SuperAdminOrPermissionsGuard,
+  ],
 })
 export class AuthModule {}
