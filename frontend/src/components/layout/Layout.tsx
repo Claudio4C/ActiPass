@@ -11,10 +11,18 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, title, subtitle, mode }) => {
-    const { user, logout } = useAuth();
+    const { user, logout, isLoading } = useAuth();
+    const [isLoggingOut, setIsLoggingOut] = React.useState(false);
 
-    const handleLogout = () => {
-        logout();
+    const handleLogout = async () => {
+        setIsLoggingOut(true);
+        try {
+            await logout();
+        } catch (error) {
+            console.error('Logout failed:', error);
+        } finally {
+            setIsLoggingOut(false);
+        }
     };
 
     const isClubMode = mode === 'club';
@@ -59,8 +67,9 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle, mode }) => {
                                 mode={mode}
                                 icon={LogOut}
                                 onClick={handleLogout}
+                                disabled={isLoggingOut || isLoading}
                             >
-                                Déconnexion
+                                {isLoggingOut ? 'Déconnexion...' : 'Déconnexion'}
                             </Button>
                         </div>
                     </div>

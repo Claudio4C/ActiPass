@@ -16,8 +16,10 @@ export interface AuthContextType {
   setMode: (mode: AppMode) => void;
   login: (email: string, password: string) => Promise<void>;
   register: (userData: RegisterData) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   isLoading: boolean;
+  error: string | null;
+  clearError: () => void;
 }
 
 export interface RegisterData {
@@ -27,7 +29,6 @@ export interface RegisterData {
   password: string;
   confirmPassword: string;
   username: string;
-  organizationName: string;
   phone?: string;
   mode: AppMode;
   acceptTerms: boolean;

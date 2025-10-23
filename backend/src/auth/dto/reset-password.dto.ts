@@ -6,7 +6,6 @@ const PASSWORD_ERROR_MESSAGE =
 
 export const ResetPasswordSchema = z
   .object({
-    userId: z.uuid(),
     token: z.string().min(1, 'Token requis'),
     newPassword: z
       .string()

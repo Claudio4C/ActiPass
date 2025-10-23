@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import type { AuthContextType, AppMode, User, RegisterData } from '../types';
+import { authService } from '../services/auth.service';
+import { ApiError, NetworkError } from '../lib/errors';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -9,84 +11,146 @@ interface AuthProviderProps {
     initialMode?: AppMode;
 }
 
+const getInitialMode = (fallback: AppMode): AppMode => {
+    const urlMode = window.location.pathname.includes('/municipalite') ? 'municipalite' : 'club';
+    const savedMode = localStorage.getItem('appMode') as AppMode;
+    return savedMode || urlMode || fallback;
+};
+
 export const AuthProvider: React.FC<AuthProviderProps> = ({
     children,
     initialMode = 'club'
 }) => {
     const [user, setUser] = useState<User | null>(null);
-    const [mode, setMode] = useState<AppMode>(initialMode);
+    const [mode, setMode] = useState<AppMode>(() => getInitialMode(initialMode));
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    // Récupérer le mode depuis l'URL ou le localStorage
+    // Utiliser une ref pour éviter les dépendances cycliques
+    const modeRef = useRef(mode);
+    modeRef.current = mode;
+
+    // Synchroniser le mode avec initialMode SEULEMENT au montage
     useEffect(() => {
-        const urlMode = window.location.pathname.includes('/municipalite') ? 'municipalite' : 'club';
-        const savedMode = localStorage.getItem('appMode') as AppMode;
-        setMode(savedMode || urlMode);
-    }, []);
+        if (initialMode && initialMode !== mode) {
+            setMode(initialMode);
+            localStorage.setItem('appMode', initialMode);
+        }
+    }, [initialMode]); // ⚠️ initialMode ne devrait jamais changer après le montage
 
-    const login = async (email: string, password: string): Promise<void> => {
+    const login = useCallback(async (email: string, password: string): Promise<void> => {
         setIsLoading(true);
+        setError(null);
         try {
-            // TODO: Implémenter l'appel API de connexion
-            console.log('Login attempt:', { email, password, mode });
+            console.log('Login attempt:', { email, password });
 
-            // Simulation d'une connexion réussie
-            const mockUser: User = {
-                id: '1',
-                email,
-                firstName: 'John',
-                lastName: 'Doe',
-                organizationName: mode === 'club' ? 'Tennis Club Paris' : 'Mairie de Paris',
-                phone: '+33 6 12 34 56 78',
-                mode
+            const response = await authService.login({ email, password });
+
+            // Utiliser modeRef pour éviter la dépendance
+            const user: User = {
+                id: response.user.id,
+                email: response.user.email,
+                firstName: response.user.firstname,
+                lastName: response.user.lastname,
+                organizationName: response.user.username,
+                phone: response.user.phone,
+                mode: modeRef.current // ← Utilise la ref au lieu du state
             };
 
-            setUser(mockUser);
-            localStorage.setItem('user', JSON.stringify(mockUser));
+            setUser(user);
+            localStorage.setItem('user', JSON.stringify(user));
         } catch (error) {
             console.error('Login error:', error);
+
+            if (error instanceof ApiError) {
+                if (error.statusCode === 401) {
+                    setError('Email ou mot de passe incorrect');
+                } else if (error.statusCode === 422) {
+                    setError('Les données saisies ne sont pas valides');
+                } else {
+                    setError(error.message);
+                }
+            } else if (error instanceof NetworkError) {
+                setError('Impossible de joindre le serveur. Vérifiez votre connexion.');
+            } else {
+                setError('Une erreur inattendue s\'est produite');
+            }
+
             throw error;
         } finally {
             setIsLoading(false);
         }
-    };
+    }, []); // ← Plus de dépendances !
 
-    const register = async (userData: RegisterData): Promise<void> => {
+    const register = useCallback(async (userData: RegisterData): Promise<void> => {
         setIsLoading(true);
+        setError(null);
         try {
-            // TODO: Implémenter l'appel API d'inscription
             console.log('Register attempt:', userData);
 
-            // Simulation d'une inscription réussie
-            const newUser: User = {
-                id: '1',
+            const registerData = {
                 email: userData.email,
-                firstName: userData.firstName,
-                lastName: userData.lastName,
-                organizationName: userData.organizationName,
+                password: userData.password,
+                confirmPassword: userData.confirmPassword,
+                firstname: userData.firstname,
+                lastname: userData.lastname,
+                username: userData.username,
+                gender: userData.gender || 'prefer_not_to_say',
                 phone: userData.phone,
-                mode: userData.mode
+                birthdate: userData.birthdate,
+                address: userData.address,
+                city: userData.city,
+                country: userData.country,
+                postalCode: userData.postalCode,
+                bio: userData.bio
             };
 
-            setUser(newUser);
-            localStorage.setItem('user', JSON.stringify(newUser));
+            const response = await authService.register(registerData);
+            console.log('Registration successful:', response.message);
+
         } catch (error) {
             console.error('Register error:', error);
+
+            if (error instanceof ApiError) {
+                if (error.statusCode === 409) {
+                    setError('Cette adresse email est déjà utilisée');
+                } else if (error.statusCode === 422) {
+                    setError('Les données saisies ne sont pas valides');
+                } else {
+                    setError(error.message);
+                }
+            } else if (error instanceof NetworkError) {
+                setError('Impossible de joindre le serveur. Vérifiez votre connexion.');
+            } else {
+                setError('Une erreur inattendue s\'est produite');
+            }
+
             throw error;
         } finally {
             setIsLoading(false);
         }
-    };
+    }, []);
 
-    const logout = (): void => {
-        setUser(null);
-        localStorage.removeItem('user');
-    };
+    const logout = useCallback(async (): Promise<void> => {
+        try {
+            await authService.logout();
+        } catch (error) {
+            console.error('Logout error:', error);
+        } finally {
+            setUser(null);
+            setError(null);
+            localStorage.removeItem('user');
+        }
+    }, []);
 
-    const handleSetMode = (newMode: AppMode): void => {
+    const clearError = useCallback((): void => {
+        setError(null);
+    }, []);
+
+    const handleSetMode = useCallback((newMode: AppMode): void => {
         setMode(newMode);
         localStorage.setItem('appMode', newMode);
-    };
+    }, []);
 
     // Vérifier si l'utilisateur est connecté au chargement
     useEffect(() => {
@@ -102,15 +166,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         }
     }, []);
 
-    const value: AuthContextType = {
+    const value: AuthContextType = useMemo(() => ({
         user,
         mode,
         setMode: handleSetMode,
         login,
         register,
         logout,
-        isLoading
-    };
+        isLoading,
+        error,
+        clearError
+    }), [user, mode, login, register, logout, isLoading, error, clearError, handleSetMode]);
 
     return (
         <AuthContext.Provider value={value}>
