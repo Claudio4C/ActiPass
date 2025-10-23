@@ -1,26 +1,27 @@
-import React from 'react'
-import { Link } from 'react-router-dom'
-import { Mail, Lock, User, Phone, Building2, Users, ArrowRight, MessageSquare, BarChart3, Settings } from 'lucide-react'
+import React, { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Mail, Lock, User, Phone, Building2, Users, ArrowRight, MessageSquare, BarChart3, Settings, CheckCircle } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
 import Button from '../../../shared/components/Button'
 import Input from '../../../shared/components/Input'
 import Checkbox from '../../../shared/components/Checkbox'
+import Select from '../../../shared/components/Select'
 import { useFormValidation } from '../../../hooks/useFormValidation'
 import { registerSchema, type RegisterFormData } from '../../../shared/schemas/auth'
 
 const Register: React.FC = () => {
     const { register, isLoading } = useAuth()
+    const navigate = useNavigate()
+    const [isSuccess, setIsSuccess] = useState(false)
 
     const {
         values: formData,
         errors,
-        isValid,
         setValue,
         validate,
         handleBlur,
         handleFocus,
         getFieldError,
-        reset,
     } = useFormValidation<RegisterFormData>({
         schema: registerSchema,
         initialValues: {
@@ -30,7 +31,6 @@ const Register: React.FC = () => {
             password: '',
             confirmPassword: '',
             username: '',
-            organizationName: '',
             phone: undefined,
             mode: 'municipalite',
             acceptTerms: false,
@@ -49,6 +49,11 @@ const Register: React.FC = () => {
         setValue(name as keyof RegisterFormData, type === 'checkbox' ? checked : value)
     }
 
+    const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const { name, value } = e.target
+        setValue(name as keyof RegisterFormData, value)
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
@@ -56,9 +61,10 @@ const Register: React.FC = () => {
 
         try {
             await register(formData)
+            setIsSuccess(true)
         } catch (error) {
             console.error('Registration failed:', error)
-            // TODO: Gérer l'erreur d'inscription
+            // L'erreur est déjà gérée par le contexte d'authentification
         }
     }
 
@@ -84,6 +90,88 @@ const Register: React.FC = () => {
             description: 'Statistiques et analyses en temps réel',
         },
     ]
+
+    // Page de succès après inscription
+    if (isSuccess) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 sm:px-6 lg:px-8">
+                <div className="max-w-md w-full space-y-8">
+                    {/* Success Header */}
+                    <div className="text-center">
+                        <div className="flex justify-center mb-6">
+                            <div className="w-20 h-20 bg-green-100 rounded-2xl flex items-center justify-center">
+                                <CheckCircle className="w-16 h-16 text-green-500" />
+                            </div>
+                        </div>
+                        <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                            Inscription réussie !
+                        </h2>
+                        <p className="text-gray-600">
+                            Vérifiez votre email pour activer votre compte
+                        </p>
+                    </div>
+
+                    {/* Success Card */}
+                    <div className="bg-green-50 border-2 border-green-200 rounded-2xl p-8 text-center">
+                        <h3 className="text-lg font-semibold text-green-800 mb-4">
+                            Email de vérification envoyé
+                        </h3>
+                        <p className="text-green-700 mb-6">
+                            Nous avons envoyé un email de vérification à <strong>{formData.email}</strong>.
+                            Cliquez sur le lien dans l'email pour activer votre compte.
+                        </p>
+
+                        <div className="space-y-4">
+                            <div className="bg-white rounded-lg p-4 border border-green-200">
+                                <h4 className="font-semibold text-gray-900 mb-2">📧 Prochaines étapes :</h4>
+                                <ul className="text-sm text-gray-700 space-y-1 text-left">
+                                    <li>• Vérifiez votre boîte de réception</li>
+                                    <li>• Consultez aussi vos spams</li>
+                                    <li>• Cliquez sur le lien de vérification</li>
+                                    <li>• Connectez-vous à votre compte</li>
+                                </ul>
+                            </div>
+
+                            <div className="space-y-3">
+                                <Button
+                                    onClick={() => navigate('/login')}
+                                    variant="primary"
+                                    size="lg"
+                                    icon={ArrowRight}
+                                    iconPosition="right"
+                                    className="w-full"
+                                >
+                                    Aller à la connexion
+                                </Button>
+
+                                <Button
+                                    onClick={() => navigate('/resend-verification')}
+                                    variant="secondary"
+                                    size="lg"
+                                    className="w-full"
+                                >
+                                    Renvoyer l'email
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Help Section */}
+                    <div className="text-center">
+                        <p className="text-sm text-gray-600">
+                            Pas reçu l'email ?{' '}
+                            <Link
+                                to="/resend-verification"
+                                className="font-medium text-purple-600 hover:text-purple-500 hover:underline"
+                            >
+                                Renvoyer l'email de vérification
+                            </Link>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
@@ -144,18 +232,38 @@ const Register: React.FC = () => {
                                 />
                             </div>
 
-                            {/* Organization name */}
+
+                            {/* Username */}
                             <Input
-                                label="Nom de la municipalité"
+                                label="Nom d'utilisateur"
                                 type="text"
-                                name="organizationName"
-                                value={formData.organizationName}
+                                name="username"
+                                value={formData.username}
                                 onChange={handleInputChange}
-                                onBlur={() => handleBlur('organizationName')}
-                                placeholder="Ex: Mairie de Paris"
-                                icon={Building2}
-                                error={getFieldError('organizationName')}
+                                onBlur={() => handleBlur('username')}
+                                placeholder="Ex: mairieparis"
+                                icon={User}
+                                error={getFieldError('username')}
                                 mode="municipalite"
+                            />
+
+                            {/* Gender */}
+                            <Select
+                                label="Genre"
+                                name="gender"
+                                value={formData.gender}
+                                onChange={handleSelectChange}
+                                onFocus={() => handleFocus('gender')}
+                                onBlur={() => handleBlur('gender')}
+                                placeholder="Sélectionnez votre genre"
+                                error={getFieldError('gender')}
+                                mode="municipalite"
+                                required
+                                options={[
+                                    { value: 'male', label: 'Homme' },
+                                    { value: 'female', label: 'Femme' },
+                                    { value: 'prefer_not_to_say', label: 'Préfère ne pas dire' }
+                                ]}
                             />
 
                             {/* Email */}
@@ -188,30 +296,37 @@ const Register: React.FC = () => {
 
                             {/* Password fields */}
                             <div className="grid grid-cols-2 gap-4">
-                                <Input
-                                    label="Mot de passe"
-                                    type="password"
-                                    name="password"
-                                    value={formData.password}
-                                    onChange={handleInputChange}
-                                    onBlur={() => handleBlur('password')}
-                                    placeholder="••••••••"
-                                    icon={Lock}
-                                    error={getFieldError('password')}
-                                    mode="municipalite"
-                                />
-                                <Input
-                                    label="Confirmer mot de passe"
-                                    type="password"
-                                    name="confirmPassword"
-                                    value={formData.confirmPassword}
-                                    onChange={handleInputChange}
-                                    onBlur={() => handleBlur('confirmPassword')}
-                                    placeholder="••••••••"
-                                    icon={Lock}
-                                    error={getFieldError('confirmPassword')}
-                                    mode="municipalite"
-                                />
+                                <div>
+                                    <Input
+                                        label="Mot de passe"
+                                        type="password"
+                                        name="password"
+                                        value={formData.password}
+                                        onChange={handleInputChange}
+                                        onBlur={() => handleBlur('password')}
+                                        placeholder="••••••••"
+                                        icon={Lock}
+                                        error={getFieldError('password')}
+                                        mode="municipalite"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Min. 12 caractères, majuscule, minuscule, chiffre, caractère spécial
+                                    </p>
+                                </div>
+                                <div>
+                                    <Input
+                                        label="Confirmer mot de passe"
+                                        type="password"
+                                        name="confirmPassword"
+                                        value={formData.confirmPassword}
+                                        onChange={handleInputChange}
+                                        onBlur={() => handleBlur('confirmPassword')}
+                                        placeholder="••••••••"
+                                        icon={Lock}
+                                        error={getFieldError('confirmPassword')}
+                                        mode="municipalite"
+                                    />
+                                </div>
                             </div>
 
                             {/* Terms and conditions */}

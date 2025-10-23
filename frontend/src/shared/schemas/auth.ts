@@ -52,12 +52,10 @@ export const registerSchema = z
       .min(3, "Le nom d'utilisateur doit contenir au moins 3 caractères")
       .max(30, "Le nom d'utilisateur ne peut pas dépasser 30 caractères"),
 
-    // Champs spécifiques à notre application
-    organizationName: z
-      .string()
-      .min(2, 'Le nom de l\'organisation doit contenir au moins 2 caractères')
-      .max(100, 'Le nom de l\'organisation ne peut pas dépasser 100 caractères'),
+    // Champs obligatoires du backend
+    gender: z.enum(['male', 'female', 'prefer_not_to_say']),
 
+    // Champs optionnels du backend
     phone: z
       .string()
       .optional()
@@ -65,6 +63,7 @@ export const registerSchema = z
         message: 'Le numéro de téléphone français n\'est pas valide',
       }),
 
+    // Champs spécifiques à notre application
     mode: z.enum(['club', 'municipalite']),
 
     acceptTerms: z
@@ -72,9 +71,6 @@ export const registerSchema = z
       .refine((val) => val === true, {
         message: 'Vous devez accepter les conditions d\'utilisation',
       }),
-
-    // Champs optionnels du backend
-    gender: z.enum(['male', 'female', 'prefer_not_to_say']).optional(),
     birthdate: z.string().optional(), // Date en string pour le frontend
     address: z.string().optional(),
     city: z.string().optional(),

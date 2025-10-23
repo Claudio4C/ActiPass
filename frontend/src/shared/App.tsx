@@ -2,6 +2,10 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { type AppMode } from '../types';
+import VerifyEmail from '../pages/VerifyEmail';
+import ForgotPassword from '../pages/ForgotPassword';
+import ResetPassword from '../pages/ResetPassword';
+import ResendVerification from '../pages/ResendVerification';
 
 interface AppProps {
     mode: AppMode;
@@ -52,6 +56,24 @@ const AppContent: React.FC<{
                 <Route
                     path="/register"
                     element={user ? <Navigate to={protectedPath} replace /> : <RegisterComponent />}
+                />
+
+                {/* Routes de gestion des comptes */}
+                <Route
+                    path="/verify-email/:userId/:token"
+                    element={<VerifyEmail />}
+                />
+                <Route
+                    path="/forgot-password"
+                    element={<ForgotPassword />}
+                />
+                <Route
+                    path="/reset-password"
+                    element={<ResetPassword />}
+                />
+                <Route
+                    path="/resend-verification"
+                    element={<ResendVerification />}
                 />
 
                 {/* Routes protégées */}

@@ -9,7 +9,7 @@ import { useFormValidation } from '../../../hooks/useFormValidation';
 import { loginSchema, type LoginFormData } from '../../../shared/schemas/auth';
 
 const Login: React.FC = () => {
-    const { login, isLoading } = useAuth();
+    const { login, isLoading, error, clearError } = useAuth();
 
     const {
         values: formData,
@@ -41,18 +41,8 @@ const Login: React.FC = () => {
         try {
             await login(formData.email, formData.password);
         } catch (error: any) {
-            // Gérer les erreurs serveur (email inexistant, mauvais mdp, etc.)
-            if (error.response?.data?.message) {
-                // Erreur spécifique à un champ
-                if (error.response.data.field) {
-                    setError(error.response.data.field, error.response.data.message);
-                } else {
-                    // Erreur générale
-                    setError('general' as keyof LoginFormData, error.response.data.message);
-                }
-            } else {
-                setError('general' as keyof LoginFormData, 'Une erreur est survenue lors de la connexion');
-            }
+            // L'erreur est déjà gérée dans AuthContext
+            console.error('Login failed:', error);
         }
     };
 
@@ -175,9 +165,19 @@ const Login: React.FC = () => {
 
                         {/* Login Form */}
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            {errors.general && (
+                            {/* Affichage des erreurs d'authentification */}
+                            {error && (
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                                    <p className="text-sm text-red-600">{errors.general}</p>
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-red-600 text-sm">{error}</p>
+                                        <button
+                                            type="button"
+                                            onClick={clearError}
+                                            className="text-red-400 hover:text-red-600 ml-2"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
                                 </div>
                             )}
 
@@ -240,7 +240,7 @@ const Login: React.FC = () => {
                         </form>
 
                         {/* Register Link */}
-                        <div className="text-center mt-6">
+                        <div className="text-center mt-6 space-y-3">
                             <p className="text-gray-600">
                                 Pas encore de compte ?{' '}
                                 <Link
@@ -250,6 +250,22 @@ const Login: React.FC = () => {
                                     Créer un compte club
                                 </Link>
                             </p>
+
+                            {/* Additional Links */}
+                            <div className="space-y-2">
+                                <Link
+                                    to="/forgot-password"
+                                    className="block text-sm text-gray-500 hover:text-blue-600 hover:underline"
+                                >
+                                    Mot de passe oublié ?
+                                </Link>
+                                <Link
+                                    to="/resend-verification"
+                                    className="block text-sm text-gray-500 hover:text-blue-600 hover:underline"
+                                >
+                                    Renvoyer l'email de vérification
+                                </Link>
+                            </div>
                         </div>
                     </div>
                 </div>

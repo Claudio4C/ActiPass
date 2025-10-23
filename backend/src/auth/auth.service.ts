@@ -164,14 +164,14 @@ export class AuthService {
 
     // Always return success to prevent email enumeration
     return {
-      message: 'If an account with that email exists, a password reset link has been sent.',
+      message:
+        'Si un compte existe avec cette adresse email, un lien de réinitialisation de mot de passe a été envoyé.',
     };
   }
 
-  async resetPassword(resetPasswordDto: { userId: string; token: string; newPassword: string }) {
+  async resetPassword(resetPasswordDto: { token: string; newPassword: string }) {
     const user = await this.prisma.user.findUnique({
       where: {
-        id: resetPasswordDto.userId,
         password_reset_token: resetPasswordDto.token,
         password_reset_expires: { gt: new Date() },
       },
@@ -192,19 +192,31 @@ export class AuthService {
       },
     });
 
-    return { message: 'Password reset successfully' };
+    return { message: 'Mot de passe réinitialisé avec succès' };
   }
 
   async verifyEmail(userId: string, token: string) {
+    // Vérifier d'abord si l'utilisateur existe
     const user = await this.prisma.user.findUnique({
-      where: {
-        id: userId,
-        email_verification_token: token,
-        email_verification_expires: { gt: new Date() },
-      },
+      where: { id: userId },
     });
 
     if (!user) {
+      throw new BadRequestException('Invalid verification token');
+    }
+
+    // Si l'email est déjà vérifié, retourner un message de succès
+    if (user.is_email_verified) {
+      return { message: "L'email à bien été vérifié avec succès" };
+    }
+
+    // Vérifier si le token correspond et n'est pas expiré
+    if (
+      !user.email_verification_token ||
+      user.email_verification_token !== token ||
+      !user.email_verification_expires ||
+      user.email_verification_expires <= new Date()
+    ) {
       throw new BadRequestException('Invalid or expired verification token');
     }
 
@@ -221,7 +233,7 @@ export class AuthService {
     // Envoyer l'email de bienvenue après vérification
     await this.emailService.sendWelcomeEmail(user.email, user.firstname);
 
-    return { message: 'Email verified successfully' };
+    return { message: 'Email vérifié avec succès' };
   }
 
   async resendVerificationEmail(email: string) {
@@ -229,24 +241,40 @@ export class AuthService {
       where: { email },
     });
 
-    if (user && !user.is_email_verified) {
-      const verificationToken = this.generateVerificationToken();
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-      await this.prisma.user.update({
-        where: { id: user.id },
-        data: {
-          email_verification_token: verificationToken,
-          email_verification_expires: expiresAt,
-        },
-      });
-
-      await this.emailService.sendVerificationEmail(user.email, user.id, verificationToken);
+    if (!user) {
+      // Pour des raisons de sécurité, on ne révèle pas si l'email existe
+      return {
+        message:
+          "Si un compte existe avec cette adresse email et n'est pas encore vérifié, un email de vérification a été envoyé.",
+      };
     }
+
+    if (user.is_email_verified) {
+      // Le compte est déjà vérifié
+      return {
+        message: 'Ce compte est déjà vérifié. Vous pouvez vous connecter directement.',
+        alreadyVerified: true,
+      };
+    }
+
+    // Le compte existe mais n'est pas vérifié
+    const verificationToken = this.generateVerificationToken();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        email_verification_token: verificationToken,
+        email_verification_expires: expiresAt,
+      },
+    });
+
+    await this.emailService.sendVerificationEmail(user.email, user.id, verificationToken);
 
     return {
       message:
-        'If an account with that email exists and is not verified, a verification email has been sent.',
+        'Un nouvel email de vérification a été envoyé. Vérifiez votre boîte de réception et vos spams.',
+      emailSent: true,
     };
   }
 

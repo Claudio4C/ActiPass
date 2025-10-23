@@ -11,7 +11,7 @@ interface UseFormValidationReturn<T> {
   values: T;
   errors: Record<string, string>;
   isValid: boolean;
-  setValue: (field: keyof T, value: any) => void;
+  setValue: (field: keyof T, value: unknown) => void;
   setError: (field: keyof T, message: string) => void;
   clearError: (field: keyof T) => void;
   clearAllErrors: () => void;
@@ -23,7 +23,7 @@ interface UseFormValidationReturn<T> {
   reset: () => void;
 }
 
-export function useFormValidation<T extends Record<string, any>>({
+export function useFormValidation<T extends Record<string, unknown>>({
   schema,
   initialValues,
   validateOnChange = true,
@@ -32,7 +32,7 @@ export function useFormValidation<T extends Record<string, any>>({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [touched, setTouched] = useState<Record<string, boolean>>({})
 
-  const setValue = useCallback((field: keyof T, value: any) => {
+  const setValue = useCallback((field: keyof T, value: unknown) => {
     setValues(prev => ({ ...prev, [field]: value }))
   }, [])
 
@@ -78,7 +78,7 @@ export function useFormValidation<T extends Record<string, any>>({
       }
       return false
     }
-  }, [schema, values, setError, clearError])
+  }, [schema, values, clearError, setError])
 
   // Validation en temps réel quand l'utilisateur tape (après avoir touché le champ)
   useEffect(() => {
@@ -88,9 +88,36 @@ export function useFormValidation<T extends Record<string, any>>({
 
     // Valider uniquement les champs touchés
     touchedFields.forEach(field => {
-      validateField(field as keyof T)
+      try {
+        // Valider le champ spécifique avec le schéma complet
+        schema.parse(values)
+        // Si aucune erreur, effacer l'erreur du champ
+        setErrors(prev => {
+          const newErrors = { ...prev }
+          delete newErrors[field]
+          return newErrors
+        })
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          // Chercher l'erreur pour ce champ spécifique
+          const fieldError = error.issues.find(
+            issue => issue.path[0] === field,
+          )
+
+          if (fieldError) {
+            setErrors(prev => ({ ...prev, [field]: fieldError.message }))
+          } else {
+            // Pas d'erreur pour ce champ
+            setErrors(prev => {
+              const newErrors = { ...prev }
+              delete newErrors[field]
+              return newErrors
+            })
+          }
+        }
+      }
     })
-  }, [values, touched, validateOnChange, validateField])
+  }, [values, touched, validateOnChange, schema])
 
   const handleBlur = useCallback((field: keyof T) => {
     setTouched(prev => ({ ...prev, [field as string]: true }))
