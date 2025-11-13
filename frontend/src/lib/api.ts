@@ -37,9 +37,9 @@ class ApiClient {
 
   private setupInterceptors() {
     // Intercepteur pour les requêtes
+    // Les tokens sont stockés dans des cookies HttpOnly, donc pas besoin d'ajouter manuellement
     this.client.interceptors.request.use(
       (config) => {
-        // Ajouter des headers si nécessaire
         return config
       },
       (error) => {
@@ -52,9 +52,24 @@ class ApiClient {
       (response: AxiosResponse) => {
         return response
       },
-      (error: AxiosError<ApiErrorResponse>) => {
+      async (error: AxiosError<ApiErrorResponse>) => {
         // Gestion centralisée des erreurs avec types personnalisés
         if (error.response) {
+          // Gestion des erreurs 401 (Unauthorized)
+          if (error.response.status === 401) {
+            // Vérifier si on est sur une route Super Admin
+            const currentPath = window.location.pathname
+            if (currentPath.startsWith('/superadmin')) {
+              // Nettoyer le localStorage
+              localStorage.removeItem('user')
+              // Rediriger vers la page de login Super Admin
+              // Utiliser window.location.href pour forcer un rechargement complet
+              window.location.href = '/superadmin/login'
+              // Ne pas lancer l'erreur pour éviter les logs inutiles
+              return Promise.reject(new Error('Session expirée'))
+            }
+          }
+
           // Erreur du serveur (4xx, 5xx)
           const apiError = createErrorFromResponse(
             error.response.status,

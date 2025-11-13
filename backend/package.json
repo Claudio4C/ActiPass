@@ -24,6 +24,7 @@
     "test:security": "jest --testPathPattern=auth/security --verbose",
     "test:email": "ts-node src/email/test-email.ts",
     "test:system": "ts-node scripts/test-system-final.ts",
+    "test:super-admin-complete": "ts-node scripts/test-super-admin-complete.ts",
     "db:migrate": "npx prisma migrate dev",
     "db:seed": "ts-node prisma/seed-roles-permissions.ts",
     "db:reset": "npx prisma migrate reset && npm run db:seed"

@@ -1,4 +1,5 @@
 export interface User {
+  is_super_admin?: boolean;
   id: string;
   email: string;
   password: string;
