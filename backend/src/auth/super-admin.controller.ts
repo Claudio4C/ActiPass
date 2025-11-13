@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, UseGuards, Req } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { Request } from 'express';
 
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -6,6 +7,7 @@ import { SuperAdminService } from './super-admin.service';
 
 @Controller('super-admin')
 @UseGuards(JwtAuthGuard)
+@SkipThrottle() // Désactiver le rate limiting pour toutes les routes Super Admin
 export class SuperAdminController {
   constructor(private superAdminService: SuperAdminService) {}
 
@@ -45,6 +47,15 @@ export class SuperAdminController {
   }
 
   /**
+   * Récupérer une organisation par ID
+   */
+  @Get('organisations/:id')
+  async getOrganisation(@Param('id') organisationId: string, @Req() req: Request) {
+    await this.checkSuperAdmin(req);
+    return this.superAdminService.getOrganisationById(organisationId);
+  }
+
+  /**
    * Lister tous les utilisateurs
    */
   @Get('users')
@@ -59,11 +70,11 @@ export class SuperAdminController {
   @Put('users/:id/suspend')
   async suspendUser(
     @Param('id') userId: string,
-    @Body() body: { reason?: string },
+    @Body() body: { reason?: string } | undefined,
     @Req() req: Request
   ) {
     await this.checkSuperAdmin(req);
-    const reason = body.reason || 'Aucune raison spécifiée';
+    const reason = body?.reason || 'Aucune raison spécifiée';
     return this.superAdminService.suspendUser(userId, reason);
   }
 
@@ -77,7 +88,25 @@ export class SuperAdminController {
   }
 
   /**
-   * Supprimer définitivement une organisation
+   * Restaurer un utilisateur supprimé
+   */
+  @Put('users/:id/restore')
+  async restoreUser(@Param('id') userId: string, @Req() req: Request) {
+    await this.checkSuperAdmin(req);
+    return this.superAdminService.restoreUser(userId);
+  }
+
+  /**
+   * Supprimer une organisation (soft delete)
+   */
+  @Delete('organisations/:id')
+  async deleteOrganisation(@Param('id') organisationId: string, @Req() req: Request) {
+    await this.checkSuperAdmin(req);
+    return this.superAdminService.deleteOrganisation(organisationId);
+  }
+
+  /**
+   * Supprimer définitivement une organisation (hard delete - à utiliser avec précaution)
    */
   @Delete('organisations/:id/permanent')
   async permanentlyDeleteOrganisation(@Param('id') organisationId: string, @Req() req: Request) {
@@ -92,6 +121,37 @@ export class SuperAdminController {
   async restoreOrganisation(@Param('id') organisationId: string, @Req() req: Request) {
     await this.checkSuperAdmin(req);
     return this.superAdminService.restoreOrganisation(organisationId);
+  }
+
+  /**
+   * Modifier une organisation (Super Admin peut modifier n'importe quelle organisation)
+   */
+  @Put('organisations/:id')
+  async updateOrganisation(
+    @Param('id') organisationId: string,
+    @Body()
+    updateData: {
+      name?: string;
+      description?: string | null;
+      type?: 'sport' | 'culture' | 'loisir' | 'social' | 'other';
+      logo_url?: string | null;
+      email?: string | null;
+      phone?: string | null;
+      website_url?: string | null;
+      address?: string | null;
+      city?: string | null;
+      zip_code?: string | null;
+      country?: string | null;
+      latitude?: number | null;
+      longitude?: number | null;
+      member_limit?: number | null;
+      is_public?: boolean;
+      status?: 'active' | 'suspended' | 'pending_validation';
+    },
+    @Req() req: Request
+  ) {
+    await this.checkSuperAdmin(req);
+    return this.superAdminService.updateOrganisation(organisationId, updateData);
   }
 
   /**

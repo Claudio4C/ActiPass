@@ -8,6 +8,7 @@ export interface User {
   organizationName?: string;
   phone?: string;
   mode: AppMode;
+  is_super_admin?: boolean;
 }
 
 export interface AuthContextType {

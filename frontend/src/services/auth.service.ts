@@ -39,6 +39,7 @@ export interface User {
   avatar?: string
   bio?: string
   isEmailVerified: boolean
+  is_super_admin?: boolean
   createdAt: string
   updatedAt: string
 }

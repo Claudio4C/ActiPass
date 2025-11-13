@@ -217,11 +217,12 @@ export class OrganisationsService {
       throw new ForbiddenException("Seul le propriétaire peut supprimer l'organisation");
     }
 
-    // Soft delete de l'organisation
+    // Soft delete de l'organisation : mettre deleted_at et passer en suspended
     await this.prisma.organisation.update({
       where: { id: organisationId },
       data: {
         deleted_at: new Date(),
+        status: 'suspended',
         updated_at: new Date(),
       },
     });

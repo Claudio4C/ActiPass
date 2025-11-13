@@ -33,6 +33,34 @@ export class AuthService {
   async validateUser(email: string, password: string): Promise<User> {
     const user = await this.prisma.user.findUnique({
       where: { email },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        firstname: true,
+        lastname: true,
+        phone: true,
+        birthdate: true,
+        gender: true,
+        avatar_url: true,
+        username: true,
+        is_email_verified: true,
+        last_login_at: true,
+        status: true,
+        refresh_token_hash: true,
+        password_reset_token: true,
+        password_reset_expires: true,
+        email_verification_token: true,
+        email_verification_expires: true,
+        failed_login_attempts: true,
+        locked_until: true,
+        two_factor_enabled: true,
+        two_factor_secret: true,
+        created_at: true,
+        updated_at: true,
+        deleted_at: true,
+        is_super_admin: true,
+      },
     });
 
     if (!user) {
@@ -290,8 +318,13 @@ export class AuthService {
       email: user.email,
     };
 
+    // Durée du token plus longue pour les Super Admins (2h au lieu de 15min)
+    const expiresIn = user.is_super_admin
+      ? '2h'
+      : this.configService.get<string>('JWT_EXPIRES_IN', '15m');
+
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload),
+      this.jwtService.signAsync(payload, { expiresIn }),
       this.jwtService.signAsync(refreshPayload, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
         expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d'),

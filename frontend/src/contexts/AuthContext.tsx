@@ -54,7 +54,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
                 lastName: response.user.lastname,
                 organizationName: response.user.username,
                 phone: response.user.phone,
-                mode: modeRef.current // ← Utilise la ref au lieu du state
+                mode: modeRef.current, // ← Utilise la ref au lieu du state
+                is_super_admin: response.user.is_super_admin || false
             };
 
             setUser(user);
