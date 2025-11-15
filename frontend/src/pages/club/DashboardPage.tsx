@@ -2,6 +2,7 @@ import React from 'react';
 import { Users, Calendar, MessageSquare, Settings } from 'lucide-react';
 import Layout from '../../components/layout/Layout';
 import Button from '../../components/ui/Button';
+import { Link } from 'react-router-dom';
 
 const DashboardPage: React.FC = () => {
     return (
@@ -61,9 +62,11 @@ const DashboardPage: React.FC = () => {
                     <p className="text-gray-600 text-sm mb-4">
                         Inscrire, gérer et suivre vos membres
                     </p>
-                    <Button variant="outline" size="sm" mode="club">
-                        Accéder
-                    </Button>
+                    <Link to="/club/members">
+                        <Button variant="outline" size="sm" mode="club">
+                            Accéder
+                        </Button>
+                    </Link>
                 </div>
 
                 <div className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow cursor-pointer">
