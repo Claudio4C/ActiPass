@@ -6,6 +6,16 @@ import VerifyEmail from '../pages/VerifyEmail';
 import ForgotPassword from '../pages/ForgotPassword';
 import ResetPassword from '../pages/ResetPassword';
 import ResendVerification from '../pages/ResendVerification';
+import MembersPage from '../pages/club/MembersPage';
+import ProfilePage from '../pages/club/ProfilePage';
+import SubscriptionPage from '../pages/club/SubscriptionPage';
+import NotificationsPage from '../pages/club/NotificationsPage';
+import TeachersPage from '../pages/club/TeachersPage';
+import DisciplinesPage from '../pages/club/DisciplinesPage';
+import VideoLessonsPage from '../pages/club/VideoLessonsPage';
+import PlanningPage from '../pages/club/PlanningPage';
+import AccountSwitch from '../pages/AccountSwitch';
+import LoyaltyPage from '../pages/club/LoyaltyPage';
 
 interface AppProps {
     mode: AppMode;
@@ -19,8 +29,7 @@ interface AppProps {
 const ProtectedRoute: React.FC<{
     children: React.ReactNode;
     requiredMode: AppMode;
-    protectedPath: string;
-}> = ({ children, requiredMode, protectedPath }) => {
+}> = ({ children, requiredMode }) => {
     const { user, mode } = useAuth();
 
     if (!user) {
@@ -80,9 +89,69 @@ const AppContent: React.FC<{
                 <Route
                     path={protectedPath}
                     element={
-                        <ProtectedRoute requiredMode={mode} protectedPath={protectedPath}>
+                        <ProtectedRoute requiredMode={mode}>
                             <DashboardComponent />
                         </ProtectedRoute>
+                    }
+                />
+                {/* Espace membres (club) */}
+                <Route
+                    path="/club/members"
+                    element={
+                        <MembersPage />
+                    }
+                />
+                <Route
+                    path="/club/loyalty"
+                    element={
+                        <LoyaltyPage />
+                    }
+                />
+                <Route
+                    path="/club/notifications"
+                    element={
+                        <NotificationsPage />
+                    }
+                />
+                <Route
+                    path="/club/professeurs"
+                    element={
+                        <TeachersPage />
+                    }
+                />
+                <Route
+                    path="/club/disciplines"
+                    element={
+                        <DisciplinesPage />
+                    }
+                />
+                <Route
+                    path="/club/cours-video"
+                    element={
+                        <VideoLessonsPage />
+                    }
+                />
+                <Route
+                    path="/club/planning"
+                    element={
+                        <PlanningPage />
+                    }
+                />
+                {/* Sélection de compte / organisation */}
+                <Route
+                    path="/accounts"
+                    element={<AccountSwitch />}
+                />
+                <Route
+                    path="/account/profile"
+                    element={
+                        <ProfilePage />
+                    }
+                />
+                <Route
+                    path="/account/subscriptions"
+                    element={
+                        <SubscriptionPage />
                     }
                 />
 
