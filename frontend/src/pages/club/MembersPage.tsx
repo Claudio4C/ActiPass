@@ -1,6 +1,8 @@
 import React from 'react';
 import Layout from '../../components/layout/Layout';
 import { Link } from 'react-router-dom';
+import Button from '../../components/ui/Button';
+import { useCurrentOrganisation } from '../../hooks/useCurrentOrganisation';
 
 type DayName = 'Lundi' | 'Mardi' | 'Mercredi' | 'Jeudi' | 'Vendredi' | 'Samedi' | 'Dimanche';
 
@@ -162,15 +164,8 @@ const news = [
     { title: 'Biratnagar Super Kings defeats Janakpur Royals to book a place in finals', date: '23 January, 2023' },
 ];
 
-const defaultClub = {
-    title: 'Mon espace club',
-    subtitle: 'Espace membres officiel de votre organisation sportive.',
-    heroTitle: "Bienvenue dans votre espace club",
-    heroDescription:
-        "Retrouvez l’ensemble de vos informations : planning d’entraînement, professeurs, actualités et services réservés aux membres.",
-};
-
 const MembersPage: React.FC = () => {
+    const { metadata: clubMetadata, role: accountRole } = useCurrentOrganisation();
     const [selectedTeacher, setSelectedTeacher] = React.useState<Teacher | null>(null);
     const [selectedSlot, setSelectedSlot] = React.useState<Slot | null>(null);
     const [disciplineFilter, setDisciplineFilter] = React.useState<'all' | Slot['discipline']>('all');
@@ -189,25 +184,6 @@ const MembersPage: React.FC = () => {
             return {};
         }
     });
-    const [clubMetadata, setClubMetadata] = React.useState(() => {
-        if (typeof window === 'undefined') return defaultClub;
-        try {
-            const raw = window.localStorage.getItem('selectedOrganisation');
-            if (!raw) return defaultClub;
-            const parsed = JSON.parse(raw) as { name?: string; subtitle?: string; description?: string } | null;
-            if (!parsed) return defaultClub;
-            return {
-                title: parsed.name ?? defaultClub.title,
-                subtitle: parsed.subtitle ?? defaultClub.subtitle,
-                heroTitle: parsed.name ? `Bienvenue chez ${parsed.name}` : defaultClub.heroTitle,
-                heroDescription: parsed.description ?? defaultClub.heroDescription,
-            };
-        } catch (error) {
-            console.error('Impossible de charger les informations du club actif', error);
-            return defaultClub;
-        }
-    });
-
     const getTeacherByName = (name: string): Teacher | undefined =>
         teachers.find((t) => t.name.toLowerCase() === name.toLowerCase());
 
@@ -238,41 +214,6 @@ const MembersPage: React.FC = () => {
             console.error('Impossible de sauvegarder les notes', error);
         }
     }, [userRatings]);
-
-    React.useEffect(() => {
-        const handleOrganisationChange = () => {
-            if (typeof window === 'undefined') return;
-            try {
-                const raw = window.localStorage.getItem('selectedOrganisation');
-                if (!raw) {
-                    setClubMetadata(defaultClub);
-                    return;
-                }
-                const parsed = JSON.parse(raw) as { name?: string; subtitle?: string; description?: string } | null;
-                if (!parsed) {
-                    setClubMetadata(defaultClub);
-                    return;
-                }
-                setClubMetadata({
-                    title: parsed.name ?? defaultClub.title,
-                    subtitle: parsed.subtitle ?? defaultClub.subtitle,
-                    heroTitle: parsed.name ? `Bienvenue chez ${parsed.name}` : defaultClub.heroTitle,
-                    heroDescription: parsed.description ?? defaultClub.heroDescription,
-                });
-            } catch (error) {
-                console.error('Impossible de mettre à jour les informations du club actif', error);
-                setClubMetadata(defaultClub);
-            }
-        };
-
-        handleOrganisationChange();
-        window.addEventListener('storage', handleOrganisationChange);
-        window.addEventListener('organisation:updated', handleOrganisationChange);
-        return () => {
-            window.removeEventListener('storage', handleOrganisationChange);
-            window.removeEventListener('organisation:updated', handleOrganisationChange);
-        };
-    }, []);
 
     const filteredTodaySchedule = React.useMemo(() => {
         return mockSchedule.filter((slot) => {
@@ -335,6 +276,30 @@ const MembersPage: React.FC = () => {
             ),
         [todayDay]
     );
+
+    if (accountRole === 'coach') {
+        return (
+            <Layout
+                title="Espace coach"
+                subtitle="Gérez vos créneaux, coachings privés et interactions avec les clubs."
+                mode="club"
+            >
+                <CoachExperienceView metadata={clubMetadata} />
+            </Layout>
+        );
+    }
+
+    if (accountRole === 'freelance') {
+        return (
+            <Layout
+                title="Studio indépendant"
+                subtitle="Partagez vos disponibilités privées et faites grandir votre clientèle."
+                mode="club"
+            >
+                <FreelanceExperienceView metadata={clubMetadata} />
+            </Layout>
+        );
+    }
 
     return (
         <Layout title={clubMetadata.title} subtitle={clubMetadata.subtitle} mode="club">
@@ -807,6 +772,429 @@ export default MembersPage;
 const themeCard = 'bg-white/90 dark:bg-slate-900/90 backdrop-blur border border-slate-100 dark:border-slate-800 shadow-sm';
 const themeAccentCard = 'bg-white/80 dark:bg-slate-900/80 backdrop-blur border border-white/60 dark:border-slate-800 shadow-lg';
 const themeMutebg = 'bg-white/70 dark:bg-slate-900/70';
+
+const CoachExperienceView: React.FC<{ metadata: { title: string; subtitle: string; heroTitle: string; heroDescription: string } }> = ({ metadata }) => {
+    const coachStats = [
+        { label: 'Créneaux cette semaine', value: '18', subLabel: '+3 vs sem. dernière' },
+        { label: 'Cours privés à venir', value: '6', subLabel: '2 en ligne' },
+        { label: 'Nouveaux messages', value: '4', subLabel: 'Clubs & élèves' },
+        { label: 'Note moyenne', value: '4.8', subLabel: '42 avis' },
+    ];
+
+    const upcomingSlots = [
+        {
+            id: 'slot-1',
+            club: 'Gracie Nova Paris',
+            date: 'Mercredi 15 janvier',
+            time: '18:00 - 19:30',
+            type: 'collectif',
+            status: 'confirmé',
+            participants: 14,
+        },
+        {
+            id: 'slot-2',
+            club: 'Cours privé - Sophie',
+            date: 'Jeudi 16 janvier',
+            time: '12:30 - 13:30',
+            type: 'privé',
+            status: 'confirmé',
+            location: 'À domicile - Paris 11e',
+        },
+        {
+            id: 'slot-3',
+            club: 'Stage découverte - Club Lyon Est',
+            date: 'Samedi 18 janvier',
+            time: '09:00 - 12:00',
+            type: 'stage',
+            status: 'en attente',
+            actionRequired: true,
+        },
+    ];
+
+    return (
+        <div className="space-y-10">
+            <section className="rounded-3xl bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 text-white shadow-xl p-8 relative overflow-hidden">
+                <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_top,_#fff1,_transparent_70%)]" />
+                <div className="relative flex flex-col gap-6">
+                    <div>
+                        <p className="text-sm uppercase tracking-[0.3em] text-white/70 font-semibold">Mode Coach actif</p>
+                        <h1 className="mt-3 text-3xl sm:text-4xl font-semibold leading-tight">
+                            {metadata.heroTitle}
+                        </h1>
+                        <p className="mt-3 text-sm sm:text-base text-white/85 max-w-3xl">
+                            {metadata.heroDescription}
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        {coachStats.map((stat) => (
+                            <div
+                                key={stat.label}
+                                className="rounded-2xl bg-white/10 backdrop-blur p-4 border border-white/10 shadow-sm"
+                            >
+                                <p className="text-xs uppercase tracking-wide text-white/70">{stat.label}</p>
+                                <p className="mt-2 text-2xl font-semibold">{stat.value}</p>
+                                <p className="text-[11px] text-white/80">{stat.subLabel}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm space-y-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 font-semibold">À propos du club</p>
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{metadata.title}</h2>
+                    <p className="text-sm text-slate-600 dark:text-slate-300">{metadata.subtitle}</p>
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                        <div className="rounded-2xl bg-slate-50 dark:bg-slate-800 p-3">
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Discipline phare</p>
+                            <p className="font-semibold text-slate-900 dark:text-white">Jiu-jitsu & Grappling</p>
+                        </div>
+                        <div className="rounded-2xl bg-slate-50 dark:bg-slate-800 p-3">
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Contact référent</p>
+                            <p className="font-semibold text-slate-900 dark:text-white">Yuki Tanaka</p>
+                        </div>
+                    </div>
+                </div>
+                <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm space-y-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 font-semibold">Infos pratiques</p>
+                    <ul className="text-sm text-slate-600 dark:text-slate-300 space-y-2">
+                        <li>📍 Adresse : 42 rue des Arts Martiaux, 69004 Lyon</li>
+                        <li>🕒 Accès salle : 07:00 - 23:00</li>
+                        <li>💌 Contact : contact@club-gracie.fr</li>
+                        <li>📱 Numéro d’urgence : 06 70 90 12 34</li>
+                    </ul>
+                </div>
+                <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm space-y-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400 font-semibold">À suivre</p>
+                    <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                        <div className="p-3 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-200">
+                            Stage compétition - Dimanche 26 Janvier • réponse attendue
+                        </div>
+                        <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-200">
+                            Nouveau créneau privé validé - Mardi 14h, visio
+                        </div>
+                        <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-200">
+                            Club en congés du 21 au 24 février
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-6 shadow-sm space-y-6">
+                    <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div>
+                            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Prochains créneaux</h2>
+                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                                Confirmez vos créneaux en attente et visualisez vos cours privés.
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <Link to="/coach/planning">
+                                <Button size="sm" mode="club">Voir mon planning</Button>
+                            </Link>
+                            <Link to="/coach/planning">
+                                <Button variant="outline" size="sm" mode="club">Créer un créneau privé</Button>
+                            </Link>
+                        </div>
+                    </div>
+                    <div className="space-y-3">
+                        {upcomingSlots.map((slot) => (
+                            <div
+                                key={slot.id}
+                                className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-wrap gap-4 items-center justify-between"
+                            >
+                                <div className="flex-1 min-w-[220px]">
+                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{slot.club}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        {slot.date} • {slot.time}
+                                    </p>
+                                    <div className="mt-2 flex items-center gap-3 text-xs text-slate-600 dark:text-slate-400">
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 text-indigo-600 px-2 py-0.5">
+                                            {slot.type}
+                                        </span>
+                                        {slot.participants ? (
+                                            <span>{slot.participants} participants</span>
+                                        ) : null}
+                                        {slot.location ? <span>{slot.location}</span> : null}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {slot.status === 'en attente' && slot.actionRequired ? (
+                                        <>
+                                            <Button variant="outline" size="sm" mode="club">
+                                                Accepter
+                                            </Button>
+                                            <Button variant="outline" size="sm" mode="club" className="text-red-600 border-red-200 hover:bg-red-50">
+                                                Refuser
+                                            </Button>
+                                        </>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 text-emerald-600 px-3 py-1 text-xs font-semibold">
+                                            Confirmé
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-6 shadow-sm space-y-4">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Actions rapides</h3>
+                    <div className="space-y-3">
+                        <QuickCoachAction
+                            title="Mettre à jour mon profil public"
+                            description="Photo, bio, tarifs, disponibilités"
+                            to="/coach/profile"
+                        />
+                        <QuickCoachAction
+                            title="Répondre aux clubs"
+                            description="Demandes de stages, offres en attente"
+                            to="/coach/applications"
+                        />
+                        <QuickCoachAction
+                            title="Suivre mes rémunérations"
+                            description="Revenus, paiements, factures"
+                            to="/coach/billing"
+                        />
+                    </div>
+                </div>
+            </section>
+        </div>
+    );
+};
+
+const FreelanceExperienceView: React.FC<{ metadata: { title: string; subtitle: string; heroTitle: string; heroDescription: string } }> = ({ metadata }) => {
+    const freelanceStats = [
+        { label: 'Revenus prévisionnels', value: '1 460 €', detail: '+12% vs mois dernier', tone: 'emerald' },
+        { label: 'Demandes actives', value: '5', detail: '3 clients + 2 clubs', tone: 'sky' },
+        { label: 'Note moyenne', value: '4.9 / 5', detail: '86 avis vérifiés', tone: 'amber' },
+    ];
+
+    const privateRequests = [
+        {
+            id: 'req-1',
+            client: 'Sophie L.',
+            format: 'Visio 60 min',
+            need: 'Préparation concours sécurité',
+            date: 'Vendredi 17 janv. • 19h30',
+            budget: '75 €',
+            status: 'new',
+        },
+        {
+            id: 'req-2',
+            client: 'Club Gym Nice',
+            format: 'Stage 1/2 journée',
+            need: 'Initiation mobilité & stretching',
+            date: 'Dimanche 26 janv.',
+            budget: '350 €',
+            status: 'club',
+        },
+        {
+            id: 'req-3',
+            client: 'Marc & Léa',
+            format: 'Coaching duo à domicile',
+            need: 'Pilates & respiration',
+            date: 'Samedi 18 janv. • 10h',
+            budget: '120 €',
+            status: 'pending',
+        },
+    ];
+
+    const publishedAvailabilities = [
+        { id: 'av-1', label: 'Visio express', window: 'Tous les jours • 07h30', visibility: 'Public IKIVIO' },
+        { id: 'av-2', label: 'Créneau à domicile', window: 'Mercredi & Vendredi • 20h', visibility: 'Clients validés' },
+        { id: 'av-3', label: 'Format entreprise', window: 'Sur demande • 90 min', visibility: 'Clubs/entreprises' },
+    ];
+
+    const upcomingPrivates = [
+        { id: 'next-1', title: 'Cours visio - Elsa', info: 'Jeudi 16 janv. • 12h', location: 'Zoom', status: 'confirmé' },
+        { id: 'next-2', title: 'Coaching mobilité - Maison Mireille', info: 'Vendredi 17 janv. • 18h', location: 'À domicile • Lyon 3e', status: 'confirmé' },
+        { id: 'next-3', title: 'Stage cardio doux', info: 'Samedi 18 janv. • 09h', location: 'Studio Flow & Co', status: 'à confirmer' },
+    ];
+
+    const toolkitLinks = [
+        { title: 'Mettre à jour mon profil public', description: 'Photo, disciplines, tarifs packs', to: '/coach/profile' },
+        { title: 'Publier un nouveau créneau', description: 'Visio, à domicile, mini stage', to: '/coach/planning' },
+        { title: 'Répondre aux messages', description: 'Clubs, élèves, suivis automatiques', to: '/coach/messages' },
+    ];
+
+    const testimonials = [
+        {
+            id: 'avis-1',
+            author: 'Lucile & Amaury',
+            content: '“Séances visio hyper structurées, nous avons enfin un rythme d’entretien qui tient dans notre agenda chargé.”',
+            rating: 5,
+        },
+        {
+            id: 'avis-2',
+            author: 'Studio Move Lyon',
+            content: '“Stage mobilité très apprécié par nos adhérents. Facile à planifier et paiement automatisé.”',
+            rating: 5,
+        },
+    ];
+
+    return (
+        <div className="space-y-10">
+            <section className="rounded-3xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-sky-50 p-8 shadow-sm relative overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.15),_transparent_70%)] pointer-events-none" />
+                <div className="relative space-y-6">
+                    <div>
+                        <p className="text-xs uppercase tracking-[0.3em] text-sky-500 font-semibold">Coach indépendant</p>
+                        <h1 className="mt-3 text-3xl sm:text-4xl font-semibold text-slate-900">{metadata.heroTitle}</h1>
+                        <p className="mt-3 text-sm sm:text-base text-slate-600 max-w-3xl">{metadata.heroDescription}</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        {freelanceStats.map((stat) => (
+                            <div
+                                key={stat.label}
+                                className="rounded-2xl border border-white/70 bg-white/80 backdrop-blur px-4 py-5 shadow-sm"
+                            >
+                                <p className="text-xs uppercase tracking-wide text-slate-500">{stat.label}</p>
+                                <p className="mt-2 text-2xl font-semibold text-slate-900">{stat.value}</p>
+                                <p className={`text-xs ${stat.tone === 'emerald' ? 'text-emerald-600' : stat.tone === 'sky' ? 'text-sky-600' : 'text-amber-600'}`}>
+                                    {stat.detail}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div>
+                            <p className="text-xs uppercase tracking-[0.2em] text-slate-500 font-semibold">Demandes privées</p>
+                            <h2 className="text-lg font-semibold text-slate-900">Clients et clubs intéressés</h2>
+                        </div>
+                        <Link to="/coach/messages">
+                            <Button size="sm" mode="club">
+                                Répondre maintenant
+                            </Button>
+                        </Link>
+                    </div>
+                    <div className="space-y-3">
+                        {privateRequests.map((request) => (
+                            <div
+                                key={request.id}
+                                className="rounded-2xl border border-slate-100 bg-slate-50 p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                            >
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-900">{request.client}</p>
+                                    <p className="text-xs text-slate-500">{request.format} • {request.date}</p>
+                                    <p className="mt-2 text-sm text-slate-600">{request.need}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold text-slate-700 bg-white rounded-full px-3 py-1 border border-slate-200">{request.budget}</span>
+                                    <Button size="sm" variant="outline" mode="club">
+                                        Accepter
+                                    </Button>
+                                    <Button size="sm" variant="outline" mode="club" className="text-slate-500 border-slate-200">
+                                        Voir
+                                    </Button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500 font-semibold">Disponibilités publiées</p>
+                    <div className="space-y-3">
+                        {publishedAvailabilities.map((availability) => (
+                            <div key={availability.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                                <p className="text-sm font-semibold text-slate-900">{availability.label}</p>
+                                <p className="text-xs text-slate-500">{availability.window}</p>
+                                <p className="mt-2 text-[11px] uppercase tracking-wide text-slate-500">{availability.visibility}</p>
+                            </div>
+                        ))}
+                    </div>
+                    <Link to="/coach/planning">
+                        <Button mode="club" className="w-full">
+                            Publier un créneau
+                        </Button>
+                    </Link>
+                </div>
+            </section>
+
+            <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold text-slate-900">Prochains coachings privés</h3>
+                        <Link to="/coach/planning" className="text-sm text-indigo-600 font-semibold">
+                            Ouvrir le planning
+                        </Link>
+                    </div>
+                    <div className="space-y-3">
+                        {upcomingPrivates.map((slot) => (
+                            <div key={slot.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                                <div>
+                                    <p className="text-sm font-semibold text-slate-900">{slot.title}</p>
+                                    <p className="text-xs text-slate-500">{slot.info}</p>
+                                    <p className="text-xs text-slate-500">{slot.location}</p>
+                                </div>
+                                <span className={`text-xs font-semibold rounded-full px-3 py-1 ${slot.status === 'confirmé' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                    {slot.status === 'confirmé' ? 'Confirmé' : 'À confirmer'}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+                    <h3 className="text-lg font-semibold text-slate-900">Boîte à outils</h3>
+                    <div className="space-y-3">
+                        {toolkitLinks.map((tool) => (
+                            <Link
+                                key={tool.title}
+                                to={tool.to}
+                                className="block rounded-2xl border border-slate-100 bg-slate-50 p-4 hover:border-indigo-200 transition"
+                            >
+                                <p className="text-sm font-semibold text-slate-900">{tool.title}</p>
+                                <p className="text-xs text-slate-500 mt-1">{tool.description}</p>
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <p className="text-xs uppercase tracking-[0.2em] text-slate-500 font-semibold">Avis clients</p>
+                        <h3 className="text-lg font-semibold text-slate-900">Ce que disent vos élèves</h3>
+                    </div>
+                    <Link to="/coach/profile" className="text-sm font-semibold text-indigo-600">
+                        Voir mon profil public
+                    </Link>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {testimonials.map((testimonial) => (
+                        <div key={testimonial.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-5 shadow-sm">
+                            <p className="text-sm text-slate-600 italic">“{testimonial.content}”</p>
+                            <div className="mt-4 flex items-center justify-between">
+                                <span className="text-sm font-semibold text-slate-900">{testimonial.author}</span>
+                                <span className="text-xs font-semibold text-amber-500">{'★'.repeat(testimonial.rating)}</span>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </section>
+        </div>
+    );
+};
+
+const QuickCoachAction: React.FC<{ title: string; description: string; to: string }> = ({ title, description, to }) => (
+    <Link
+        to={to}
+        className="block rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 hover:border-indigo-200 hover:shadow-sm transition-colors"
+    >
+        <p className="text-sm font-semibold text-slate-900 dark:text-white">{title}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{description}</p>
+    </Link>
+);
 
 const RatingStars: React.FC<{
     value: number;

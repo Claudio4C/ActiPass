@@ -6,8 +6,8 @@ import Layout from '../components/layout/Layout';
 type Organisation = {
     id: string;
     name: string;
-    role: 'membre' | 'coach' | 'gestionnaire';
-    type: 'club' | 'association';
+    role: 'membre' | 'coach' | 'gestionnaire' | 'independant';
+    type: 'club' | 'association' | 'independant';
     coverQuery: string;
     avatarQuery: string;
     subtitle?: string;
@@ -65,10 +65,23 @@ const mockOrgs: Organisation[] = [
         description:
             'Coaching personnalisé, mobilité et fluidité au sol pour grapplers souhaitant progresser sans kimono.',
     },
+    {
+        id: 'org-4',
+        name: 'Studio Flow Privé',
+        role: 'independant',
+        type: 'independant',
+        coverQuery: 'personal trainer home coaching living room minimal',
+        avatarQuery: 'coach portrait lifestyle',
+        subtitle: 'Profil freelance dédié à mes cours visio et à domicile',
+        description:
+            'Diffusez vos créneaux privés, automatisez les paiements et laissez les clubs vous solliciter pour animer un stage.',
+    },
 ];
 
 const primarySection = 'bg-white/80 dark:bg-slate-900/80 backdrop-blur rounded-3xl border border-white/60 dark:border-slate-800 shadow-lg';
 const secondarySection = 'bg-white/70 dark:bg-slate-900/70 backdrop-blur rounded-3xl border border-white/60 dark:border-slate-800 shadow-sm';
+const roleFilterOptions: Array<'all' | Organisation['role']> = ['all', 'membre', 'coach', 'gestionnaire', 'independant'];
+const typeFilterOptions: Array<'all' | Organisation['type']> = ['all', 'club', 'association', 'independant'];
 
 const AccountSwitch: React.FC = () => {
     const navigate = useNavigate();
@@ -104,9 +117,11 @@ const AccountSwitch: React.FC = () => {
     const stats = React.useMemo(() => {
         const total = mockOrgs.length;
         const clubs = mockOrgs.filter((org) => org.type === 'club').length;
-        const associations = total - clubs;
+        const associations = mockOrgs.filter((org) => org.type === 'association').length;
+        const independants = mockOrgs.filter((org) => org.type === 'independant').length;
         const coachRoles = mockOrgs.filter((org) => org.role === 'coach').length;
-        return { total, clubs, associations, coachRoles };
+        const freelanceRoles = mockOrgs.filter((org) => org.role === 'independant').length;
+        return { total, clubs, associations, independants, coachRoles, freelanceRoles };
     }, []);
 
     const handleDiscoverNearby = React.useCallback(() => {
@@ -167,7 +182,7 @@ const AccountSwitch: React.FC = () => {
                                 Accédez rapidement à vos espaces clubs & associations. Filtrez vos organisations, vérifiez vos droits et reprenez votre activité en quelques secondes.
                             </p>
                         </div>
-                        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-4 flex flex-col gap-2 min-w-[220px] transition-colors">
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-4 flex flex-col gap-3 min-w-[220px] transition-colors">
                             <div className="text-xs text-slate-500 dark:text-slate-300 font-medium uppercase tracking-wide">Résumé</div>
                             <div className="flex gap-3">
                                 <div className="flex-1">
@@ -175,16 +190,22 @@ const AccountSwitch: React.FC = () => {
                                     <div className="text-xs text-slate-500 dark:text-slate-300">Organisations</div>
                                 </div>
                                 <div className="flex-1">
-                                    <div className="text-lg font-semibold text-indigo-600">{stats.coachRoles}</div>
+                                    <div className="text-lg font-semibold text-indigo-600">{stats.coachRoles + stats.freelanceRoles}</div>
                                     <div className="text-xs text-slate-500 dark:text-slate-300">Rôles coach</div>
+                                    <p className="text-[11px] text-slate-400">
+                                        dont {stats.freelanceRoles} indép.
+                                    </p>
                                 </div>
                             </div>
-                            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-300">
+                            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-300">
                                 <span>
                                     Clubs: <span className="text-slate-900 dark:text-white font-medium">{stats.clubs}</span>
                                 </span>
                                 <span>
                                     Associations: <span className="text-slate-900 dark:text-white font-medium">{stats.associations}</span>
+                                </span>
+                                <span>
+                                    Indépendants: <span className="text-slate-900 dark:text-white font-medium">{stats.independants}</span>
                                 </span>
                             </div>
                         </div>
@@ -218,7 +239,7 @@ const AccountSwitch: React.FC = () => {
                             </svg>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                            {(['all', 'membre', 'coach', 'gestionnaire'] as const).map((roleKey) => (
+                            {roleFilterOptions.map((roleKey) => (
                                 <button
                                     key={roleKey}
                                     type="button"
@@ -229,11 +250,11 @@ const AccountSwitch: React.FC = () => {
                                             : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-200 hover:text-indigo-600'
                                     }`}
                                 >
-                                    {roleKey === 'all' ? 'Tous les rôles' : `Rôle ${roleKey}`}
+                                    {roleKey === 'all' ? 'Tous les rôles' : formatRoleLabel(roleKey)}
                                 </button>
                             ))}
                             <span className="hidden sm:block h-5 w-px bg-slate-200" />
-                            {(['all', 'club', 'association'] as const).map((typeKey) => (
+                            {typeFilterOptions.map((typeKey) => (
                                 <button
                                     key={typeKey}
                                     type="button"
@@ -244,7 +265,7 @@ const AccountSwitch: React.FC = () => {
                                             : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 hover:text-slate-900'
                                     }`}
                                 >
-                                    {typeKey === 'all' ? 'Tous les types' : typeKey === 'club' ? 'Clubs' : 'Associations'}
+                                    {typeKey === 'all' ? 'Tous les types' : formatTypeLabel(typeKey)}
                                 </button>
                             ))}
                         </div>
@@ -305,9 +326,9 @@ const AccountSwitch: React.FC = () => {
                                     />
                                     <div className="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-slate-900/10 to-transparent transition opacity-90 group-hover:opacity-100" />
                                     <div className="absolute top-4 left-4 inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-slate-700 shadow-sm">
-                                        {org.type === 'club' ? 'Club' : 'Association'}
+                                        {formatTypeLabel(org.type)}
                                         <span className="h-1 w-1 rounded-full bg-slate-400" />
-                                        {org.role}
+                                        {formatRoleLabel(org.role)}
                                     </div>
                                 </div>
                                 <div className="p-5 bg-white dark:bg-slate-900">
@@ -378,3 +399,33 @@ const AccountSwitch: React.FC = () => {
 };
 
 export default AccountSwitch;
+
+const formatRoleLabel = (role: Organisation['role'] | 'all'): string => {
+    if (role === 'all') return 'Tous les rôles';
+    switch (role) {
+        case 'membre':
+            return 'Rôle membre';
+        case 'coach':
+            return 'Rôle coach';
+        case 'gestionnaire':
+            return 'Gestionnaire';
+        case 'independant':
+            return 'Coach indépendant';
+        default:
+            return role;
+    }
+};
+
+const formatTypeLabel = (type: Organisation['type'] | 'all'): string => {
+    if (type === 'all') return 'Tous les types';
+    switch (type) {
+        case 'club':
+            return 'Club';
+        case 'association':
+            return 'Association';
+        case 'independant':
+            return 'Indépendant';
+        default:
+            return type;
+    }
+};

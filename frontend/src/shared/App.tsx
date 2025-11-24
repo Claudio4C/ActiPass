@@ -16,6 +16,14 @@ import VideoLessonsPage from '../pages/club/VideoLessonsPage';
 import PlanningPage from '../pages/club/PlanningPage';
 import AccountSwitch from '../pages/AccountSwitch';
 import LoyaltyPage from '../pages/club/LoyaltyPage';
+import CoachPlanningPage from '../pages/coach/PlanningPage';
+import CoachProfilePage from '../pages/coach/ProfilePage';
+import CoachApplicationsPage from '../pages/coach/ApplicationsPage';
+import CoachBillingPage from '../pages/coach/BillingPage';
+import CoachMessagesPage from '../pages/coach/MessagesPage';
+import CoachMessageDetailPage from '../pages/coach/MessageDetailPage';
+import CoachesDirectoryPage from '../pages/club/CoachesDirectoryPage';
+import HomePage from '../pages/HomePage';
 
 interface AppProps {
     mode: AppMode;
@@ -85,6 +93,12 @@ const AppContent: React.FC<{
                     element={<ResendVerification />}
                 />
 
+                {/* Page d'accueil générale */}
+                <Route
+                    path="/home"
+                    element={<HomePage />}
+                />
+
                 {/* Routes protégées */}
                 <Route
                     path={protectedPath}
@@ -137,6 +151,12 @@ const AppContent: React.FC<{
                         <PlanningPage />
                     }
                 />
+                <Route
+                    path="/club/coaches"
+                    element={
+                        <CoachesDirectoryPage />
+                    }
+                />
                 {/* Sélection de compte / organisation */}
                 <Route
                     path="/accounts"
@@ -152,6 +172,44 @@ const AppContent: React.FC<{
                     path="/account/subscriptions"
                     element={
                         <SubscriptionPage />
+                    }
+                />
+
+                {/* Espace coach */}
+                <Route
+                    path="/coach/planning"
+                    element={
+                        <CoachPlanningPage />
+                    }
+                />
+                <Route
+                    path="/coach/profile"
+                    element={
+                        <CoachProfilePage />
+                    }
+                />
+                <Route
+                    path="/coach/messages"
+                    element={
+                        <CoachMessagesPage />
+                    }
+                />
+                <Route
+                    path="/coach/messages/:messageId"
+                    element={
+                        <CoachMessageDetailPage />
+                    }
+                />
+                <Route
+                    path="/coach/applications"
+                    element={
+                        <CoachApplicationsPage />
+                    }
+                />
+                <Route
+                    path="/coach/billing"
+                    element={
+                        <CoachBillingPage />
                     }
                 />
 
