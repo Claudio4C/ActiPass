@@ -9,6 +9,7 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SuperAdminThrottlerGuard } from './auth/guards/super-admin-throttler.guard';
 import { EmailModule } from './email/email.module';
+import { EventsModule } from './events/events.module';
 import { OrganisationsModule } from './organisations/organisations.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './users/users.module';
@@ -21,19 +22,20 @@ import { UsersModule } from './users/users.module';
     }),
     ThrottlerModule.forRoot([
       {
-        ttl: 60,
-        limit: 10,
+        ttl: 60, // 60 secondes
+        limit: 50, // 50 requêtes par minute (augmenté de 10 pour permettre une navigation normale)
       },
       {
         name: 'auth',
         ttl: 60,
-        limit: 5,
+        limit: 10, // 10 tentatives de connexion par minute (augmenté de 5)
       },
     ]),
     PrismaModule,
     AuthModule,
     UsersModule,
     OrganisationsModule,
+    EventsModule,
     EmailModule,
   ],
   controllers: [AppController],

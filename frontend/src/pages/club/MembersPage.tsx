@@ -340,14 +340,14 @@ const MembersPage: React.FC = () => {
                         </p>
                         <div className="mt-5 flex flex-wrap gap-3">
                             <Link
-                                to="#"
+                                to="/club/events"
                                 className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400"
                             >
                                 <span className="relative flex h-2.5 w-2.5">
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
                                     <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-white" />
                                 </span>
-                                S’inscrire à un cours
+                                Voir les événements
                             </Link>
                             <Link
                                 to="#"
@@ -452,11 +452,11 @@ const MembersPage: React.FC = () => {
             <section className="mt-12">
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Partenaires</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-center">
-                    {[0,1,2,3].map((i) => (
+                    {[0, 1, 2, 3].map((i) => (
                         <div key={i} className="h-14 rounded-xl ring-1 ring-gray-200/60 dark:ring-slate-700 bg-white/70 dark:bg-slate-900/70 backdrop-blur flex items-center justify-center">
                             <ImgWithFallback
                                 src={unsplash(160, 56, 'logo,minimal,brand,monochrome', `partner-${i}`)}
-                                alt={`Partenaire ${i+1}`}
+                                alt={`Partenaire ${i + 1}`}
                                 className="h-8 w-auto object-contain opacity-70"
                                 width={160}
                                 height={56}
@@ -511,11 +511,10 @@ const MembersPage: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => setDisciplineFilter('all')}
-                            className={`rounded-full px-4 py-2 text-xs font-medium transition shadow-sm border ${
-                                disciplineFilter === 'all'
-                                    ? 'bg-indigo-500 text-white border-indigo-500'
-                                    : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-200 hover:text-indigo-600'
-                            }`}
+                            className={`rounded-full px-4 py-2 text-xs font-medium transition shadow-sm border ${disciplineFilter === 'all'
+                                ? 'bg-indigo-500 text-white border-indigo-500'
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-200 hover:text-indigo-600'
+                                }`}
                         >
                             Toutes les disciplines
                         </button>
@@ -524,11 +523,10 @@ const MembersPage: React.FC = () => {
                                 key={discipline}
                                 type="button"
                                 onClick={() => setDisciplineFilter(discipline)}
-                                className={`rounded-full px-4 py-2 text-xs font-medium transition shadow-sm border ${
-                                    disciplineFilter === discipline
-                                        ? 'bg-slate-900 text-white border-slate-900'
-                                        : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:text-slate-900'
-                                }`}
+                                className={`rounded-full px-4 py-2 text-xs font-medium transition shadow-sm border ${disciplineFilter === discipline
+                                    ? 'bg-slate-900 text-white border-slate-900'
+                                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:text-slate-900'
+                                    }`}
                             >
                                 {discipline}
                             </button>
@@ -1294,14 +1292,14 @@ const TeacherModal: React.FC<{
                         <div className="grid grid-cols-1 md:grid-cols-5">
                             {/* Visual side */}
                             <div className="relative md:col-span-2">
-                            <ImgWithFallback
-                                src={unsplash(800, 800, teacher.query, `teacher-modal-${teacher.name}`)}
-                                alt={teacher.name}
+                                <ImgWithFallback
+                                    src={unsplash(800, 800, teacher.query, `teacher-modal-${teacher.name}`)}
+                                    alt={teacher.name}
                                     className="w-full h-56 md:h-full object-cover"
-                                width={800}
-                                height={800}
-                                seed={`teacher-modal-${teacher.name}`}
-                            />
+                                    width={800}
+                                    height={800}
+                                    seed={`teacher-modal-${teacher.name}`}
+                                />
                                 <div className="absolute inset-x-0 bottom-0 p-4">
                                     <span className="inline-flex items-center rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white ring-1 ring-white/20 backdrop-blur">
                                         Coach

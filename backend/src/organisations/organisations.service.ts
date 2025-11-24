@@ -1,12 +1,16 @@
 import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
 
+import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 
-import { CreateOrganisationDto, UpdateOrganisationDto } from './dto';
+import { CreateOrganisationDto, UpdateOrganisationDto, InviteMemberDto } from './dto';
 
 @Injectable()
 export class OrganisationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService
+  ) {}
 
   /**
    * Créer une nouvelle organisation
@@ -112,6 +116,7 @@ export class OrganisationsService {
       organisation: membership.organisation,
       role: membership.role,
       joined_at: membership.joined_at,
+      status: membership.status,
     }));
   }
 
@@ -262,7 +267,8 @@ export class OrganisationsService {
     const members = await this.prisma.membership.findMany({
       where: {
         organisation_id: organisationId,
-        left_at: null,
+        left_at: null, // Seulement les membres actifs (non retirés)
+        deleted_at: null, // Exclure aussi les membres supprimés (soft delete)
       },
       include: {
         user: {
@@ -286,6 +292,10 @@ export class OrganisationsService {
       },
       orderBy: { joined_at: 'asc' },
     });
+
+    console.log(
+      `[getOrganisationMembers] Retourné ${members.length} membres actifs pour l'organisation ${organisationId}`
+    );
 
     return members.map((member) => ({
       id: member.user.id,
@@ -391,14 +401,70 @@ export class OrganisationsService {
       throw new BadRequestException('Vous ne pouvez pas vous retirer de votre propre organisation');
     }
 
-    // Marquer l'adhésion comme terminée
-    await this.prisma.membership.updateMany({
+    // Vérifier que le membre existe et est actif
+    // Utiliser findFirst pour trouver le membership actif
+    const memberToRemove = await this.prisma.membership.findFirst({
       where: {
         user_id: memberId,
         organisation_id: organisationId,
         left_at: null,
+        deleted_at: null, // Exclure aussi les membres supprimés (soft delete)
       },
-      data: { left_at: new Date() },
+    });
+
+    if (!memberToRemove) {
+      throw new BadRequestException('Membre introuvable ou déjà retiré de cette organisation');
+    }
+
+    console.log(`[removeMember] Trouvé membership à retirer:`, {
+      membershipId: memberToRemove.id,
+      userId: memberId,
+      organisationId: organisationId,
+      currentLeftAt: memberToRemove.left_at,
+    });
+
+    // Marquer l'adhésion comme terminée en utilisant l'ID du membership pour garantir la mise à jour
+    const leftAtDate = new Date();
+    const updatedMembership = await this.prisma.membership.update({
+      where: {
+        id: memberToRemove.id,
+      },
+      data: {
+        left_at: leftAtDate,
+        // Le status reste tel quel, seul left_at indique que le membre a quitté
+      },
+    });
+
+    console.log(`[removeMember] Membership mis à jour:`, {
+      membershipId: updatedMembership.id,
+      leftAt: updatedMembership.left_at,
+      success: !!updatedMembership.left_at,
+    });
+
+    // Vérifier que la mise à jour a bien été effectuée
+    if (!updatedMembership.left_at) {
+      throw new BadRequestException('Erreur lors de la mise à jour du membership');
+    }
+
+    // Vérifier en relisant depuis la BDD pour confirmer
+    const verifyMembership = await this.prisma.membership.findUnique({
+      where: { id: memberToRemove.id },
+      select: { id: true, left_at: true, user_id: true, organisation_id: true },
+    });
+
+    if (!verifyMembership || !verifyMembership.left_at) {
+      console.error(`[removeMember] ERREUR: La mise à jour n'a pas été persistée en BDD`, {
+        membershipId: memberToRemove.id,
+        verifyResult: verifyMembership,
+      });
+      throw new BadRequestException(
+        "La mise à jour du membership n'a pas été persistée en base de données"
+      );
+    }
+
+    console.log(`[removeMember] Vérification BDD réussie:`, {
+      membershipId: verifyMembership.id,
+      leftAt: verifyMembership.left_at,
     });
 
     return { message: 'Membre retiré avec succès' };
@@ -475,6 +541,267 @@ export class OrganisationsService {
     return {
       message: "Demande d'adhésion envoyée avec succès",
       membership,
+    };
+  }
+
+  /**
+   * Inviter un membre par email
+   */
+  async inviteMember(organisationId: string, userId: string, inviteMemberDto: InviteMemberDto) {
+    // Vérifier que l'utilisateur est propriétaire ou admin
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        user_id: userId,
+        organisation_id: organisationId,
+        left_at: null,
+        role: {
+          type: {
+            in: ['club_owner', 'club_manager'] as ('club_owner' | 'club_manager')[],
+          },
+        },
+      },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException(
+        'Seul le propriétaire ou un administrateur peut inviter des membres'
+      );
+    }
+
+    // Vérifier que l'organisation existe
+    const organisation = await this.prisma.organisation.findUnique({
+      where: { id: organisationId },
+    });
+
+    if (!organisation) {
+      throw new BadRequestException('Organisation non trouvée');
+    }
+
+    // Vérifier si l'utilisateur existe déjà
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: inviteMemberDto.email },
+    });
+
+    const roleType = inviteMemberDto.roleType || 'member';
+
+    // Trouver le rôle
+    const role = await this.prisma.role.findFirst({
+      where: {
+        type: roleType as 'club_owner' | 'club_manager' | 'treasurer' | 'coach' | 'member',
+        space: organisation.type === 'sport' ? 'club_360' : 'municipality',
+      },
+    });
+
+    if (!role) {
+      throw new BadRequestException(`Rôle ${roleType} non trouvé`);
+    }
+
+    // Si l'utilisateur existe déjà, créer directement le membership
+    if (existingUser) {
+      const existingMembership = await this.prisma.membership.findFirst({
+        where: {
+          user_id: existingUser.id,
+          organisation_id: organisationId,
+          left_at: null,
+        },
+      });
+
+      if (existingMembership) {
+        throw new BadRequestException('Cet utilisateur est déjà membre de cette organisation');
+      }
+
+      // Créer le membership
+      await this.prisma.membership.create({
+        data: {
+          user_id: existingUser.id,
+          organisation_id: organisationId,
+          role_id: role.id,
+          joined_at: new Date(),
+          status: 'pending',
+        },
+      });
+
+      // Envoyer un email de notification
+      await this.emailService.sendEmail({
+        to: inviteMemberDto.email,
+        subject: `Invitation à rejoindre ${organisation.name}`,
+        html: `
+          <h2>Vous avez été invité à rejoindre ${organisation.name}</h2>
+          <p>Bonjour ${inviteMemberDto.firstname || inviteMemberDto.email},</p>
+          <p>Vous avez été invité à rejoindre l'organisation <strong>${organisation.name}</strong> en tant que <strong>${role.name}</strong>.</p>
+          <p>Connectez-vous à votre compte pour accepter l'invitation.</p>
+          ${inviteMemberDto.message ? `<p><em>${inviteMemberDto.message}</em></p>` : ''}
+        `,
+      });
+
+      return { message: 'Invitation envoyée avec succès' };
+    }
+
+    // Si l'utilisateur n'existe pas, envoyer un email d'invitation avec lien d'inscription
+    const invitationToken = `invite_${organisationId}_${Date.now()}`; // TODO: Générer un token sécurisé
+
+    await this.emailService.sendEmail({
+      to: inviteMemberDto.email,
+      subject: `Invitation à rejoindre ${organisation.name}`,
+      html: `
+        <h2>Invitation à rejoindre ${organisation.name}</h2>
+        <p>Bonjour ${inviteMemberDto.firstname || inviteMemberDto.email},</p>
+        <p>Vous avez été invité à rejoindre l'organisation <strong>${organisation.name}</strong> en tant que <strong>${role.name}</strong>.</p>
+        <p>Pour accepter cette invitation, veuillez créer un compte en cliquant sur le lien ci-dessous :</p>
+        <p><a href="${process.env.FRONTEND_URL || 'http://localhost:5173'}/register?invite=${invitationToken}">Créer mon compte et accepter l'invitation</a></p>
+        ${inviteMemberDto.message ? `<p><em>${inviteMemberDto.message}</em></p>` : ''}
+      `,
+    });
+
+    return { message: 'Invitation envoyée avec succès' };
+  }
+
+  /**
+   * Récupérer l'historique des anciens membres (left_at != null)
+   */
+  async getOrganisationMembersHistory(organisationId: string, userId: string) {
+    // Vérifier que l'utilisateur est membre de l'organisation
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        user_id: userId,
+        organisation_id: organisationId,
+        left_at: null,
+      },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException("Vous n'êtes pas membre de cette organisation");
+    }
+
+    const members = await this.prisma.membership.findMany({
+      where: {
+        organisation_id: organisationId,
+        left_at: { not: null }, // Seulement les membres qui ont quitté
+        deleted_at: null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstname: true,
+            lastname: true,
+            username: true,
+            created_at: true,
+          },
+        },
+        role: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            level: true,
+          },
+        },
+      },
+      orderBy: { left_at: 'desc' },
+    });
+
+    return members.map((member) => ({
+      id: member.user.id,
+      email: member.user.email,
+      firstname: member.user.firstname,
+      lastname: member.user.lastname,
+      username: member.user.username,
+      role: member.role,
+      joined_at: member.joined_at,
+      left_at: member.left_at,
+    }));
+  }
+
+  /**
+   * Exporter les membres en CSV
+   */
+  async exportMembersToCSV(
+    organisationId: string,
+    userId: string,
+    includeHistory: boolean = false
+  ) {
+    // Vérifier que l'utilisateur est membre de l'organisation
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        user_id: userId,
+        organisation_id: organisationId,
+        left_at: null,
+      },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException("Vous n'êtes pas membre de cette organisation");
+    }
+
+    const whereClause: {
+      organisation_id: string;
+      deleted_at: null;
+      left_at?: null | { not: null };
+    } = {
+      organisation_id: organisationId,
+      deleted_at: null,
+    };
+
+    if (!includeHistory) {
+      whereClause.left_at = null;
+    }
+
+    const members = await this.prisma.membership.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstname: true,
+            lastname: true,
+            username: true,
+            phone: true,
+            created_at: true,
+          },
+        },
+        role: {
+          select: {
+            name: true,
+            type: true,
+          },
+        },
+      },
+      orderBy: { joined_at: 'asc' },
+    });
+
+    // Générer le CSV
+    const headers = [
+      'Email',
+      'Prénom',
+      'Nom',
+      'Username',
+      'Téléphone',
+      'Rôle',
+      "Date d'adhésion",
+      'Date de départ',
+    ];
+    const rows = members.map((member) => [
+      member.user.email,
+      member.user.firstname,
+      member.user.lastname,
+      member.user.username || '',
+      member.user.phone || '',
+      member.role.name,
+      member.joined_at.toISOString().split('T')[0],
+      member.left_at ? member.left_at.toISOString().split('T')[0] : '',
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+    ].join('\n');
+
+    return {
+      csv: csvContent,
+      filename: `membres_${organisationId}_${new Date().toISOString().split('T')[0]}.csv`,
     };
   }
 }

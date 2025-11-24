@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { type LucideIcon, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
+import type { LucideProps } from 'lucide-react';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
     label?: string;
-    icon?: LucideIcon;
+    icon?: React.ComponentType<LucideProps>;
     error?: string;
     mode?: 'club' | 'municipalite';
 }
