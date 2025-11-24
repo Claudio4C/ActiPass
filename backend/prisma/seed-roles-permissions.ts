@@ -89,6 +89,43 @@ async function seedRolesAndPermissions() {
       scope: 'organisation',
     },
 
+    // 6.2.1 Événements (stages, tournois, compétitions, cours)
+    {
+      name: 'Lire les événements',
+      slug: 'events:read',
+      resource: 'events',
+      action: 'read',
+      scope: 'organisation',
+    },
+    {
+      name: 'Créer des événements',
+      slug: 'events:create',
+      resource: 'events',
+      action: 'create',
+      scope: 'organisation',
+    },
+    {
+      name: 'Modifier des événements',
+      slug: 'events:update',
+      resource: 'events',
+      action: 'update',
+      scope: 'organisation',
+    },
+    {
+      name: 'Supprimer des événements',
+      slug: 'events:delete',
+      resource: 'events',
+      action: 'delete',
+      scope: 'organisation',
+    },
+    {
+      name: 'Gérer les événements',
+      slug: 'events:manage',
+      resource: 'events',
+      action: 'manage',
+      scope: 'organisation',
+    },
+
     // 6.3 Réservations & Planning
     {
       name: 'Consulter les créneaux',
@@ -367,6 +404,7 @@ async function seedRolesAndPermissions() {
       permissions: [
         'directory:*',
         'activity:*',
+        'events:*',
         'booking:*',
         'case:*',
         'document:*',
@@ -390,6 +428,7 @@ async function seedRolesAndPermissions() {
       permissions: [
         'directory:*',
         'activity:manage',
+        'events:*',
         'booking:*',
         'case:*',
         'document:*',
@@ -414,7 +453,15 @@ async function seedRolesAndPermissions() {
       type: 'coach',
       level: 50,
       is_default: false,
-      permissions: ['booking:read', 'attendance:manage', 'comm:message', 'case:read'],
+      permissions: [
+        'events:read',
+        'events:create',
+        'events:update',
+        'booking:read',
+        'attendance:manage',
+        'comm:message',
+        'case:read',
+      ],
     },
     {
       name: 'Adhérent',

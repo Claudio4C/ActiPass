@@ -6,7 +6,7 @@ import VerifyEmail from '../pages/VerifyEmail';
 import ForgotPassword from '../pages/ForgotPassword';
 import ResetPassword from '../pages/ResetPassword';
 import ResendVerification from '../pages/ResendVerification';
-import MembersPage from '../pages/club/MembersPage';
+import ClubMembersPage from '../pages/club/MembersPage';
 import ProfilePage from '../pages/club/ProfilePage';
 import SubscriptionPage from '../pages/club/SubscriptionPage';
 import NotificationsPage from '../pages/club/NotificationsPage';
@@ -14,8 +14,16 @@ import TeachersPage from '../pages/club/TeachersPage';
 import DisciplinesPage from '../pages/club/DisciplinesPage';
 import VideoLessonsPage from '../pages/club/VideoLessonsPage';
 import PlanningPage from '../pages/club/PlanningPage';
+import EventsPageClub from '../pages/club/EventsPage';
 import AccountSwitch from '../pages/AccountSwitch';
 import LoyaltyPage from '../pages/club/LoyaltyPage';
+import OverviewPage from '../pages/dashboard/OverviewPage';
+import MembersPage from '../pages/dashboard/MembersPage';
+import MemberDetailPage from '../pages/dashboard/MemberDetailPage';
+import EventsPage from '../pages/dashboard/EventsPage';
+import EventCreatePage from '../pages/dashboard/EventCreatePage';
+import EventEditPage from '../pages/dashboard/EventEditPage';
+import EventDetailPage from '../pages/dashboard/EventDetailPage';
 
 interface AppProps {
     mode: AppMode;
@@ -98,7 +106,7 @@ const AppContent: React.FC<{
                 <Route
                     path="/club/members"
                     element={
-                        <MembersPage />
+                        <ClubMembersPage />
                     }
                 />
                 <Route
@@ -137,6 +145,85 @@ const AppContent: React.FC<{
                         <PlanningPage />
                     }
                 />
+                <Route
+                    path="/club/events"
+                    element={
+                        <EventsPageClub />
+                    }
+                />
+                {/* Routes Dashboard avec organisationId */}
+                <Route
+                    path="/dashboard/:organisationId/overview"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <OverviewPage />
+                        </ProtectedRoute>
+                    }
+                />
+                {/* Redirection depuis /dashboard/:organisationId vers overview */}
+                <Route
+                    path="/dashboard/:organisationId"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <Navigate to="overview" replace />
+                        </ProtectedRoute>
+                    }
+                />
+                {/* Routes Membres */}
+                <Route
+                    path="/dashboard/:organisationId/members"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <MembersPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/:organisationId/members/:memberId"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <MemberDetailPage />
+                        </ProtectedRoute>
+                    }
+                />
+                {/* Routes Événements */}
+                <Route
+                    path="/dashboard/:organisationId/events"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <EventsPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/:organisationId/events/create"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <EventCreatePage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/:organisationId/events/:eventId"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <EventDetailPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/:organisationId/events/:eventId/edit"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <EventEditPage />
+                        </ProtectedRoute>
+                    }
+                />
+                {/* /dashboard/:organisationId/attendance */}
+                {/* /dashboard/:organisationId/payments */}
+                {/* /dashboard/:organisationId/documents */}
+                {/* /dashboard/:organisationId/settings */}
+
                 {/* Sélection de compte / organisation */}
                 <Route
                     path="/accounts"

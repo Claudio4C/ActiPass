@@ -1,11 +1,10 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
   output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -59,17 +58,17 @@ model User {
 }
 
 model Role {
-  id          String       @id @default(uuid())
+  id          String           @id @default(uuid())
   name        String
-  slug        String       @unique
+  slug        String           @unique
   description String?
-  is_default  Boolean      @default(false)
+  is_default  Boolean          @default(false)
   level       Int
   space       UserSpace
   type        RoleType
-  created_at  DateTime     @default(now())
+  created_at  DateTime         @default(now())
   deleted_at  DateTime?
-  updated_at  DateTime     @updatedAt
+  updated_at  DateTime         @updatedAt
   memberships Membership[]
   permissions RolePermission[]
 
@@ -77,31 +76,31 @@ model Role {
 }
 
 model Permission {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  slug        String   @unique
+  id          String    @id @default(uuid())
+  name        String    @unique
+  slug        String    @unique
   description String?
-  resource    String   // 'events', 'members', 'payments', etc.
-  action      String   // 'create', 'read', 'update', 'delete', 'manage'
-  scope       String   // 'own', 'organisation', 'global'
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  resource    String // 'events', 'members', 'payments', etc.
+  action      String // 'create', 'read', 'update', 'delete', 'manage'
+  scope       String // 'own', 'organisation', 'global'
+  created_at  DateTime  @default(now())
+  updated_at  DateTime  @updatedAt
   deleted_at  DateTime?
-  
+
   rolePermissions RolePermission[]
-  
+
   @@map("permissions")
 }
 
 model RolePermission {
-  id            String     @id @default(uuid())
+  id            String   @id @default(uuid())
   role_id       String
   permission_id String
-  created_at    DateTime   @default(now())
-  
-  role        Role       @relation(fields: [role_id], references: [id], onDelete: Cascade)
-  permission  Permission @relation(fields: [permission_id], references: [id], onDelete: Cascade)
-  
+  created_at    DateTime @default(now())
+
+  role       Role       @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+
   @@unique([role_id, permission_id])
   @@map("role_permissions")
 }
@@ -230,6 +229,7 @@ model Event {
   id                    String             @id @default(uuid())
   organisation_id       String
   linked_listing_id     String?
+  parent_event_id       String? // Pour les séries récurrentes : référence l'événement parent
   title                 String
   description           String?
   event_type            EventType
@@ -242,7 +242,7 @@ model Event {
   registration_required Boolean            @default(false)
   price                 Float              @default(0)
   is_recurring          Boolean            @default(false)
-  recurrence_pattern    String?
+  recurrence_pattern    String? // JSON string pour la récurrence
   status                EventStatus        @default(draft)
   cover_url             String?
   created_at            DateTime           @default(now())
@@ -254,11 +254,14 @@ model Event {
   created_by            User               @relation("EventCreatedBy", fields: [created_by_id], references: [id])
   linked_listing        Listing?           @relation(fields: [linked_listing_id], references: [id])
   organisation          Organisation       @relation(fields: [organisation_id], references: [id])
+  parent_event          Event?             @relation("EventRecurrence", fields: [parent_event_id], references: [id])
+  recurring_occurrences Event[]            @relation("EventRecurrence")
   Invoice               Invoice[]
   Reservation           Reservation[]
 
   @@index([organisation_id, start_time])
   @@index([start_time, end_time, status])
+  @@index([parent_event_id])
   @@map("events")
 }
 
@@ -546,17 +549,17 @@ model Penalty {
 }
 
 model AuditLog {
-  id              String    @id @default(uuid())
+  id              String   @id @default(uuid())
   user_id         String
-  action          String    // create, update, delete, export, approve, login, etc.
-  resource_type   String    // events, members, payments, etc.
+  action          String // create, update, delete, export, approve, login, etc.
+  resource_type   String // events, members, payments, etc.
   resource_id     String?
   organisation_id String?
   details         Json?
   ip_address      String?
   user_agent      String?
-  timestamp       DateTime  @default(now())
-  user            User      @relation(fields: [user_id], references: [id])
+  timestamp       DateTime @default(now())
+  user            User     @relation(fields: [user_id], references: [id])
 
   @@index([user_id, timestamp])
   @@index([organisation_id, timestamp])
@@ -779,20 +782,20 @@ enum PenaltyType {
 }
 
 enum UserSpace {
-  club_360      // Espace 360° (associatif/privé)
-  municipality  // Portail Propriétaire (Mairie)
+  club_360 // Espace 360° (associatif/privé)
+  municipality // Portail Propriétaire (Mairie)
 }
 
 enum RoleType {
   // Espace 360° - Rôles optimisés
-  club_owner      // Propriétaire (tous droits)
-  club_manager    // Gestionnaire (gestion opérationnelle)
-  treasurer       // Trésorier (finances uniquement)
-  coach           // Coach (ses cours + présences)
-  member          // Membre (lecture + réservations)
-  
+  club_owner // Propriétaire (tous droits)
+  club_manager // Gestionnaire (gestion opérationnelle)
+  treasurer // Trésorier (finances uniquement)
+  coach // Coach (ses cours + présences)
+  member // Membre (lecture + réservations)
+
   // Portail Propriétaire - Rôles municipaux
-  municipal_admin     // Admin municipal (tous droits)
-  municipal_manager   // Gestionnaire (équipements + subventions)
-  municipal_viewer    // Lecteur (données agrégées)
+  municipal_admin // Admin municipal (tous droits)
+  municipal_manager // Gestionnaire (équipements + subventions)
+  municipal_viewer // Lecteur (données agrégées)
 }

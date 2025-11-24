@@ -1,17 +1,22 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin } from 'lucide-react';
+import { MapPin, Loader2, AlertCircle } from 'lucide-react';
 import Layout from '../components/layout/Layout';
+import { api } from '../lib/api';
+import type { RoleType } from '../types';
 
 type Organisation = {
     id: string;
     name: string;
-    role: 'membre' | 'coach' | 'gestionnaire';
+    role: 'membre' | 'coach' | 'gestionnaire' | 'propriétaire' | 'trésorier';
+    roleType: RoleType;
+    roleName: string;
     type: 'club' | 'association';
     coverQuery: string;
     avatarQuery: string;
     subtitle?: string;
     description?: string;
+    membershipStatus?: 'pending' | 'active' | 'banned';
 };
 
 const unsplash = (w: number, h: number, query: string, seed: string | number) =>
@@ -31,83 +36,147 @@ const ImgWithFallback: React.FC<{ src: string; alt: string; className?: string; 
     );
 };
 
-const mockOrgs: Organisation[] = [
-    {
-        id: 'org-1',
-        name: 'Gracie Nova',
-        role: 'membre',
-        type: 'club',
-        coverQuery: 'brazilian jiu jitsu,dojo,mats,training',
-        avatarQuery: 'bjj logo,emblem',
-        subtitle: "Espace membres officiel de l’académie Gracie Nova, quartier de la Croix-Rousse",
-        description:
-            'Club historique de Lyon spécialisé en jiu-jitsu brésilien, cours tous niveaux et préparation compétition.',
-    },
-    {
-        id: 'org-2',
-        name: 'Grappling Lyon',
-        role: 'coach',
-        type: 'association',
-        coverQuery: 'brazilian jiu jitsu,gi training,grappling',
-        avatarQuery: 'martial arts logo,minimal',
-        subtitle: 'Association dédiée au grappling no-gi et à la lutte moderne dans le 7ᵉ arrondissement.',
-        description:
-            'Séances intensives en no-gi, ateliers lutte et conditionnement physique pour compétiteurs et passionnés.',
-    },
-    {
-        id: 'org-3',
-        name: 'No-Gi Academy',
-        role: 'gestionnaire',
-        type: 'club',
-        coverQuery: 'no-gi grappling,training,dojo',
-        avatarQuery: 'minimal logo,abstract',
-        subtitle: 'Académie spécialisée dans les disciplines no-gi et le travail en mobilité.',
-        description:
-            'Coaching personnalisé, mobilité et fluidité au sol pour grapplers souhaitant progresser sans kimono.',
-    },
-];
+// Mapper les rôles de la BDD vers les rôles de l'UI
+const mapRoleToUI = (roleType: RoleType): Organisation['role'] => {
+    switch (roleType) {
+        case 'club_owner':
+            return 'propriétaire';
+        case 'club_manager':
+            return 'gestionnaire';
+        case 'treasurer':
+            return 'trésorier';
+        case 'coach':
+            return 'coach';
+        case 'member':
+        default:
+            return 'membre';
+    }
+};
+
+// Générer des queries Unsplash basées sur le nom de l'organisation
+const generateQueries = (orgName: string): { cover: string; avatar: string } => {
+    const lowerName = orgName.toLowerCase();
+    let coverQuery = 'sports,club,association';
+    let avatarQuery = 'logo,emblem';
+
+    if (lowerName.includes('jiu') || lowerName.includes('bjj') || lowerName.includes('grappling')) {
+        coverQuery = 'brazilian jiu jitsu,dojo,mats,training';
+        avatarQuery = 'bjj logo,emblem';
+    } else if (lowerName.includes('tennis')) {
+        coverQuery = 'tennis,court,racket';
+        avatarQuery = 'tennis logo';
+    } else if (lowerName.includes('football') || lowerName.includes('soccer')) {
+        coverQuery = 'football,soccer,field';
+        avatarQuery = 'football logo';
+    } else if (lowerName.includes('basket')) {
+        coverQuery = 'basketball,court,hoop';
+        avatarQuery = 'basketball logo';
+    }
+
+    return { cover: coverQuery, avatar: avatarQuery };
+};
 
 const primarySection = 'bg-white/80 dark:bg-slate-900/80 backdrop-blur rounded-3xl border border-white/60 dark:border-slate-800 shadow-lg';
-const secondarySection = 'bg-white/70 dark:bg-slate-900/70 backdrop-blur rounded-3xl border border-white/60 dark:border-slate-800 shadow-sm';
 
 const AccountSwitch: React.FC = () => {
     const navigate = useNavigate();
+    const [organisations, setOrganisations] = React.useState<Organisation[]>([]);
+    const [loading, setLoading] = React.useState(true);
+    const [error, setError] = React.useState<string | null>(null);
     const [search, setSearch] = React.useState('');
     const [roleFilter, setRoleFilter] = React.useState<'all' | Organisation['role']>('all');
     const [typeFilter, setTypeFilter] = React.useState<'all' | Organisation['type']>('all');
     const [lastSelectedId, setLastSelectedId] = React.useState<string | null>(null);
+
+    // Charger les organisations depuis l'API
+    React.useEffect(() => {
+        const loadOrganisations = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+                const data = await api.get<Array<{
+                    organisation: {
+                        id: string;
+                        name: string;
+                        type: 'club' | 'association' | null;
+                        description: string | null;
+                    };
+                    role: {
+                        id: string;
+                        name: string;
+                        type: RoleType;
+                        level: number;
+                    };
+                    joined_at: string;
+                    status: 'pending' | 'active' | 'banned';
+                }>>('/organisations/my', {}, { useCache: true, cacheTTL: 60000 });
+
+                const mappedOrgs: Organisation[] = data.map((item) => {
+                    const orgType = item.organisation.type || 'club';
+                    const queries = generateQueries(item.organisation.name);
+                    const uiRole = mapRoleToUI(item.role.type);
+
+                    return {
+                        id: item.organisation.id,
+                        name: item.organisation.name,
+                        role: uiRole,
+                        roleType: item.role.type,
+                        roleName: item.role.name,
+                        type: orgType,
+                        coverQuery: queries.cover,
+                        avatarQuery: queries.avatar,
+                        subtitle: item.organisation.description || undefined,
+                        description: item.organisation.description || undefined,
+                        membershipStatus: item.status || 'active', // Ajouter le statut du membership
+                    };
+                });
+
+                setOrganisations(mappedOrgs);
+            } catch (err: any) {
+                console.error('Error loading organisations:', err);
+                setError(err?.response?.data?.message || err?.message || 'Erreur lors du chargement des organisations');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadOrganisations();
+    }, []);
 
     React.useEffect(() => {
         if (typeof window === 'undefined') return;
         const stored = window.localStorage.getItem('selectedOrganisation');
         if (!stored) return;
         try {
-            const parsed: Organisation = JSON.parse(stored);
-            setLastSelectedId(parsed.id);
+            const parsed = JSON.parse(stored);
+            if (parsed?.id) {
+                setLastSelectedId(parsed.id);
+            }
         } catch (error) {
             console.error('Impossible de récupérer la dernière organisation sélectionnée', error);
         }
     }, []);
 
     const filteredOrgs = React.useMemo(() => {
-        return mockOrgs.filter((org) => {
+        return organisations.filter((org) => {
             const matchesSearch =
                 search.trim().length === 0 ||
                 org.name.toLowerCase().includes(search.trim().toLowerCase()) ||
-                org.role.toLowerCase().includes(search.trim().toLowerCase());
+                org.role.toLowerCase().includes(search.trim().toLowerCase()) ||
+                org.roleName.toLowerCase().includes(search.trim().toLowerCase());
             const matchesRole = roleFilter === 'all' || org.role === roleFilter;
             const matchesType = typeFilter === 'all' || org.type === typeFilter;
             return matchesSearch && matchesRole && matchesType;
         });
-    }, [search, roleFilter, typeFilter]);
+    }, [organisations, search, roleFilter, typeFilter]);
 
     const stats = React.useMemo(() => {
-        const total = mockOrgs.length;
-        const clubs = mockOrgs.filter((org) => org.type === 'club').length;
+        const total = organisations.length;
+        const clubs = organisations.filter((org) => org.type === 'club').length;
         const associations = total - clubs;
-        const coachRoles = mockOrgs.filter((org) => org.role === 'coach').length;
+        const coachRoles = organisations.filter((org) => org.role === 'coach').length;
         return { total, clubs, associations, coachRoles };
-    }, []);
+    }, [organisations]);
 
     const handleDiscoverNearby = React.useCallback(() => {
         if (typeof window === 'undefined') return;
@@ -142,12 +211,22 @@ const AccountSwitch: React.FC = () => {
     }, []);
 
     const handleSelect = (org: Organisation) => {
-        localStorage.setItem('selectedOrganisation', JSON.stringify(org));
+        // Sauvegarder l'organisation avec les informations nécessaires
+        const orgToSave = {
+            id: org.id,
+            name: org.name,
+            type: org.type,
+            role: org.role,
+            roleType: org.roleType,
+            roleName: org.roleName,
+            membershipStatus: org.membershipStatus,
+        };
+        localStorage.setItem('selectedOrganisation', JSON.stringify(orgToSave));
         setLastSelectedId(org.id);
         if (typeof window !== 'undefined') {
             window.dispatchEvent(new Event('organisation:updated'));
         }
-        // Redirige vers l’espace club (modifiable ensuite selon logique)
+        // Redirige vers la page membres du club/association
         navigate('/club/members');
     };
 
@@ -218,31 +297,35 @@ const AccountSwitch: React.FC = () => {
                             </svg>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                            {(['all', 'membre', 'coach', 'gestionnaire'] as const).map((roleKey) => (
-                                <button
-                                    key={roleKey}
-                                    type="button"
-                                    onClick={() => setRoleFilter(roleKey)}
-                                    className={`rounded-full px-4 py-2 text-xs font-medium transition shadow-sm border ${
-                                        roleFilter === roleKey
+                            {(['all', 'membre', 'coach', 'gestionnaire', 'propriétaire', 'trésorier'] as const).map((roleKey) => {
+                                // Ne pas afficher les filtres qui n'ont pas d'organisations correspondantes
+                                const hasOrgsWithRole = roleKey === 'all' || organisations.some(org => org.role === roleKey);
+                                if (!hasOrgsWithRole) return null;
+
+                                return (
+                                    <button
+                                        key={roleKey}
+                                        type="button"
+                                        onClick={() => setRoleFilter(roleKey)}
+                                        className={`rounded-full px-4 py-2 text-xs font-medium transition shadow-sm border ${roleFilter === roleKey
                                             ? 'bg-indigo-500 text-white border-indigo-500'
                                             : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-200 hover:text-indigo-600'
-                                    }`}
-                                >
-                                    {roleKey === 'all' ? 'Tous les rôles' : `Rôle ${roleKey}`}
-                                </button>
-                            ))}
+                                            }`}
+                                    >
+                                        {roleKey === 'all' ? 'Tous les rôles' : roleKey === 'propriétaire' ? 'Propriétaire' : roleKey === 'trésorier' ? 'Trésorier' : `Rôle ${roleKey}`}
+                                    </button>
+                                );
+                            })}
                             <span className="hidden sm:block h-5 w-px bg-slate-200" />
                             {(['all', 'club', 'association'] as const).map((typeKey) => (
                                 <button
                                     key={typeKey}
                                     type="button"
                                     onClick={() => setTypeFilter(typeKey)}
-                                    className={`rounded-full px-4 py-2 text-xs font-medium transition shadow-sm border ${
-                                        typeFilter === typeKey
-                                            ? 'bg-slate-900 text-white border-slate-900'
-                                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 hover:text-slate-900'
-                                    }`}
+                                    className={`rounded-full px-4 py-2 text-xs font-medium transition shadow-sm border ${typeFilter === typeKey
+                                        ? 'bg-slate-900 text-white border-slate-900'
+                                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 hover:text-slate-900'
+                                        }`}
                                 >
                                     {typeKey === 'all' ? 'Tous les types' : typeKey === 'club' ? 'Clubs' : 'Associations'}
                                 </button>
@@ -257,16 +340,35 @@ const AccountSwitch: React.FC = () => {
                                 <p className="text-indigo-600/70">
                                     Vous avez quitté la plateforme sur{' '}
                                     <span className="font-semibold">
-                                        {mockOrgs.find((org) => org.id === lastSelectedId)?.name ?? 'une organisation qui n’est plus disponible'}
+                                        {organisations.find((org) => org.id === lastSelectedId)?.name ?? "une organisation qui n'est plus disponible"}
                                     </span>
                                 </p>
+                            </div>
+                        </div>
+                    )}
+                    {error && (
+                        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50/70 px-4 py-3 text-sm text-red-700 flex items-start gap-2">
+                            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                            <div>
+                                <p className="font-medium">Erreur</p>
+                                <p className="text-red-600/70 mt-1">{error}</p>
                             </div>
                         </div>
                     )}
                 </section>
 
                 <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {filteredOrgs.length === 0 ? (
+                    {loading ? (
+                        <div className="col-span-full">
+                            <div className="flex flex-col items-center justify-center rounded-3xl border border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-900/60 py-12 text-center shadow-inner">
+                                <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
+                                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Chargement des organisations...</h2>
+                                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300 max-w-sm">
+                                    Récupération de vos clubs et associations.
+                                </p>
+                            </div>
+                        </div>
+                    ) : filteredOrgs.length === 0 ? (
                         <div className="col-span-full">
                             <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-900/60 py-12 text-center shadow-inner">
                                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 shadow-sm mb-4">
@@ -278,9 +380,13 @@ const AccountSwitch: React.FC = () => {
                                         />
                                     </svg>
                                 </div>
-                                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Aucune organisation trouvée</h2>
+                                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                                    {organisations.length === 0 ? 'Aucune organisation' : 'Aucune organisation trouvée'}
+                                </h2>
                                 <p className="mt-2 text-sm text-slate-600 dark:text-slate-300 max-w-sm">
-                                    Ajustez vos filtres ou relancez une recherche plus large pour retrouver vos clubs et associations.
+                                    {organisations.length === 0
+                                        ? "Vous n'êtes membre d'aucune organisation pour le moment."
+                                        : 'Ajustez vos filtres ou relancez une recherche plus large pour retrouver vos clubs et associations.'}
                                 </p>
                             </div>
                         </div>
@@ -290,9 +396,8 @@ const AccountSwitch: React.FC = () => {
                                 key={org.id}
                                 type="button"
                                 onClick={() => handleSelect(org)}
-                                className={`relative group text-left rounded-3xl overflow-hidden border transition shadow-sm hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500 ${
-                                    lastSelectedId === org.id ? 'border-indigo-200 ring-1 ring-indigo-200' : 'border-white/60'
-                                }`}
+                                className={`relative group text-left rounded-3xl overflow-hidden border transition shadow-sm hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-indigo-500 ${lastSelectedId === org.id ? 'border-indigo-200 ring-1 ring-indigo-200' : 'border-white/60'
+                                    }`}
                             >
                                 <div className="relative">
                                     <ImgWithFallback
@@ -307,7 +412,7 @@ const AccountSwitch: React.FC = () => {
                                     <div className="absolute top-4 left-4 inline-flex items-center gap-1 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-slate-700 shadow-sm">
                                         {org.type === 'club' ? 'Club' : 'Association'}
                                         <span className="h-1 w-1 rounded-full bg-slate-400" />
-                                        {org.role}
+                                        {org.role === 'propriétaire' ? 'Propriétaire' : org.role === 'trésorier' ? 'Trésorier' : org.role === 'gestionnaire' ? 'Gestionnaire' : org.role}
                                     </div>
                                 </div>
                                 <div className="p-5 bg-white dark:bg-slate-900">

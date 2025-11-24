@@ -19,8 +19,17 @@ interface ApiResponse<T = unknown> {
   message?: string
 }
 
+// Cache simple pour réduire les requêtes répétées
+interface CacheEntry<T> {
+  data: T
+  timestamp: number
+  ttl: number // Time to live en millisecondes
+}
+
 class ApiClient {
   private client: AxiosInstance
+  private cache: Map<string, CacheEntry<unknown>> = new Map()
+  private readonly DEFAULT_TTL = 30000 // 30 secondes par défaut
 
   constructor() {
     this.client = axios.create({
@@ -33,6 +42,53 @@ class ApiClient {
     })
 
     this.setupInterceptors()
+
+    // Nettoyer le cache toutes les minutes
+    setInterval(() => this.cleanCache(), 60000)
+  }
+
+  private cleanCache() {
+    const now = Date.now()
+    for (const [key, entry] of this.cache.entries()) {
+      if (now - entry.timestamp > entry.ttl) {
+        this.cache.delete(key)
+      }
+    }
+  }
+
+  private getCacheKey(url: string, params?: Record<string, unknown>): string {
+    const paramsStr = params ? JSON.stringify(params) : ''
+    return `${url}${paramsStr}`
+  }
+
+  private getFromCache<T>(key: string): T | null {
+    const entry = this.cache.get(key)
+    if (!entry) {return null}
+
+    const now = Date.now()
+    if (now - entry.timestamp > entry.ttl) {
+      this.cache.delete(key)
+      return null
+    }
+
+    return entry.data as T
+  }
+
+  private setCache<T>(key: string, data: T, ttl?: number): void {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl: ttl || this.DEFAULT_TTL,
+    })
+  }
+
+  // Invalider le cache pour une URL spécifique
+  invalidateCache(urlPattern: string): void {
+    for (const key of this.cache.keys()) {
+      if (key.includes(urlPattern)) {
+        this.cache.delete(key)
+      }
+    }
   }
 
   private setupInterceptors() {
@@ -92,29 +148,64 @@ class ApiClient {
   }
 
   // Méthodes HTTP
-  async get<T = unknown>(url: string, params?: Record<string, unknown>): Promise<T> {
+  async get<T = unknown>(url: string, params?: Record<string, unknown>, options?: { useCache?: boolean; cacheTTL?: number }): Promise<T> {
+    const cacheKey = this.getCacheKey(url, params)
+
+    // Vérifier le cache si activé (par défaut activé pour GET)
+    if (options?.useCache !== false) {
+      const cached = this.getFromCache<T>(cacheKey)
+      if (cached !== null) {
+        return cached
+      }
+    }
+
     const response = await this.client.get<T>(url, { params })
-    return response.data
+    const data = response.data
+
+    // Mettre en cache si activé
+    if (options?.useCache !== false) {
+      this.setCache(cacheKey, data, options?.cacheTTL)
+    }
+
+    return data
   }
 
   async post<T = unknown>(url: string, data?: unknown): Promise<T> {
     const response = await this.client.post<T>(url, data)
+    // Invalider le cache pour les routes liées (si nécessaire)
+    // Par exemple, si on crée un membre, invalider le cache des membres
+    if (url.includes('/members') || url.includes('/organisations')) {
+      this.invalidateCache(url.split('/').slice(0, -1).join('/'))
+    }
     return response.data
   }
 
   async put<T = unknown>(url: string, data?: unknown): Promise<T> {
     const response = await this.client.put<T>(url, data)
+    // Invalider le cache pour les routes liées
+    this.invalidateCache(url)
     return response.data
   }
 
   async delete<T = unknown>(url: string): Promise<T> {
     const response = await this.client.delete<T>(url)
+    // Invalider le cache pour les routes liées
+    this.invalidateCache(url)
     return response.data
   }
 
   // Méthode pour obtenir l'instance axios (si besoin)
   getInstance(): AxiosInstance {
     return this.client
+  }
+
+  // Méthode publique pour invalider le cache (utile après des modifications)
+  clearCache(urlPattern?: string): void {
+    if (urlPattern) {
+      this.invalidateCache(urlPattern)
+    } else {
+      this.cache.clear()
+    }
   }
 }
 

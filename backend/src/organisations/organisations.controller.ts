@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseGuards,
   Req,
   HttpCode,
@@ -17,7 +18,7 @@ import { RequireManage, RequirePermissions } from '../auth/decorators/permission
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 
-import { CreateOrganisationDto, UpdateOrganisationDto } from './dto';
+import { CreateOrganisationDto, UpdateOrganisationDto, InviteMemberDto } from './dto';
 import { OrganisationsService } from './organisations.service';
 
 @Controller('organisations')
@@ -166,5 +167,56 @@ export class OrganisationsController {
       throw new Error('Utilisateur non authentifié');
     }
     return this.organisationsService.removeMember(organisationId, memberId, userId);
+  }
+
+  /**
+   * Inviter un membre par email
+   */
+  @Post(':id/members/invite')
+  @RequirePermissions({ resource: 'role', action: 'assign', scope: 'organisation' })
+  async inviteMember(
+    @Param('id') organisationId: string,
+    @Body() inviteMemberDto: InviteMemberDto,
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) {
+      throw new Error('Utilisateur non authentifié');
+    }
+    return this.organisationsService.inviteMember(organisationId, userId, inviteMemberDto);
+  }
+
+  /**
+   * Récupérer l'historique des anciens membres
+   */
+  @Get(':id/members/history')
+  async getOrganisationMembersHistory(@Param('id') organisationId: string, @Req() req: Request) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) {
+      throw new Error('Utilisateur non authentifié');
+    }
+    return this.organisationsService.getOrganisationMembersHistory(organisationId, userId);
+  }
+
+  /**
+   * Exporter les membres en CSV
+   */
+  @Get(':id/members/export')
+  async exportMembersToCSV(
+    @Param('id') organisationId: string,
+    @Query('includeHistory') includeHistory?: string,
+    @Req() req?: Request
+  ) {
+    const userId = req?.user?.['sub'] as string;
+    if (!userId) {
+      throw new Error('Utilisateur non authentifié');
+    }
+    const result = await this.organisationsService.exportMembersToCSV(
+      organisationId,
+      userId,
+      includeHistory === 'true'
+    );
+    // Retourner le CSV avec les headers appropriés
+    return result;
   }
 }
