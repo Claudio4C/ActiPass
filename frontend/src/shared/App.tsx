@@ -76,11 +76,11 @@ const AppContent: React.FC<{
                 {/* Routes d'authentification */}
                 <Route
                     path="/login"
-                    element={user ? <Navigate to={protectedPath} replace /> : <LoginComponent />}
+                    element={user ? <Navigate to="/home" replace /> : <LoginComponent />}
                 />
                 <Route
                     path="/register"
-                    element={user ? <Navigate to={protectedPath} replace /> : <RegisterComponent />}
+                    element={user ? <Navigate to="/home" replace /> : <RegisterComponent />}
                 />
 
                 {/* Routes de gestion des comptes */}
@@ -165,6 +165,7 @@ const AppContent: React.FC<{
                         <CoachesDirectoryPage />
                     }
                 />
+                <Route
                     path="/club/events"
                     element={
                         <EventsPageClub />

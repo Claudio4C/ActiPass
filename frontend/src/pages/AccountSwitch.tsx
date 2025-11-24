@@ -127,8 +127,6 @@ const generateQueries = (orgName: string): { cover: string; avatar: string } => 
     return { cover: coverQuery, avatar: avatarQuery };
 };
 
-const primarySection = 'bg-white/80 dark:bg-slate-900/80 backdrop-blur rounded-3xl border border-white/60 dark:border-slate-800 shadow-lg';
-
 const AccountSwitch: React.FC = () => {
     const navigate = useNavigate();
     const [organisations, setOrganisations] = React.useState<Organisation[]>([]);
@@ -230,12 +228,6 @@ const AccountSwitch: React.FC = () => {
         const freelanceRoles = mockOrgs.filter((org) => org.role === 'independant').length;
         return { total, clubs, associations, independants, coachRoles, freelanceRoles };
     }, []);
-        const total = organisations.length;
-        const clubs = organisations.filter((org) => org.type === 'club').length;
-        const associations = total - clubs;
-        const coachRoles = organisations.filter((org) => org.role === 'coach').length;
-        return { total, clubs, associations, coachRoles };
-    }, [organisations]);
 
     const handleDiscoverNearby = React.useCallback(() => {
         if (typeof window === 'undefined') return;
