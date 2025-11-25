@@ -1,9 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Loader2, AlertCircle } from 'lucide-react';
+import { MapPin, Loader2, AlertCircle, Building2, UserPlus, BadgeCheck } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import { api } from '../lib/api';
 import type { RoleType } from '../types';
+import Button from '../components/ui/Button';
 
 type Organisation = {
     id: string;
@@ -87,6 +88,57 @@ const primarySection = 'bg-white/80 dark:bg-slate-900/80 backdrop-blur rounded-3
 const secondarySection = 'bg-white/70 dark:bg-slate-900/70 backdrop-blur rounded-3xl border border-white/60 dark:border-slate-800 shadow-sm';
 const roleFilterOptions: Array<'all' | Organisation['role']> = ['all', 'membre', 'coach', 'gestionnaire', 'independant'];
 const typeFilterOptions: Array<'all' | Organisation['type']> = ['all', 'club', 'association', 'independant'];
+type EmptyStateAction = {
+    id: string;
+    title: string;
+    description: string;
+    ctaLabel: string;
+    to?: string;
+    onClick?: () => void;
+    icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+    accent: string;
+    badge?: string;
+};
+
+const emptyStateActions: EmptyStateAction[] = [
+    {
+        id: 'create-organisation',
+        title: 'Créer une organisation',
+        description: 'Déclarez votre association ou votre club pour activer toutes les fonctionnalités IKIVIO.',
+        ctaLabel: 'Créer mon espace',
+        to: '/accounts?intent=create-organisation',
+        icon: Building2,
+        accent: 'bg-indigo-50 text-indigo-600'
+    },
+    {
+        id: 'join-organisation',
+        title: 'Rejoindre une organisation',
+        description: 'Recevez un lien d’invitation ou envoyez une demande d’accès à votre club existant.',
+        ctaLabel: 'Rejoindre un club',
+        to: '/accounts?intent=join-organisation',
+        icon: UserPlus,
+        accent: 'bg-emerald-50 text-emerald-600'
+    },
+    {
+        id: 'coach-independant',
+        title: 'Créer mon profil coach',
+        description: 'Créez un studio indépendant pour vendre vos créneaux privés et gérer vos clients.',
+        ctaLabel: 'Lancer mon studio',
+        to: '/coach/profile?mode=independant',
+        icon: BadgeCheck,
+        accent: 'bg-pink-50 text-pink-600',
+        badge: 'Freelance'
+    },
+    {
+        id: 'demo-space',
+        title: 'Activer un espace démo',
+        description: 'Générez un faux club instantané pour explorer le tableau de bord membre sans attendre une invitation.',
+        ctaLabel: 'Créer l’espace test',
+        onClick: undefined, // défini dynamiquement plus bas
+        icon: BadgeCheck,
+        accent: 'bg-slate-50 text-slate-700'
+    }
+];
 // Mapper les rôles de la BDD vers les rôles de l'UI
 const mapRoleToUI = (roleType: RoleType): Organisation['role'] => {
     switch (roleType) {
@@ -281,6 +333,54 @@ const AccountSwitch: React.FC = () => {
         navigate('/club/members');
     };
 
+    const handleCreateDemoSpace = React.useCallback(() => {
+        const demoOrg: Organisation = {
+            id: `demo-org-${Date.now()}`,
+            name: 'Demo BJJ Club',
+            role: 'membre',
+            roleType: 'member',
+            roleName: 'Membre (démo)',
+            type: 'club',
+            coverQuery: 'dojo training sparring',
+            avatarQuery: 'club logo minimal',
+            subtitle: 'Espace fictif pour tester vos parcours',
+            description: 'Accès instantané aux sections membres, événements et messages.',
+            membershipStatus: 'active'
+        };
+
+        setOrganisations((prev) => [demoOrg, ...prev]);
+        setLastSelectedId(demoOrg.id);
+
+        const orgToSave = {
+            id: demoOrg.id,
+            name: demoOrg.name,
+            type: demoOrg.type,
+            role: demoOrg.role,
+            roleType: demoOrg.roleType,
+            roleName: demoOrg.roleName,
+            membershipStatus: demoOrg.membershipStatus
+        };
+        localStorage.setItem('selectedOrganisation', JSON.stringify(orgToSave));
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new Event('organisation:updated'));
+        }
+        navigate('/club/members');
+    }, [navigate]);
+
+    const handleActionNavigate = React.useCallback((path?: string) => {
+        if (!path) return;
+        navigate(path);
+    }, [navigate]);
+
+    // Injecter le handler dynamique dans l'action démo (évite de recréer l'array à chaque rendu)
+    const actionsWithHandlers = React.useMemo(() => {
+        return emptyStateActions.map((action) =>
+            action.id === 'demo-space'
+                ? { ...action, onClick: handleCreateDemoSpace }
+                : action
+        );
+    }, [handleCreateDemoSpace]);
+
     return (
         <Layout
             title="Changer d’organisation"
@@ -459,6 +559,41 @@ const AccountSwitch: React.FC = () => {
                                         ? "Vous n'êtes membre d'aucune organisation pour le moment."
                                         : 'Ajustez vos filtres ou relancez une recherche plus large pour retrouver vos clubs et associations.'}
                                 </p>
+                                <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-4xl">
+                                    {actionsWithHandlers.map((action) => {
+                                        const Icon = action.icon;
+                                        return (
+                                            <div
+                                                key={action.id}
+                                                className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 text-left shadow-sm hover:shadow-md hover:border-indigo-200 transition-colors"
+                                            >
+                                                <div className="flex items-start gap-3 mb-3">
+                                                    <span className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${action.accent}`}>
+                                                        <Icon className="w-5 h-5" />
+                                                    </span>
+                                                    <div>
+                                                        {action.badge ? (
+                                                            <p className="text-[11px] uppercase tracking-[0.3em] text-slate-500 font-semibold">
+                                                                {action.badge}
+                                                            </p>
+                                                        ) : null}
+                                                        <h3 className="text-base font-semibold text-slate-900 dark:text-white">{action.title}</h3>
+                                                    </div>
+                                                </div>
+                                                <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">{action.description}</p>
+                                                <Button
+                                                    variant="secondary"
+                                                    size="sm"
+                                                    className="w-full justify-center"
+                                                    onClick={() => (action.onClick ? action.onClick() : handleActionNavigate(action.to))}
+                                                    type="button"
+                                                >
+                                                    {action.ctaLabel}
+                                                </Button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
                     ) : (

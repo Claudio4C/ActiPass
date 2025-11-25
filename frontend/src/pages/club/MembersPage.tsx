@@ -1,8 +1,9 @@
 import React from 'react';
 import Layout from '../../components/layout/Layout';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Button from '../../components/ui/Button';
 import { useCurrentOrganisation } from '../../hooks/useCurrentOrganisation';
+import { newsArticles } from './NewsPage';
 
 type DayName = 'Lundi' | 'Mardi' | 'Mercredi' | 'Jeudi' | 'Vendredi' | 'Samedi' | 'Dimanche';
 
@@ -61,10 +62,40 @@ const mockSchedule: Slot[] = [
     { time: '11:00', discipline: 'Préparation physique', coach: 'Hamza', location: 'Studio Croix-Rousse', day: 'Dimanche', city: 'Lyon' },
 ];
 
-const disciplines = [
-    { name: 'Jiu-jitsu brésilien', query: 'brazilian jiu jitsu,bjj,grappling,rolling' },
-    { name: 'Luta Livre', query: 'brazilian jiu jitsu,bjj,grappling,training' },
-    { name: 'Judo', query: 'brazilian jiu jitsu,bjj,grappling,dojo' },
+type Discipline = {
+    name: string;
+    query: string;
+    description: string;
+    benefits?: string[];
+    schedule?: string;
+    level?: string;
+};
+
+const disciplines: Discipline[] = [
+    {
+        name: 'Jiu-jitsu brésilien',
+        query: 'brazilian jiu jitsu,bjj,grappling,rolling',
+        description: 'Art martial brésilien axé sur le combat au sol et les techniques de soumission. Le Jiu-jitsu brésilien développe la technique, la stratégie et la confiance en soi.',
+        benefits: ['Défense personnelle efficace', 'Amélioration de la condition physique', 'Développement mental et stratégique', 'Communauté bienveillante'],
+        schedule: 'Lundi, Mercredi, Vendredi - 19h30',
+        level: 'Tous niveaux',
+    },
+    {
+        name: 'Luta Livre',
+        query: 'brazilian jiu jitsu,bjj,grappling,training',
+        description: 'Discipline de grappling sans kimono, privilégiant la vitesse et la fluidité. Idéale pour le combat libre et la préparation physique.',
+        benefits: ['Techniques adaptées au combat libre', 'Conditionnement physique intense', 'Adaptabilité et réactivité', 'Préparation compétition'],
+        schedule: 'Mardi, Jeudi - 20h00',
+        level: 'Intermédiaire à avancé',
+    },
+    {
+        name: 'Judo',
+        query: 'brazilian jiu jitsu,bjj,grappling,dojo',
+        description: 'Art martial japonais mettant l\'accent sur les projections et le contrôle au sol. Le Judo développe la discipline, le respect et la maîtrise technique.',
+        benefits: ['Projections et techniques debout', 'Développement de la discipline', 'Amélioration de la coordination', 'Valeurs traditionnelles'],
+        schedule: 'Jeudi - 12h15',
+        level: 'Tous niveaux',
+    },
 ];
 
 type Teacher = {
@@ -145,6 +176,15 @@ const videoLessons = [
     },
 ];
 
+const clubGalleryShots = [
+    { id: 'shot-1', caption: 'Stage compétition', date: '8 mars', query: 'bjj competition training team photo' },
+    { id: 'shot-2', caption: 'Session kids & parents', date: '2 mars', query: 'family sport dojo kids training' },
+    { id: 'shot-3', caption: 'Open mat nocturne', date: '28 fév.', query: 'night training gym lights' },
+    { id: 'shot-4', caption: 'Cours mobilité', date: '27 fév.', query: 'mobility training stretching class' },
+    { id: 'shot-5', caption: 'Atelier no-gi', date: '25 fév.', query: 'nogi grappling training mat' },
+    { id: 'shot-6', caption: 'Vie du dojo', date: '24 fév.', query: 'dojo lifestyle team photo' }
+];
+
 type RatingSummary = {
     average: number;
     count: number;
@@ -157,17 +197,13 @@ const baseTeacherRatings: Record<string, { average: number; count: number }> = {
     Hamza: { average: 4.7, count: 74 },
     Fabrice: { average: 4.5, count: 51 },
 };
-const news = [
-    { title: "This Day That Year: Sandeep Lamichhane's IPL signing, Paras Khadka...", date: '31 January, 2023' },
-    { title: 'Six central members leave CAN meeting demanding President Chand’s Resign...', date: '1 February, 2023' },
-    { title: 'Adil Ansari confesses the spot fixing accusation over him', date: '13 January, 2023' },
-    { title: 'Biratnagar Super Kings defeats Janakpur Royals to book a place in finals', date: '23 January, 2023' },
-];
 
 const MembersPage: React.FC = () => {
     const { metadata: clubMetadata, role: accountRole } = useCurrentOrganisation();
+    const navigate = useNavigate();
     const [selectedTeacher, setSelectedTeacher] = React.useState<Teacher | null>(null);
     const [selectedSlot, setSelectedSlot] = React.useState<Slot | null>(null);
+    const [selectedDiscipline, setSelectedDiscipline] = React.useState<Discipline | null>(null);
     const [disciplineFilter, setDisciplineFilter] = React.useState<'all' | Slot['discipline']>('all');
     const [lastTeacherName, setLastTeacherName] = React.useState<string | null>(null);
     const [searchDiscipline, setSearchDiscipline] = React.useState('');
@@ -192,6 +228,7 @@ const MembersPage: React.FC = () => {
             if (e.key === 'Escape') {
                 setSelectedTeacher(null);
                 setSelectedSlot(null);
+                setSelectedDiscipline(null);
             }
         };
         window.addEventListener('keydown', onKey);
@@ -617,7 +654,12 @@ const MembersPage: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {disciplines.map((d, idx) => (
-                        <div key={idx} className="group relative rounded-xl overflow-hidden shadow-md">
+                        <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setSelectedDiscipline(d)}
+                            className="group relative rounded-xl overflow-hidden shadow-md cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                        >
                             <ImgWithFallback
                                 src={unsplash(900, 600, d.query, `discipline-${idx}`)}
                                 alt={d.name}
@@ -630,7 +672,7 @@ const MembersPage: React.FC = () => {
                             <div className="absolute inset-0 flex items-end p-5">
                                 <span className="text-white font-semibold drop-shadow">{d.name}</span>
                             </div>
-                        </div>
+                        </button>
                     ))}
                 </div>
             </section>
@@ -671,6 +713,32 @@ const MembersPage: React.FC = () => {
                         </div>
                     </div>
                 )}
+            </section>
+
+            {/* Galerie photos */}
+            <section className="mb-12">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Photos récentes</h3>
+                    <Link to="/club/galerie" className="text-sm text-blue-600 hover:text-blue-700 transition-colors">Ouvrir la galerie</Link>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {clubGalleryShots.map((shot, idx) => (
+                        <figure key={shot.id} className="relative overflow-hidden rounded-3xl shadow-md border border-white/40 bg-white/40 dark:bg-slate-900/40 backdrop-blur">
+                            <ImgWithFallback
+                                src={unsplash(900, 600, shot.query, `gallery-${idx}`)}
+                                alt={shot.caption}
+                                className="w-full aspect-[4/3] object-cover"
+                                width={900}
+                                height={600}
+                                seed={`gallery-${idx}`}
+                            />
+                            <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-4 text-white">
+                                <div className="text-xs uppercase tracking-[0.3em] text-white/70">{shot.date}</div>
+                                <div className="text-sm font-semibold">{shot.caption}</div>
+                            </figcaption>
+                        </figure>
+                    ))}
+                </div>
             </section>
 
             {/* Cours vidéo */}
@@ -722,29 +790,39 @@ const MembersPage: React.FC = () => {
             <section>
                 <div className="flex items-center justify-between mb-4">
                     <h3 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Actualités</h3>
-                    <Link to="#" className="text-sm text-blue-600 hover:text-blue-700 transition-colors">Voir tout</Link>
+                    <Link to="/club/actualites" className="text-sm text-blue-600 hover:text-blue-700 transition-colors">Voir tout</Link>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    {news.map((n, idx) => (
-                        <article key={idx} className="bg-white/80 dark:bg-slate-900/80 backdrop-blur rounded-xl ring-1 ring-gray-200/60 shadow-sm overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md hover:ring-blue-300/60">
+                    {newsArticles.slice(0, 4).map((article) => (
+                        <article
+                            key={article.id}
+                            onClick={() => navigate(`/club/actualites/${article.id}`)}
+                            className="bg-white/80 dark:bg-slate-900/80 backdrop-blur rounded-xl ring-1 ring-gray-200/60 shadow-sm overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md hover:ring-blue-300/60 cursor-pointer"
+                        >
                             <ImgWithFallback
-                                src={unsplash(600, 350, 'brazilian jiu jitsu,bjj,competition,dojo,mats', `news-${idx}`)}
-                                alt={n.title}
+                                src={unsplash(600, 350, article.imageQuery, article.id)}
+                                alt={article.title}
                                 className="w-full aspect-video object-cover"
                                 width={600}
                                 height={350}
-                                seed={`news-${idx}`}
+                                seed={article.id}
                             />
                             <div className="p-5">
-                                <div className="text-xs text-gray-500 dark:text-slate-400 mb-2">{n.date}</div>
-                                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
-                                    {n.title}
+                                <div className="text-xs text-gray-500 dark:text-slate-400 mb-2">{article.date}</div>
+                                <h4 className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-2">
+                                    {article.title}
                                 </h4>
                             </div>
                         </article>
                     ))}
                 </div>
             </section>
+            {/* Modal Discipline */}
+            <DisciplineModal
+                open={!!selectedDiscipline}
+                discipline={selectedDiscipline}
+                onClose={() => setSelectedDiscipline(null)}
+            />
             {/* Modal Professeur */}
             <TeacherModal
                 open={!!selectedTeacher}
@@ -770,6 +848,82 @@ export default MembersPage;
 const themeCard = 'bg-white/90 dark:bg-slate-900/90 backdrop-blur border border-slate-100 dark:border-slate-800 shadow-sm';
 const themeAccentCard = 'bg-white/80 dark:bg-slate-900/80 backdrop-blur border border-white/60 dark:border-slate-800 shadow-lg';
 const themeMutebg = 'bg-white/70 dark:bg-slate-900/70';
+
+const DisciplineModal: React.FC<{
+    open: boolean;
+    discipline: Discipline | null;
+    onClose: () => void;
+}> = ({ open, discipline, onClose }) => {
+    if (!open || !discipline) return null;
+
+    return (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center px-4">
+            <div className="absolute inset-0" onClick={onClose} role="presentation" />
+            <div className="relative max-w-2xl w-full bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-slate-100 dark:ring-slate-800">
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="absolute top-4 right-4 w-9 h-9 rounded-full bg-black/40 text-white flex items-center justify-center text-sm font-semibold hover:bg-black/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                >
+                    ✕
+                </button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-0">
+                    <div className="relative">
+                        <ImgWithFallback
+                            src={unsplash(900, 900, discipline.query, `discipline-modal-${discipline.name}`)}
+                            alt={discipline.name}
+                            className="w-full h-full object-cover md:rounded-l-3xl"
+                            width={900}
+                            height={900}
+                            seed={`discipline-modal-${discipline.name}`}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                        <div className="absolute bottom-5 left-5 right-5 text-white">
+                            <p className="text-xs uppercase tracking-[0.3em] text-white/70 mb-1">{discipline.level ?? 'Tous niveaux'}</p>
+                            <h3 className="text-2xl font-semibold">{discipline.name}</h3>
+                            <p className="text-sm text-white/80 mt-2">{discipline.schedule}</p>
+                        </div>
+                    </div>
+                    <div className="p-6 space-y-4 flex flex-col">
+                        <div>
+                            <p className="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400 font-semibold">À propos</p>
+                            <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">
+                                {discipline.description}
+                            </p>
+                        </div>
+                        {discipline.benefits?.length ? (
+                            <div>
+                                <p className="text-xs uppercase tracking-[0.3em] text-slate-500 dark:text-slate-400 font-semibold mb-2">Pourquoi essayer</p>
+                                <ul className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                                    {discipline.benefits.map((benefit) => (
+                                        <li key={benefit} className="flex items-start gap-2">
+                                            <span className="mt-1 h-1.5 w-1.5 rounded-full bg-indigo-500" />
+                                            <span>{benefit}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ) : null}
+                        <div className="mt-auto">
+                            <Link
+                                to={{
+                                    pathname: '/club/planning',
+                                    search: discipline?.name ? `?discipline=${encodeURIComponent(discipline.name)}` : ''
+                                }}
+                                state={discipline?.name ? { filterDiscipline: discipline.name } : undefined}
+                                onClick={onClose}
+                            >
+                                <Button className="w-full justify-center">
+                                    Voir le planning {discipline?.name ? `(${discipline.name})` : ''}
+                                </Button>
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const CoachExperienceView: React.FC<{ metadata: { title: string; subtitle: string; heroTitle: string; heroDescription: string } }> = ({ metadata }) => {
     const coachStats = [
