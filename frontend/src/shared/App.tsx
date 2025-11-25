@@ -106,49 +106,65 @@ const AppContent: React.FC<{
                 <Route
                     path="/club/members"
                     element={
-                        <ClubMembersPage />
+                        <ProtectedRoute requiredMode={mode}>
+                            <ClubMembersPage />
+                        </ProtectedRoute>
                     }
                 />
                 <Route
                     path="/club/loyalty"
                     element={
-                        <LoyaltyPage />
+                        <ProtectedRoute requiredMode={mode}>
+                            <LoyaltyPage />
+                        </ProtectedRoute>
                     }
                 />
                 <Route
                     path="/club/notifications"
                     element={
-                        <NotificationsPage />
+                        <ProtectedRoute requiredMode={mode}>
+                            <NotificationsPage />
+                        </ProtectedRoute>
                     }
                 />
                 <Route
                     path="/club/professeurs"
                     element={
-                        <TeachersPage />
+                        <ProtectedRoute requiredMode={mode}>
+                            <TeachersPage />
+                        </ProtectedRoute>
                     }
                 />
                 <Route
                     path="/club/disciplines"
                     element={
-                        <DisciplinesPage />
+                        <ProtectedRoute requiredMode={mode}>
+                            <DisciplinesPage />
+                        </ProtectedRoute>
                     }
                 />
                 <Route
                     path="/club/cours-video"
                     element={
-                        <VideoLessonsPage />
+                        <ProtectedRoute requiredMode={mode}>
+                            <VideoLessonsPage />
+                        </ProtectedRoute>
                     }
                 />
                 <Route
                     path="/club/planning"
                     element={
-                        <PlanningPage />
+                        <ProtectedRoute requiredMode={mode}>
+                            <PlanningPage />
+                        </ProtectedRoute>
                     }
                 />
                 <Route
                     path="/club/events"
                     element={
-                        <EventsPageClub />
+                        <ProtectedRoute requiredMode={mode}>
+                            <EventsPageClub />
+                        </ProtectedRoute>
                     }
                 />
                 {/* Routes Dashboard avec organisationId */}
@@ -227,18 +243,26 @@ const AppContent: React.FC<{
                 {/* Sélection de compte / organisation */}
                 <Route
                     path="/accounts"
-                    element={<AccountSwitch />}
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <AccountSwitch />
+                        </ProtectedRoute>
+                    }
                 />
                 <Route
                     path="/account/profile"
                     element={
-                        <ProfilePage />
+                        <ProtectedRoute requiredMode={mode}>
+                            <ProfilePage />
+                        </ProtectedRoute>
                     }
                 />
                 <Route
                     path="/account/subscriptions"
                     element={
-                        <SubscriptionPage />
+                        <ProtectedRoute requiredMode={mode}>
+                            <SubscriptionPage />
+                        </ProtectedRoute>
                     }
                 />
 

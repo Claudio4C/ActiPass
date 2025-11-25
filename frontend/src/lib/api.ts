@@ -113,17 +113,24 @@ class ApiClient {
         if (error.response) {
           // Gestion des erreurs 401 (Unauthorized)
           if (error.response.status === 401) {
-            // Vérifier si on est sur une route Super Admin
+            // Nettoyer le localStorage
+            localStorage.removeItem('user')
+
+            // Vérifier la route actuelle pour rediriger vers la bonne page de login
             const currentPath = window.location.pathname
+            let redirectPath = '/login'
+
             if (currentPath.startsWith('/superadmin')) {
-              // Nettoyer le localStorage
-              localStorage.removeItem('user')
-              // Rediriger vers la page de login Super Admin
-              // Utiliser window.location.href pour forcer un rechargement complet
-              window.location.href = '/superadmin/login'
-              // Ne pas lancer l'erreur pour éviter les logs inutiles
-              return Promise.reject(new Error('Session expirée'))
+              redirectPath = '/superadmin/login'
+            } else if (currentPath.startsWith('/admin')) {
+              redirectPath = '/admin/login'
             }
+
+            // Rediriger vers la page de login appropriée
+            // Utiliser window.location.href pour forcer un rechargement complet
+            window.location.href = redirectPath
+            // Ne pas lancer l'erreur pour éviter les logs inutiles
+            return Promise.reject(new Error('Session expirée'))
           }
 
           // Erreur du serveur (4xx, 5xx)
