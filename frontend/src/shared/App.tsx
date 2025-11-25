@@ -13,6 +13,9 @@ import NotificationsPage from '../pages/club/NotificationsPage';
 import TeachersPage from '../pages/club/TeachersPage';
 import DisciplinesPage from '../pages/club/DisciplinesPage';
 import VideoLessonsPage from '../pages/club/VideoLessonsPage';
+import GalleryPage from '../pages/club/GalleryPage';
+import NewsPage from '../pages/club/NewsPage';
+import NewsDetailPage from '../pages/club/NewsDetailPage';
 import PlanningPage from '../pages/club/PlanningPage';
 import EventsPageClub from '../pages/club/EventsPage';
 import AccountSwitch from '../pages/AccountSwitch';
@@ -151,6 +154,24 @@ const AppContent: React.FC<{
                     path="/club/cours-video"
                     element={
                         <VideoLessonsPage />
+                    }
+                />
+                <Route
+                    path="/club/galerie"
+                    element={
+                        <GalleryPage />
+                    }
+                />
+                <Route
+                    path="/club/actualites"
+                    element={
+                        <NewsPage />
+                    }
+                />
+                <Route
+                    path="/club/actualites/:articleId"
+                    element={
+                        <NewsDetailPage />
                     }
                 />
                 <Route

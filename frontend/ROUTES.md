@@ -27,6 +27,7 @@ Documentation complète de toutes les routes disponibles dans l'application fron
 - `GET /club/professeurs` - Liste des professeurs
 - `GET /club/disciplines` - Disciplines
 - `GET /club/cours-video` - Cours vidéo
+- `GET /club/galerie` - Galerie photos
 - `GET /club/planning` - Planning
 
 ### 🎯 Dashboard Organisation (avec `organisationId`)
