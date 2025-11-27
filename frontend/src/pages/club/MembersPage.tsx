@@ -62,6 +62,45 @@ const mockSchedule: Slot[] = [
     { time: '11:00', discipline: 'Préparation physique', coach: 'Hamza', location: 'Studio Croix-Rousse', day: 'Dimanche', city: 'Lyon' },
 ];
 
+type UpcomingEvent = {
+    id: string;
+    title: string;
+    date: string;
+    time: string;
+    location: string;
+    type: 'stage' | 'competition' | 'decouverte';
+    spotsLeft?: number;
+};
+
+const upcomingEvents: UpcomingEvent[] = [
+    {
+        id: 'evt-1',
+        title: 'Stage compétition BJJ Adultes',
+        date: 'Samedi 14 décembre',
+        time: '14h00 - 17h30',
+        location: 'Dojo Villeurbanne',
+        type: 'stage',
+        spotsLeft: 6,
+    },
+    {
+        id: 'evt-2',
+        title: 'Séance découverte “Premiers pas sur le tatami”',
+        date: 'Mercredi 18 décembre',
+        time: '18h30 - 20h00',
+        location: 'Studio Croix-Rousse',
+        type: 'decouverte',
+        spotsLeft: 12,
+    },
+    {
+        id: 'evt-3',
+        title: 'Déplacement compétition régionale',
+        date: 'Dimanche 5 janvier',
+        time: 'Journée complète',
+        location: 'Gymnase Gerland',
+        type: 'competition',
+    },
+];
+
 type Discipline = {
     name: string;
     query: string;
@@ -485,25 +524,6 @@ const MembersPage: React.FC = () => {
                 </div>
             </section>
 
-            {/* Partenaires */}
-            <section className="mt-12">
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Partenaires</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 items-center">
-                    {[0, 1, 2, 3].map((i) => (
-                        <div key={i} className="h-14 rounded-xl ring-1 ring-gray-200/60 dark:ring-slate-700 bg-white/70 dark:bg-slate-900/70 backdrop-blur flex items-center justify-center">
-                            <ImgWithFallback
-                                src={unsplash(160, 56, 'logo,minimal,brand,monochrome', `partner-${i}`)}
-                                alt={`Partenaire ${i + 1}`}
-                                className="h-8 w-auto object-contain opacity-70"
-                                width={160}
-                                height={56}
-                                seed={`partner-${i}`}
-                            />
-                        </div>
-                    ))}
-                </div>
-            </section>
-
             {/* Appel à l’action */}
             <section className="mt-12 mb-10">
                 <div className="relative overflow-hidden rounded-2xl p-6 sm:p-8 bg-gradient-to-tr from-blue-600 via-indigo-600 to-fuchsia-600 text-white">
@@ -711,6 +731,66 @@ const MembersPage: React.FC = () => {
                             <p className="font-medium text-indigo-900">Vous avez récemment consulté {lastTeacher.name}</p>
                             <p className="text-indigo-600/70">Utilisez les cartes pour accéder à la fiche détaillée de vos coachs préférés.</p>
                         </div>
+                    </div>
+                )}
+            </section>
+
+            {/* Événements à venir */}
+            <section className="mb-12">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Événements à venir</h3>
+                    <Link to="/club/events" className="text-sm text-blue-600 hover:text-blue-700 transition-colors">
+                        Voir tous les événements
+                    </Link>
+                </div>
+                {upcomingEvents.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-white/70 dark:bg-slate-900/70 py-6 px-6 text-center text-sm text-slate-600 dark:text-slate-300">
+                        Aucun événement n’est encore programmé. Revenez bientôt pour découvrir les prochains stages, compétitions et soirées du club.
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {upcomingEvents.map((event) => (
+                            <article
+                                key={event.id}
+                                className="relative rounded-2xl bg-white/80 dark:bg-slate-900/80 backdrop-blur ring-1 ring-slate-200/70 dark:ring-slate-700 shadow-sm p-5 flex flex-col gap-3"
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p className="text-[11px] uppercase tracking-[0.25em] text-slate-500">
+                                            {event.type === 'stage'
+                                                ? 'Stage'
+                                                : event.type === 'competition'
+                                                ? 'Compétition'
+                                                : 'Découverte'}
+                                        </p>
+                                        <h4 className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                            {event.title}
+                                        </h4>
+                                    </div>
+                                </div>
+                                <div className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
+                                    <div>{event.date}</div>
+                                    <div>{event.time}</div>
+                                    <div className="text-slate-500">{event.location}</div>
+                                </div>
+                                {typeof event.spotsLeft === 'number' && (
+                                    <div className="mt-1 text-[11px] font-medium text-emerald-600">
+                                        {event.spotsLeft} places restantes
+                                    </div>
+                                )}
+                                <div className="mt-4 flex items-center justify-between">
+                                    <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-[11px] font-medium text-slate-700 dark:text-slate-200">
+                                        Proposé par votre club
+                                    </span>
+                                    <Link
+                                        to="/club/events"
+                                        className="text-xs font-semibold text-blue-600 hover:text-blue-700"
+                                    >
+                                        Détails
+                                    </Link>
+                                </div>
+                            </article>
+                        ))}
                     </div>
                 )}
             </section>

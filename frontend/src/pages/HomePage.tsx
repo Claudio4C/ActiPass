@@ -4,7 +4,7 @@ import {
     Users, Calendar, MessageSquare, Award,
     Bell, Clock, ArrowRight, MapPin, Activity,
     Settings, BarChart3, Building2, UserPlus,
-    BadgeCheck
+    BadgeCheck, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import Layout from '../components/layout/Layout';
@@ -102,7 +102,7 @@ const emptyStateActions: EmptyStateAction[] = [
     {
         id: 'join-organisation',
         title: 'Rejoindre une organisation',
-        description: 'Recevez un lien d’invitation ou envoyez une demande d’accès à votre club existant.',
+        description: "Recevez un lien d'invitation ou envoyez une demande d'accès à votre club existant.",
         ctaLabel: 'Rejoindre un club',
         to: '/accounts?intent=join-organisation',
         icon: UserPlus,
@@ -117,8 +117,65 @@ const emptyStateActions: EmptyStateAction[] = [
         icon: BadgeCheck,
         accent: 'bg-pink-50 text-pink-600',
         badge: 'Freelance'
+    },
+    {
+        id: 'discover-clubs',
+        title: 'Découvrir des clubs proches',
+        description: 'Parcourez les clubs et associations partenaires pour trouver de nouvelles salles où vous entraîner.',
+        ctaLabel: 'Explorer les clubs',
+        to: '/discover',
+        icon: MapPin,
+        accent: 'bg-sky-50 text-sky-600'
+    },
+    {
+        id: 'browse-coaches',
+        title: 'Trouver un coach indépendant',
+        description: 'Accédez aux profils coachs pour organiser des cours privés ou des ateliers dans votre club.',
+        ctaLabel: 'Voir les coachs',
+        to: '/coach/independants/demo',
+        icon: Activity,
+        accent: 'bg-amber-50 text-amber-600',
+        badge: 'Nouveau'
+    },
+    {
+        id: 'setup-notifications',
+        title: 'Configurer mes notifications',
+        description: 'Choisissez comment vous souhaitez être prévenu des nouvelles demandes, inscriptions et paiements.',
+        ctaLabel: 'Ajuster les alertes',
+        to: '/club/notifications',
+        icon: Bell,
+        accent: 'bg-slate-50 text-slate-700'
     }
 ];
+
+type ScheduleSlot = {
+    id: string;
+    organisationId: string;
+    organisationName: string;
+    day: string;
+    time: string;
+    discipline: string;
+    coach: string;
+    location: string;
+};
+
+const allScheduleSlots: ScheduleSlot[] = [
+    { id: 'slot-1', organisationId: 'org-1', organisationName: 'Gracie Nova', day: 'Lundi', time: '07:30', discipline: 'Conditioning No-Gi', coach: 'Hamza', location: 'Studio Croix-Rousse' },
+    { id: 'slot-2', organisationId: 'org-1', organisationName: 'Gracie Nova', day: 'Lundi', time: '19:30', discipline: 'Jiu-jitsu brésilien', coach: 'Willy', location: 'COSEC Marcel Pagnol' },
+    { id: 'slot-3', organisationId: 'org-2', organisationName: 'Grappling Lyon', day: 'Lundi', time: '12:30', discipline: 'Luta Livre', coach: 'Youssef', location: 'COSEC Marcel Pagnol' },
+    { id: 'slot-4', organisationId: 'org-2', organisationName: 'Grappling Lyon', day: 'Mardi', time: '18:30', discipline: 'Jiu-jitsu brésilien', coach: 'Fabrice', location: 'Dojo Villeurbanne' },
+    { id: 'slot-5', organisationId: 'org-1', organisationName: 'Gracie Nova', day: 'Mardi', time: '08:00', discipline: 'Drills compétition', coach: 'Hamza', location: 'Studio Croix-Rousse' },
+    { id: 'slot-6', organisationId: 'org-3', organisationName: 'No-Gi Academy', day: 'Mercredi', time: '07:00', discipline: 'Mobilité & récupération', coach: 'Willy', location: 'Studio Croix-Rousse' },
+    { id: 'slot-7', organisationId: 'org-2', organisationName: 'Grappling Lyon', day: 'Mercredi', time: '20:00', discipline: 'No-Gi Grappling', coach: 'Youssef', location: 'COSEC Marcel Pagnol' },
+    { id: 'slot-8', organisationId: 'org-1', organisationName: 'Gracie Nova', day: 'Jeudi', time: '19:45', discipline: 'Sparring compétition', coach: 'Hamza', location: 'Dojo Villeurbanne' },
+    { id: 'slot-9', organisationId: 'org-3', organisationName: 'No-Gi Academy', day: 'Jeudi', time: '12:15', discipline: 'Judo', coach: 'Youssef', location: 'COSEC Marcel Pagnol' },
+    { id: 'slot-10', organisationId: 'org-1', organisationName: 'Gracie Nova', day: 'Vendredi', time: '18:00', discipline: 'Jiu-jitsu brésilien', coach: 'Willy', location: 'COSEC Marcel Pagnol' },
+    { id: 'slot-11', organisationId: 'org-3', organisationName: 'No-Gi Academy', day: 'Vendredi', time: '20:30', discipline: 'Open mat libre', coach: 'Collectif', location: 'Studio Croix-Rousse' },
+    { id: 'slot-12', organisationId: 'org-2', organisationName: 'Grappling Lyon', day: 'Samedi', time: '10:30', discipline: 'Stage technique', coach: 'Invité', location: 'COSEC Marcel Pagnol' },
+    { id: 'slot-13', organisationId: 'org-1', organisationName: 'Gracie Nova', day: 'Dimanche', time: '11:00', discipline: 'Préparation physique', coach: 'Hamza', location: 'Studio Croix-Rousse' },
+];
+
+const daysOfWeek = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 
 // Fonction utilitaire pour mettre la première lettre en majuscule
 const capitalizeFirst = (str: string): string => {
@@ -442,6 +499,68 @@ const HomePage: React.FC = () => {
                             subLabel="Espaces actifs"
                             color="emerald"
                         />
+                    </div>
+                </section>
+
+                {/* Calendrier des créneaux */}
+                <section>
+                    <div className="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                                Calendrier des créneaux
+                            </h2>
+                            <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                                Tous les créneaux de vos organisations pour la semaine
+                            </p>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                        <div className="grid grid-cols-7 gap-px bg-slate-200 dark:bg-slate-700">
+                            {daysOfWeek.map((day) => {
+                                const daySlots = allScheduleSlots.filter((slot) => slot.day === day);
+                                return (
+                                    <div key={day} className="bg-white dark:bg-slate-900">
+                                        <div className="p-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+                                            <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide text-center">
+                                                {day.substring(0, 3)}
+                                            </p>
+                                        </div>
+                                        <div className="p-2 space-y-2 min-h-[200px]">
+                                            {daySlots.map((slot) => {
+                                                const org = mockOrganizations.find((o) => o.id === slot.organisationId);
+                                                const orgColor = org?.role === 'coach'
+                                                    ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800'
+                                                    : org?.role === 'gestionnaire'
+                                                    ? 'bg-purple-50 border-purple-200 dark:bg-purple-900/20 dark:border-purple-800'
+                                                    : 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800';
+                                                return (
+                                                    <div
+                                                        key={slot.id}
+                                                        className={`p-2 rounded-lg border text-xs ${orgColor} cursor-pointer hover:shadow-sm transition-shadow`}
+                                                        onClick={() => handleSelectOrganization(slot.organisationId)}
+                                                    >
+                                                        <p className="font-semibold text-slate-900 dark:text-white mb-1">
+                                                            {slot.time}
+                                                        </p>
+                                                        <p className="text-slate-700 dark:text-slate-300 truncate">
+                                                            {slot.discipline}
+                                                        </p>
+                                                        <p className="text-slate-600 dark:text-slate-400 text-[10px] mt-1 truncate">
+                                                            {slot.organisationName}
+                                                        </p>
+                                                    </div>
+                                                );
+                                            })}
+                                            {daySlots.length === 0 && (
+                                                <p className="text-xs text-slate-400 dark:text-slate-500 text-center pt-4">
+                                                    Aucun créneau
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </section>
 

@@ -18,6 +18,9 @@ import NewsPage from '../pages/club/NewsPage';
 import NewsDetailPage from '../pages/club/NewsDetailPage';
 import PlanningPage from '../pages/club/PlanningPage';
 import EventsPageClub from '../pages/club/EventsPage';
+import EventDetailPageClub from '../pages/club/EventDetailPage';
+import CreateTripPage from '../pages/club/CreateTripPage';
+import TripViewPage from '../pages/club/TripViewPage';
 import AccountSwitch from '../pages/AccountSwitch';
 import LoyaltyPage from '../pages/club/LoyaltyPage';
 import CoachPlanningPage from '../pages/coach/PlanningPage';
@@ -28,6 +31,8 @@ import CoachMessagesPage from '../pages/coach/MessagesPage';
 import CoachMessageDetailPage from '../pages/coach/MessageDetailPage';
 import CoachesDirectoryPage from '../pages/club/CoachesDirectoryPage';
 import HomePage from '../pages/HomePage';
+import DiscoverPage from '../pages/DiscoverPage';
+import CoachDetailPage from '../pages/CoachDetailPage';
 import OverviewPage from '../pages/dashboard/OverviewPage';
 import MembersPage from '../pages/dashboard/MembersPage';
 import MemberDetailPage from '../pages/dashboard/MemberDetailPage';
@@ -104,10 +109,14 @@ const AppContent: React.FC<{
                     element={<ResendVerification />}
                 />
 
-                {/* Page d'accueil générale */}
+                {/* Pages générales */}
                 <Route
                     path="/home"
                     element={<HomePage />}
+                />
+                <Route
+                    path="/discover"
+                    element={<DiscoverPage />}
                 />
 
                 {/* Routes protégées */}
@@ -205,6 +214,30 @@ const AppContent: React.FC<{
                     element={
                         <ProtectedRoute requiredMode={mode}>
                             <EventsPageClub />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/club/events/:eventId"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <EventDetailPageClub />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/club/events/:eventId/create-trip"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <CreateTripPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/club/events/:eventId/trip"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <TripViewPage />
                         </ProtectedRoute>
                     }
                 />
@@ -344,11 +377,15 @@ const AppContent: React.FC<{
                         <CoachBillingPage />
                     }
                 />
+                <Route
+                    path="/coach/independants/:coachId"
+                    element={<CoachDetailPage />}
+                />
 
                 {/* Redirection par défaut vers login */}
                 <Route
                     path="/"
-                    element={<Navigate to="/login" replace />}
+                    element={user ? <Navigate to="/home" replace /> : <DiscoverPage />}
                 />
 
                 {/* Route de fallback */}
