@@ -37,52 +37,6 @@ const ImgWithFallback: React.FC<{ src: string; alt: string; className?: string; 
     );
 };
 
-const mockOrgs: Organisation[] = [
-    {
-        id: 'org-1',
-        name: 'Gracie Nova',
-        role: 'membre',
-        type: 'club',
-        coverQuery: 'brazilian jiu jitsu,dojo,mats,training',
-        avatarQuery: 'bjj logo,emblem',
-        subtitle: "Espace membres officiel de l’académie Gracie Nova, quartier de la Croix-Rousse",
-        description:
-            'Club historique de Lyon spécialisé en jiu-jitsu brésilien, cours tous niveaux et préparation compétition.',
-    },
-    {
-        id: 'org-2',
-        name: 'Grappling Lyon',
-        role: 'coach',
-        type: 'association',
-        coverQuery: 'brazilian jiu jitsu,gi training,grappling',
-        avatarQuery: 'martial arts logo,minimal',
-        subtitle: 'Association dédiée au grappling no-gi et à la lutte moderne dans le 7ᵉ arrondissement.',
-        description:
-            'Séances intensives en no-gi, ateliers lutte et conditionnement physique pour compétiteurs et passionnés.',
-    },
-    {
-        id: 'org-3',
-        name: 'No-Gi Academy',
-        role: 'gestionnaire',
-        type: 'club',
-        coverQuery: 'no-gi grappling,training,dojo',
-        avatarQuery: 'minimal logo,abstract',
-        subtitle: 'Académie spécialisée dans les disciplines no-gi et le travail en mobilité.',
-        description:
-            'Coaching personnalisé, mobilité et fluidité au sol pour grapplers souhaitant progresser sans kimono.',
-    },
-    {
-        id: 'org-4',
-        name: 'Studio Flow Privé',
-        role: 'independant',
-        type: 'independant',
-        coverQuery: 'personal trainer home coaching living room minimal',
-        avatarQuery: 'coach portrait lifestyle',
-        subtitle: 'Profil freelance dédié à mes cours visio et à domicile',
-        description:
-            'Diffusez vos créneaux privés, automatisez les paiements et laissez les clubs vous solliciter pour animer un stage.',
-    },
-];
 
 const primarySection = 'bg-white/80 dark:bg-slate-900/80 backdrop-blur rounded-3xl border border-white/60 dark:border-slate-800 shadow-lg';
 const secondarySection = 'bg-white/70 dark:bg-slate-900/70 backdrop-blur rounded-3xl border border-white/60 dark:border-slate-800 shadow-sm';
@@ -272,14 +226,14 @@ const AccountSwitch: React.FC = () => {
     }, [organisations, search, roleFilter, typeFilter]);
 
     const stats = React.useMemo(() => {
-        const total = mockOrgs.length;
-        const clubs = mockOrgs.filter((org) => org.type === 'club').length;
-        const associations = mockOrgs.filter((org) => org.type === 'association').length;
-        const independants = mockOrgs.filter((org) => org.type === 'independant').length;
-        const coachRoles = mockOrgs.filter((org) => org.role === 'coach').length;
-        const freelanceRoles = mockOrgs.filter((org) => org.role === 'independant').length;
+        const total = organisations.length;
+        const clubs = organisations.filter((org) => org.type === 'club').length;
+        const associations = organisations.filter((org) => org.type === 'association').length;
+        const independants = organisations.filter((org) => org.type === 'independant').length;
+        const coachRoles = organisations.filter((org) => org.role === 'coach').length;
+        const freelanceRoles = organisations.filter((org) => org.role === 'independant').length;
         return { total, clubs, associations, independants, coachRoles, freelanceRoles };
-    }, []);
+    }, [organisations]);
 
     const handleDiscoverNearby = React.useCallback(() => {
         if (typeof window === 'undefined') return;

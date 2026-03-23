@@ -15,7 +15,7 @@ import {
     UserCog
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getMockMembership } from '../../utils/mockRoles';
+import { api } from '../../lib/api';
 import type { Membership, RoleType } from '../../types';
 
 interface MenuItem {
@@ -42,32 +42,22 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
     }, [organisationId, user?.id]);
 
     const loadMembership = async () => {
-        if (!user?.id) return;
+        if (!user?.id || !organisationId) return;
         try {
             setLoading(true);
-            // TODO: Remplacer par l'endpoint réel qui récupère le membership avec rôle
-            // Pour l'instant, on utilise des données mockées selon l'organisation
-            // const memberships = await api.get<Membership[]>(`/users/${user.id}/memberships`, undefined, { useCache: true, cacheTTL: 60000 });
-            // const currentMembership = memberships.find(m => m.organisationId === organisationId);
-
-            // Mock data temporaire - rôle différent selon l'organisation
-            const mockMembership = getMockMembership(organisationId);
-            setMembership(mockMembership);
+            const data = await api.get<{ organisation: { id: string; name: string }; myRole: { id: string; name: string; type: RoleType; level: number } }>(
+                `/organisations/${organisationId}`,
+                undefined,
+                { useCache: true, cacheTTL: 60000 }
+            );
+            setMembership({
+                id: `${organisationId}-${user.id}`,
+                organisationId,
+                role: data.myRole,
+                joined_at: new Date().toISOString(),
+            });
         } catch (error) {
             console.error('Error loading membership:', error);
-            // En cas d'erreur, on utilise un rôle par défaut pour permettre l'accès
-            const defaultMembership: Membership = {
-                id: 'default-membership',
-                organisationId: organisationId,
-                role: {
-                    id: 'default-role',
-                    name: 'Membre',
-                    type: 'member',
-                    level: 20
-                },
-                joined_at: new Date().toISOString()
-            };
-            setMembership(defaultMembership);
         } finally {
             setLoading(false);
         }

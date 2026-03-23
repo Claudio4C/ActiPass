@@ -42,6 +42,9 @@ import EventsPage from '../pages/dashboard/EventsPage';
 import EventCreatePage from '../pages/dashboard/EventCreatePage';
 import EventEditPage from '../pages/dashboard/EventEditPage';
 import EventDetailPage from '../pages/dashboard/EventDetailPage';
+import AttendancePage from '../pages/dashboard/AttendancePage';
+import AttendanceDetailPage from '../pages/dashboard/AttendanceDetailPage';
+import AttendanceStatsPage from '../pages/dashboard/AttendanceStatsPage';
 
 interface AppProps {
     mode: AppMode;
@@ -327,7 +330,31 @@ const AppContent: React.FC<{
                         </ProtectedRoute>
                     }
                 />
-                {/* /dashboard/:organisationId/attendance */}
+                {/* Routes Présences */}
+                <Route
+                    path="/dashboard/:organisationId/attendance"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <AttendancePage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/:organisationId/attendance/stats"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <AttendanceStatsPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/:organisationId/attendance/:eventId"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <AttendanceDetailPage />
+                        </ProtectedRoute>
+                    }
+                />
                 {/* /dashboard/:organisationId/payments */}
                 {/* /dashboard/:organisationId/documents */}
                 {/* /dashboard/:organisationId/settings */}

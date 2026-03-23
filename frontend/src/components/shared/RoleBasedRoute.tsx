@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getMockMembership } from '../../utils/mockRoles';
-import type { Membership, RoleType } from '../../types';
+import { api } from '../../lib/api';
+import type { RoleType } from '../../types';
 
 interface RoleBasedRouteProps {
     children: React.ReactNode;
@@ -32,18 +32,12 @@ const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
         }
 
         try {
-            // TODO: Remplacer par l'endpoint réel qui récupère le membership avec rôle
-            // Pour l'instant, on utilise des données mockées selon l'organisation
-            // const memberships = await api.get<Membership[]>(`/users/${user.id}/memberships`);
-            // const membership = memberships.find(m => m.organisationId === organisationId);
-
-            // Mock data temporaire - rôle différent selon l'organisation
-            const mockMembership = getMockMembership(organisationId);
-
-            const userRole = mockMembership.role?.type;
-            const hasAccess = allowedRoles.includes(userRole);
-
-            setIsAuthorized(hasAccess);
+            const data = await api.get<{ myRole: { type: RoleType } }>(
+                `/organisations/${organisationId}`,
+                undefined,
+                { useCache: true, cacheTTL: 60000 }
+            );
+            setIsAuthorized(allowedRoles.includes(data.myRole.type));
         } catch (error) {
             console.error('Error checking authorization:', error);
             setIsAuthorized(false);
@@ -91,4 +85,3 @@ const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
 };
 
 export default RoleBasedRoute;
-

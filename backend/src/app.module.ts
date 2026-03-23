@@ -12,6 +12,7 @@ import { EmailModule } from './email/email.module';
 import { EventsModule } from './events/events.module';
 import { OrganisationsModule } from './organisations/organisations.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { AttendanceModule } from './attendance/attendance.module';
 import { FamilyModule } from './family/family.module';
 import { UsersModule } from './users/users.module';
 
@@ -37,6 +38,7 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     OrganisationsModule,
     EventsModule,
+    AttendanceModule,
     FamilyModule,
     EmailModule,
   ],

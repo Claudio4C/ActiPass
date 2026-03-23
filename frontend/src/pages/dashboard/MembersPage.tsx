@@ -52,45 +52,6 @@ const MembersPage: React.FC = () => {
             setMembers(data);
         } catch (error) {
             console.error('Error loading members:', error);
-            // Si l'API retourne une erreur (pas de membres), on utilise des données mockées pour tester
-            if (error && typeof error === 'object' && 'response' in error) {
-                const apiError = error as { response?: { status?: number } };
-                if (apiError.response?.status === 404 || apiError.response?.status === 403) {
-                    // Pas de membres ou pas d'accès - données mockées pour tester
-                    const mockMembers: Member[] = [
-                        {
-                            id: 'mock-member-1',
-                            email: 'jean.dupont@example.com',
-                            firstname: 'Jean',
-                            lastname: 'Dupont',
-                            username: 'jdupont',
-                            role: {
-                                id: 'role-1',
-                                name: 'Membre',
-                                type: 'member',
-                                level: 20
-                            },
-                            joined_at: new Date().toISOString()
-                        },
-                        {
-                            id: 'mock-member-2',
-                            email: 'marie.martin@example.com',
-                            firstname: 'Marie',
-                            lastname: 'Martin',
-                            username: 'mmartin',
-                            role: {
-                                id: 'role-2',
-                                name: 'Coach',
-                                type: 'coach',
-                                level: 40
-                            },
-                            joined_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-                        }
-                    ];
-                    setMembers(mockMembers);
-                    return;
-                }
-            }
             setMembers([]);
         } finally {
             setLoading(false);
@@ -101,21 +62,6 @@ const MembersPage: React.FC = () => {
         if (!organisationId || !selectedMember) return;
         try {
             setActionLoading(true);
-            // Si c'est un membre mocké, simuler le changement
-            if (selectedMember.id.startsWith('mock-member-')) {
-                // Simuler le changement de rôle pour les données mockées
-                setMembers(prev => prev.map(m =>
-                    m.id === selectedMember.id
-                        ? { ...m, role: { ...m.role, type: selectedRoleType, name: roleOptions.find(r => r.value === selectedRoleType)?.label || m.role.name } }
-                        : m
-                ));
-                setShowRoleModal(false);
-                setSelectedMember(null);
-                setSelectedRoleType('');
-                setActionLoading(false);
-                return;
-            }
-
             await api.put(`/organisations/${organisationId}/members/${selectedMember.id}/role`, {
                 roleType: selectedRoleType
             });
@@ -143,15 +89,6 @@ const MembersPage: React.FC = () => {
         if (!organisationId) return;
         try {
             setActionLoading(true);
-            // Si c'est un membre mocké, simuler la suppression
-            if (memberId.startsWith('mock-member-')) {
-                setMembers(prev => prev.filter(m => m.id !== memberId));
-                setShowDeleteModal(false);
-                setSelectedMember(null);
-                setActionLoading(false);
-                return;
-            }
-
             await api.delete(`/organisations/${organisationId}/members/${memberId}`);
             // Invalider le cache des membres pour forcer le rechargement
             api.clearCache(`/organisations/${organisationId}/members`);

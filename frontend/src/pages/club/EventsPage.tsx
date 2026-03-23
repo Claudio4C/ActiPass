@@ -15,75 +15,6 @@ interface EventWithRegistration extends Event {
     available_spots?: number | null;
 }
 
-// Événements mockés pour l'affichage lorsque l'API n'est pas encore branchée
-const mockEvents: EventWithRegistration[] = [
-    {
-        id: 'mock-1',
-        organisation_id: 'mock-org',
-        title: 'Stage technique Jiu-jitsu brésilien',
-        description: 'Un après-midi dédié aux passages de garde et aux mises en situation, ouvert à tous les niveaux.',
-        event_type: 'training',
-        start_time: new Date().toISOString(),
-        end_time: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-        location: 'Dojo Villeurbanne',
-        created_by_id: 'mock-user',
-        visibility: 'members_only',
-        capacity: 30,
-        registration_required: true,
-        price: 20,
-        is_recurring: false,
-        status: 'published',
-        cover_url: 'https://source.unsplash.com/random/1200x600/?bjj,training,dojo',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        current_registrations: 18,
-        available_spots: 12,
-    },
-    {
-        id: 'mock-2',
-        organisation_id: 'mock-org',
-        title: 'Séance découverte “Venez essayer le grappling”',
-        description: 'Séance découverte gratuite pour inviter des proches à tester le club dans une ambiance détendue.',
-        event_type: 'workshop',
-        start_time: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-        end_time: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000 + 90 * 60 * 1000).toISOString(),
-        location: 'Studio Croix-Rousse',
-        created_by_id: 'mock-user',
-        visibility: 'public',
-        capacity: 40,
-        registration_required: true,
-        price: 0,
-        is_recurring: false,
-        status: 'published',
-        cover_url: 'https://source.unsplash.com/random/1200x600/?grappling,jiu-jitsu,fitness',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        current_registrations: 22,
-        available_spots: 18,
-    },
-    {
-        id: 'mock-3',
-        organisation_id: 'mock-org',
-        title: 'Déplacement compétition régionale',
-        description: 'Accompagnement du club sur une journée de compétition officielle (transport non inclus).',
-        event_type: 'match',
-        start_time: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString(),
-        end_time: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000 + 6 * 60 * 60 * 1000).toISOString(),
-        location: 'Gymnase Gerland',
-        created_by_id: 'mock-user',
-        visibility: 'members_only',
-        capacity: 20,
-        registration_required: true,
-        price: 0,
-        is_recurring: false,
-        status: 'published',
-        cover_url: 'https://source.unsplash.com/random/1200x600/?tournament,competition,sport',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        current_registrations: 20,
-        available_spots: 0,
-    },
-];
 
 const EventsPage: React.FC = () => {
     const { user } = useAuth();
@@ -93,9 +24,6 @@ const EventsPage: React.FC = () => {
     const [registering, setRegistering] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [organisationId, setOrganisationId] = useState<string | null>(null);
-    const [showWaitlistModal, setShowWaitlistModal] = useState(false);
-    const [waitlistEventTitle, setWaitlistEventTitle] = useState<string | null>(null);
-    const [waitlistPosition, setWaitlistPosition] = useState<number | null>(null);
 
     useEffect(() => {
         // Récupérer l'organisation sélectionnée depuis localStorage
@@ -123,11 +51,9 @@ const EventsPage: React.FC = () => {
         };
     }, []);
 
-    // Fallback pour pouvoir visualiser la page même sans organisation configurée
     useEffect(() => {
         if (!organisationId) {
             setLoading(false);
-            setEvents(mockEvents);
         }
     }, [organisationId]);
 
@@ -152,8 +78,7 @@ const EventsPage: React.FC = () => {
         } catch (error) {
             console.error('Error loading events:', error);
             setError('Erreur lors du chargement des événements');
-            // Afficher au moins quelques événements mockés pour la démo
-            setEvents(mockEvents);
+            setEvents([]);
         } finally {
             setLoading(false);
         }
@@ -300,7 +225,6 @@ const EventsPage: React.FC = () => {
                             const registrationStatus = getRegistrationStatus(event);
                             const canRegisterToEvent = canRegister(event);
                             const StatusIcon = registrationStatus?.icon;
-                            const isMock = event.id.startsWith('mock-');
                             const isFull =
                                 !!event.capacity &&
                                 event.available_spots !== null &&
@@ -407,31 +331,6 @@ const EventsPage: React.FC = () => {
                                                         <span>S'inscrire</span>
                                                     )}
                                                 </button>
-                                            ) : isMock && isFull ? (
-                                                <div className="space-y-2 text-center">
-                                                    <div className="text-sm text-gray-500">
-                                                        Événement complet — les nouvelles inscriptions seront placées sur liste
-                                                        d'attente (démo).
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setWaitlistEventTitle(event.title);
-                                                            // Position simulée pour la démo
-                                                            const randomPosition = Math.floor(Math.random() * 5) + 1;
-                                                            setWaitlistPosition(randomPosition);
-                                                            setShowWaitlistModal(true);
-                                                        }}
-                                                        className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-blue-600 border border-blue-200 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors"
-                                                    >
-                                                        Rejoindre la liste d'attente (démo)
-                                                    </button>
-                                                    <p className="text-xs text-gray-400">
-                                                        Si un participant annule, les personnes en liste d’attente seront ajoutées
-                                                        automatiquement par ordre de priorité.
-                                                    </p>
-                                                </div>
                                             ) : (
                                                 <div className="text-sm text-gray-500 text-center py-2">
                                                     {event.myReservation
@@ -453,55 +352,7 @@ const EventsPage: React.FC = () => {
                     </div>
                 )}
 
-                {showWaitlistModal && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                        <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 p-6 relative overflow-hidden">
-                            <div className="absolute -top-16 -right-10 h-32 w-32 rounded-full bg-blue-100 opacity-40 blur-2xl" />
-                            <div className="absolute -bottom-20 -left-10 h-32 w-32 rounded-full bg-indigo-100 opacity-50 blur-2xl" />
 
-                            <div className="relative">
-                                <div className="flex items-center gap-3 mb-3">
-                                    <div className="relative inline-flex">
-                                        <span className="absolute inline-flex h-9 w-9 rounded-full bg-blue-200 opacity-75 animate-ping" />
-                                        <span className="relative inline-flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-white text-sm font-semibold shadow-md">
-                                            ✔
-                                        </span>
-                                    </div>
-                                    <h2 className="text-lg font-semibold text-slate-900">
-                                        Ajouté à la liste d’attente
-                                    </h2>
-                                </div>
-
-                                <p className="text-sm text-slate-600 mb-3">
-                                    Vous avez été ajouté(e) à la liste d’attente pour l’événement :
-                                </p>
-                                <p className="text-sm font-medium text-slate-900 mb-4">
-                                    {waitlistEventTitle}
-                                </p>
-                                {typeof waitlistPosition === 'number' && (
-                                    <p className="text-sm text-slate-700 mb-4">
-                                        Position simulée dans la liste :{' '}
-                                        <span className="font-semibold">#{waitlistPosition}</span>.
-                                    </p>
-                                )}
-                                <p className="text-xs text-slate-500 mb-6">
-                                    Dans la version réelle, si un participant se désinscrit, les personnes en liste
-                                    d’attente seraient automatiquement intégrées à l’événement dans l’ordre de la liste,
-                                    et vous seriez notifié(e) par email.
-                                </p>
-                                <div className="flex justify-end gap-3">
-                                    <button
-                                        type="button"
-                                        className="px-4 py-2 text-sm rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50"
-                                        onClick={() => setShowWaitlistModal(false)}
-                                    >
-                                        Fermer
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
             </div>
         </Layout>
     );
