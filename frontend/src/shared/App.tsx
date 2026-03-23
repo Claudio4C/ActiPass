@@ -23,6 +23,8 @@ import CreateTripPage from '../pages/club/CreateTripPage';
 import TripViewPage from '../pages/club/TripViewPage';
 import AccountSwitch from '../pages/AccountSwitch';
 import LoyaltyPage from '../pages/club/LoyaltyPage';
+import FamilyPage from '../pages/club/FamilyPage';
+import FamilyDashboardPage from '../pages/club/FamilyDashboardPage';
 import CoachPlanningPage from '../pages/coach/PlanningPage';
 import CoachProfilePage from '../pages/coach/ProfilePage';
 import CoachApplicationsPage from '../pages/coach/ApplicationsPage';
@@ -142,6 +144,22 @@ const AppContent: React.FC<{
                     element={
                         <ProtectedRoute requiredMode={mode}>
                             <LoyaltyPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/club/famille"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <FamilyPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/club/famille/planning"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <FamilyDashboardPage />
                         </ProtectedRoute>
                     }
                 />

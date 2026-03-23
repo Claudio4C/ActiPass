@@ -5,12 +5,14 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
   id                         String             @id @default(uuid())
   email                      String             @unique
-  password                   String
+  password                   String?
+  is_minor                   Boolean            @default(false)
   firstname                  String
   lastname                   String
   phone                      String?
@@ -35,7 +37,10 @@ model User {
   two_factor_enabled         Boolean            @default(false)
   two_factor_secret          String?
   attendancesChecked         Attendance[]       @relation("AttendanceCheckedBy")
+  attendancesCorrected       Attendance[]       @relation("AttendanceCorrectedBy")
   attendances                Attendance[]       @relation("UserAttendances")
+  parentLinks                FamilyLink[]       @relation("ParentLinks")
+  childLinks                 FamilyLink[]       @relation("ChildLinks")
   availabilityCreated        AvailabilitySlot[] @relation("AvailabilityCreatedBy")
   availabilitySlots          AvailabilitySlot[] @relation("UserAvailabilitySlots")
   ConflictCheck              ConflictCheck[]
@@ -481,8 +486,15 @@ model Attendance {
   score             Decimal?         @db.Decimal(5, 2)
   type              AttendanceType   @default(manual)
   comment           String?
+  correction_by     String?
+  correction_date   DateTime?
+  correction_note   String?
+  validated_at      DateTime?
+  updated_at        DateTime         @updatedAt
+  qr_code           String?          @unique
   created_at        DateTime         @default(now())
   checker           User?            @relation("AttendanceCheckedBy", fields: [checked_in_by], references: [id])
+  corrector         User?            @relation("AttendanceCorrectedBy", fields: [correction_by], references: [id])
   event             Event            @relation(fields: [event_id], references: [id])
   user              User             @relation("UserAttendances", fields: [user_id], references: [id])
 
@@ -798,4 +810,27 @@ enum RoleType {
   municipal_admin // Admin municipal (tous droits)
   municipal_manager // Gestionnaire (équipements + subventions)
   municipal_viewer // Lecteur (données agrégées)
+}
+
+model FamilyLink {
+  id                 String             @id @default(uuid())
+  parent_id          String
+  child_id           String
+  relationship       FamilyRelationship @default(parent)
+  is_primary_contact Boolean            @default(true)
+  created_at         DateTime           @default(now())
+  updated_at         DateTime           @updatedAt
+  parent             User               @relation("ParentLinks", fields: [parent_id], references: [id], onDelete: Cascade)
+  child              User               @relation("ChildLinks", fields: [child_id], references: [id], onDelete: Cascade)
+
+  @@unique([parent_id, child_id])
+  @@index([parent_id])
+  @@index([child_id])
+  @@map("family_links")
+}
+
+enum FamilyRelationship {
+  parent
+  tuteur
+  autre
 }

@@ -1,10 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Calendar, Shield, Trash2, User } from 'lucide-react';
+import { ArrowLeft, Mail, Calendar, Shield, Trash2, User, Phone, Baby } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import RoleBasedRoute from '../../components/shared/RoleBasedRoute';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+
+interface Guardian {
+    id: string;
+    firstname: string;
+    lastname: string;
+    email: string;
+    phone: string | null;
+}
 
 interface MemberDetail {
     id: string;
@@ -12,13 +20,20 @@ interface MemberDetail {
     firstname: string;
     lastname: string;
     username: string;
+    phone: string | null;
+    birthdate: string | null;
+    is_minor: boolean;
     role: {
         id: string;
         name: string;
         type: string;
         level: number;
     };
+    membership_status: string;
+    docs_status: string;
+    payment_status: string;
     joined_at: string;
+    guardians: Guardian[];
 }
 
 const MemberDetailPage: React.FC = () => {
@@ -42,38 +57,11 @@ const MemberDetailPage: React.FC = () => {
         if (!organisationId || !memberId) return;
         try {
             setLoading(true);
-            // Récupérer tous les membres et trouver celui qui correspond
-            const members = await api.get<MemberDetail[]>(`/organisations/${organisationId}/members`);
-            const foundMember = members.find(m => m.id === memberId);
-            if (foundMember) {
-                setMember(foundMember);
-                setSelectedRoleType(foundMember.role.type);
-            }
+            const data = await api.get<MemberDetail>(`/organisations/${organisationId}/members/${memberId}`);
+            setMember(data);
+            setSelectedRoleType(data.role.type);
         } catch (error) {
             console.error('Error loading member:', error);
-            // Si erreur, utiliser des données mockées pour tester
-            if (error && typeof error === 'object' && 'response' in error) {
-                const apiError = error as { response?: { status?: number } };
-                if (apiError.response?.status === 404 || apiError.response?.status === 403) {
-                    // Données mockées pour tester
-                    const mockMember: MemberDetail = {
-                        id: memberId,
-                        email: 'jean.dupont@example.com',
-                        firstname: 'Jean',
-                        lastname: 'Dupont',
-                        username: 'jdupont',
-                        role: {
-                            id: 'role-1',
-                            name: 'Membre',
-                            type: 'member',
-                            level: 20
-                        },
-                        joined_at: new Date().toISOString()
-                    };
-                    setMember(mockMember);
-                    setSelectedRoleType(mockMember.role.type);
-                }
-            }
         } finally {
             setLoading(false);
         }
@@ -83,28 +71,6 @@ const MemberDetailPage: React.FC = () => {
         if (!organisationId || !memberId || !member) return;
         try {
             setActionLoading(true);
-            // Si c'est un membre mocké, simuler le changement
-            if (memberId.startsWith('mock-member-')) {
-                const roleOptions = [
-                    { value: 'club_owner', label: 'Propriétaire' },
-                    { value: 'club_manager', label: 'Gestionnaire' },
-                    { value: 'treasurer', label: 'Trésorier' },
-                    { value: 'coach', label: 'Coach' },
-                    { value: 'member', label: 'Membre' }
-                ];
-                setMember({
-                    ...member,
-                    role: {
-                        ...member.role,
-                        type: selectedRoleType,
-                        name: roleOptions.find(r => r.value === selectedRoleType)?.label || member.role.name
-                    }
-                });
-                setShowRoleModal(false);
-                setActionLoading(false);
-                return;
-            }
-
             await api.put(`/organisations/${organisationId}/members/${memberId}/role`, {
                 roleType: selectedRoleType
             });
@@ -122,12 +88,6 @@ const MemberDetailPage: React.FC = () => {
         if (!organisationId || !memberId) return;
         try {
             setActionLoading(true);
-            // Si c'est un membre mocké, simuler la suppression
-            if (memberId.startsWith('mock-member-')) {
-                navigate(`/dashboard/${organisationId}/members`);
-                return;
-            }
-
             await api.delete(`/organisations/${organisationId}/members/${memberId}`);
             navigate(`/dashboard/${organisationId}/members`);
         } catch (error) {
@@ -145,7 +105,7 @@ const MemberDetailPage: React.FC = () => {
         { value: 'member', label: 'Membre', level: 20, description: 'Accès de base (réservations, lecture)' }
     ];
 
-    const canManageRoles = true; // TODO: Vérifier depuis l'API
+    const canManageRoles = true;
 
     if (loading) {
         return (
@@ -188,12 +148,18 @@ const MemberDetailPage: React.FC = () => {
                         <ArrowLeft className="h-5 w-5" />
                     </Link>
                     <div className="flex-1">
-                        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
-                            {member.firstname} {member.lastname}
-                        </h1>
-                        <p className="text-gray-600 dark:text-gray-400 mt-1">
-                            Détails du membre
-                        </p>
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                                {member.firstname} {member.lastname}
+                            </h1>
+                            {member.is_minor && (
+                                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 text-xs font-medium">
+                                    <Baby className="h-3.5 w-3.5" />
+                                    Membre mineur
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-gray-600 dark:text-gray-400 mt-1">Détails du membre</p>
                     </div>
                     {canManageRoles && member.id !== user?.id && member.role.type !== 'club_owner' && (
                         <div className="flex gap-2">
@@ -217,7 +183,7 @@ const MemberDetailPage: React.FC = () => {
                         <div className="px-4 py-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
                             <p className="text-sm text-purple-700 dark:text-purple-300">
                                 <Shield className="h-4 w-4 inline mr-2" />
-                                Propriétaire - Ce rôle ne peut pas être modifié
+                                Propriétaire — ce rôle ne peut pas être modifié
                             </p>
                         </div>
                     )}
@@ -238,24 +204,36 @@ const MemberDetailPage: React.FC = () => {
                                     Informations personnelles
                                 </h2>
                                 <div className="space-y-2">
-                                    <div className="flex items-center gap-3 text-sm">
-                                        <Mail className="h-4 w-4 text-gray-400" />
-                                        <span className="text-gray-600 dark:text-gray-400">{member.email}</span>
-                                    </div>
-                                    {member.username && (
+                                    {!member.is_minor && (
+                                        <div className="flex items-center gap-3 text-sm">
+                                            <Mail className="h-4 w-4 text-gray-400" />
+                                            <span className="text-gray-600 dark:text-gray-400">{member.email}</span>
+                                        </div>
+                                    )}
+                                    {member.phone && (
+                                        <div className="flex items-center gap-3 text-sm">
+                                            <Phone className="h-4 w-4 text-gray-400" />
+                                            <span className="text-gray-600 dark:text-gray-400">{member.phone}</span>
+                                        </div>
+                                    )}
+                                    {!member.is_minor && member.username && (
                                         <div className="flex items-center gap-3 text-sm">
                                             <User className="h-4 w-4 text-gray-400" />
                                             <span className="text-gray-600 dark:text-gray-400">@{member.username}</span>
                                         </div>
                                     )}
+                                    {member.birthdate && (
+                                        <div className="flex items-center gap-3 text-sm">
+                                            <Baby className="h-4 w-4 text-gray-400" />
+                                            <span className="text-gray-600 dark:text-gray-400">
+                                                Né(e) le {new Date(member.birthdate).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                            </span>
+                                        </div>
+                                    )}
                                     <div className="flex items-center gap-3 text-sm">
                                         <Calendar className="h-4 w-4 text-gray-400" />
                                         <span className="text-gray-600 dark:text-gray-400">
-                                            Membre depuis le {new Date(member.joined_at).toLocaleDateString('fr-FR', {
-                                                year: 'numeric',
-                                                month: 'long',
-                                                day: 'numeric'
-                                            })}
+                                            Membre depuis le {new Date(member.joined_at).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
                                         </span>
                                     </div>
                                 </div>
@@ -266,12 +244,13 @@ const MemberDetailPage: React.FC = () => {
                                     Rôle et permissions
                                 </h3>
                                 <div className="flex items-center gap-3">
-                                    <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${member.role.type === 'club_owner' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400' :
+                                    <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium ${
+                                        member.role.type === 'club_owner' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400' :
                                         member.role.type === 'club_manager' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400' :
-                                            member.role.type === 'treasurer' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
-                                                member.role.type === 'coach' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400' :
-                                                    'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
-                                        }`}>
+                                        member.role.type === 'treasurer' ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400' :
+                                        member.role.type === 'coach' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400' :
+                                        'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
+                                    }`}>
                                         <Shield className="h-4 w-4" />
                                         {member.role.name}
                                     </span>
@@ -284,13 +263,43 @@ const MemberDetailPage: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Carte tuteurs pour les mineurs */}
+                {member.is_minor && member.guardians && member.guardians.length > 0 && (
+                    <div className="bg-pink-50 dark:bg-pink-900/10 rounded-xl border border-pink-200 dark:border-pink-800 p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                            <Baby className="h-5 w-5 text-pink-500" />
+                            Contact(s) parent / tuteur
+                        </h3>
+                        <div className="space-y-3">
+                            {member.guardians.map(g => (
+                                <div key={g.id} className="flex items-center gap-4 text-sm">
+                                    <div className="h-9 w-9 rounded-full bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center text-pink-600 font-bold text-xs flex-shrink-0">
+                                        {g.firstname.charAt(0)}{g.lastname.charAt(0)}
+                                    </div>
+                                    <div>
+                                        <p className="font-medium text-gray-900 dark:text-white">{g.firstname} {g.lastname}</p>
+                                        <div className="flex flex-wrap gap-3 mt-0.5">
+                                            <span className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                                                <Mail className="h-3.5 w-3.5" />{g.email}
+                                            </span>
+                                            {g.phone && (
+                                                <span className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                                                    <Phone className="h-3.5 w-3.5" />{g.phone}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Change Role Modal */}
                 {showRoleModal && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl max-w-md w-full p-6">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                                Changer le rôle
-                            </h3>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Changer le rôle</h3>
                             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                                 Rôle actuel : <span className="font-medium">{member.role.name}</span>
                             </p>
@@ -298,10 +307,11 @@ const MemberDetailPage: React.FC = () => {
                                 {roleOptions.map((role) => (
                                     <label
                                         key={role.value}
-                                        className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${selectedRoleType === role.value
-                                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
-                                            : 'border-gray-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700'
-                                            }`}
+                                        className={`flex items-start gap-3 p-3 rounded-lg border-2 cursor-pointer transition-colors ${
+                                            selectedRoleType === role.value
+                                                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                                                : 'border-gray-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-700'
+                                        }`}
                                     >
                                         <input
                                             type="radio"
@@ -312,25 +322,16 @@ const MemberDetailPage: React.FC = () => {
                                             className="mt-1 text-indigo-600 focus:ring-indigo-500"
                                         />
                                         <div className="flex-1">
-                                            <div className="font-medium text-gray-900 dark:text-white">
-                                                {role.label}
-                                            </div>
-                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                {role.description}
-                                            </div>
-                                            <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                                Niveau {role.level}
-                                            </div>
+                                            <div className="font-medium text-gray-900 dark:text-white">{role.label}</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{role.description}</div>
+                                            <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">Niveau {role.level}</div>
                                         </div>
                                     </label>
                                 ))}
                             </div>
                             <div className="flex gap-3">
                                 <button
-                                    onClick={() => {
-                                        setShowRoleModal(false);
-                                        setSelectedRoleType(member.role.type);
-                                    }}
+                                    onClick={() => { setShowRoleModal(false); setSelectedRoleType(member.role.type); }}
                                     className="flex-1 px-4 py-2 border border-gray-300 dark:border-slate-700 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
                                     disabled={actionLoading}
                                 >
@@ -352,9 +353,7 @@ const MemberDetailPage: React.FC = () => {
                 {showDeleteModal && (
                     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
                         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl max-w-md w-full p-6">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                                Retirer le membre
-                            </h3>
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Retirer le membre</h3>
                             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
                                 Êtes-vous sûr de vouloir retirer <span className="font-medium">{member.firstname} {member.lastname}</span> de cette organisation ?
                                 Cette action est irréversible.
@@ -383,7 +382,6 @@ const MemberDetailPage: React.FC = () => {
     );
 };
 
-// Wrapper avec protection par rôle
 const ProtectedMemberDetailPage: React.FC = () => {
     return (
         <RoleBasedRoute allowedRoles={['club_owner', 'club_manager']}>
@@ -393,4 +391,3 @@ const ProtectedMemberDetailPage: React.FC = () => {
 };
 
 export default ProtectedMemberDetailPage;
-

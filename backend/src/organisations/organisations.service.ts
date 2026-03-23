@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
 
 import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -278,6 +278,9 @@ export class OrganisationsService {
             firstname: true,
             lastname: true,
             username: true,
+            phone: true,
+            birthdate: true,
+            is_minor: true,
             created_at: true,
           },
         },
@@ -303,9 +306,71 @@ export class OrganisationsService {
       firstname: member.user.firstname,
       lastname: member.user.lastname,
       username: member.user.username,
+      phone: member.user.phone,
+      birthdate: member.user.birthdate,
+      is_minor: member.user.is_minor,
       role: member.role,
       joined_at: member.joined_at,
     }));
+  }
+
+  /**
+   * Récupérer le détail d'un membre, avec ses tuteurs si mineur
+   */
+  async getMemberById(organisationId: string, memberId: string, requesterId: string) {
+    const requesterMembership = await this.prisma.membership.findFirst({
+      where: { user_id: requesterId, organisation_id: organisationId, left_at: null },
+    });
+    if (!requesterMembership) {
+      throw new ForbiddenException("Vous n'êtes pas membre de cette organisation");
+    }
+
+    const membership = await this.prisma.membership.findFirst({
+      where: { user_id: memberId, organisation_id: organisationId, left_at: null, deleted_at: null },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstname: true,
+            lastname: true,
+            username: true,
+            phone: true,
+            birthdate: true,
+            is_minor: true,
+            childLinks: {
+              include: {
+                parent: {
+                  select: { id: true, firstname: true, lastname: true, email: true, phone: true },
+                },
+              },
+            },
+          },
+        },
+        role: { select: { id: true, name: true, type: true, level: true } },
+      },
+    });
+
+    if (!membership) {
+      throw new NotFoundException('Membre introuvable');
+    }
+
+    return {
+      id: membership.user.id,
+      email: membership.user.email,
+      firstname: membership.user.firstname,
+      lastname: membership.user.lastname,
+      username: membership.user.username,
+      phone: membership.user.phone,
+      birthdate: membership.user.birthdate,
+      is_minor: membership.user.is_minor,
+      role: membership.role,
+      membership_status: membership.status,
+      docs_status: 'ok',
+      payment_status: 'ok',
+      joined_at: membership.joined_at,
+      guardians: membership.user.childLinks.map((link) => link.parent),
+    };
   }
 
   /**

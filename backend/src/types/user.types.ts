@@ -2,7 +2,7 @@ export interface User {
   is_super_admin?: boolean;
   id: string;
   email: string;
-  password: string;
+  password: string | null;
   firstname: string;
   lastname: string;
   phone: string | null;
@@ -10,6 +10,7 @@ export interface User {
   gender: 'male' | 'female' | 'prefer_not_to_say';
   avatar_url: string | null;
   username: string;
+  is_minor: boolean;
   is_email_verified: boolean;
   last_login_at: Date | null;
   status: 'active' | 'suspended' | 'pending' | 'locked';

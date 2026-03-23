@@ -130,6 +130,19 @@ export class OrganisationsController {
   }
 
   /**
+   * Détail d'un membre (avec tuteurs si mineur)
+   */
+  @Get(':id/members/:memberId')
+  async getMemberById(
+    @Param('id') organisationId: string,
+    @Param('memberId') memberId: string,
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    return this.organisationsService.getMemberById(organisationId, memberId, userId);
+  }
+
+  /**
    * Changer le rôle d'un membre (seulement si je suis propriétaire)
    */
   @Put(':id/members/:memberId/role')

@@ -25,16 +25,22 @@ describe('AuthService', () => {
     username: 'johndoe',
     gender: 'male' as const,
     is_email_verified: true,
+    is_minor: false,
     status: 'active' as const,
     phone: null,
     birthdate: null,
     avatar_url: null,
     last_login_at: null,
-    refresh_token: null,
+    refresh_token_hash: null,
     password_reset_token: null,
     password_reset_expires: null,
     email_verification_token: null,
     email_verification_expires: null,
+    failed_login_attempts: 0,
+    locked_until: null,
+    two_factor_enabled: false,
+    two_factor_secret: null,
+    is_super_admin: false,
     created_at: new Date(),
     updated_at: new Date(),
     deleted_at: null,
@@ -194,7 +200,7 @@ describe('AuthService', () => {
       jest.spyOn(prismaService.user, 'findFirst').mockResolvedValue(null);
       jest.spyOn(bcrypt, 'hash').mockResolvedValue('hashedPassword' as never);
       jest.spyOn(prismaService.user, 'create').mockResolvedValue(newUser);
-      jest.spyOn(emailService, 'sendVerificationEmail').mockResolvedValue(undefined);
+      jest.spyOn(emailService, 'sendVerificationEmail').mockResolvedValue(undefined as never);
       jest.spyOn(usersService, 'sanitizeUser').mockReturnValue(sanitizedUser);
 
       const result = await service.register(registerDto);
@@ -226,7 +232,7 @@ describe('AuthService', () => {
 
       jest.spyOn(prismaService.user, 'findUnique').mockResolvedValue(mockUser);
       jest.spyOn(service as any, 'generatePasswordResetToken').mockResolvedValue('reset-token');
-      jest.spyOn(emailService, 'sendPasswordResetEmail').mockResolvedValue(undefined);
+      jest.spyOn(emailService, 'sendPasswordResetEmail').mockResolvedValue(undefined as never);
 
       const result = await service.forgotPassword(forgotPasswordDto);
 

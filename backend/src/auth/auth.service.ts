@@ -60,11 +60,16 @@ export class AuthService {
         updated_at: true,
         deleted_at: true,
         is_super_admin: true,
+        is_minor: true,
       },
     });
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.is_minor) {
+      throw new ForbiddenException('Les comptes enfants ne peuvent pas se connecter directement');
     }
 
     if (!user.is_email_verified) {
@@ -75,12 +80,16 @@ export class AuthService {
       throw new UnauthorizedException('Account is not active');
     }
 
+    if (!user.password) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    return user;
+    return user as User;
   }
 
   async login(loginDto: LoginDto) {
@@ -324,11 +333,13 @@ export class AuthService {
       : this.configService.get<string>('JWT_EXPIRES_IN', '15m');
 
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, { expiresIn }),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.jwtService.signAsync(payload, { expiresIn } as any),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.jwtService.signAsync(refreshPayload, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
         expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d'),
-      }),
+      } as any),
     ]);
 
     return {

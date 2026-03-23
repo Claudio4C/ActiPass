@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut, Menu, Sparkles, User, CreditCard, ArrowLeftRight, Bell, Calendar, MapPin, DollarSign, Award, MessageSquare, Users, Home } from 'lucide-react';
+import { LogOut, Menu, Sparkles, User, CreditCard, ArrowLeftRight, Bell, Calendar, MapPin, DollarSign, Award, MessageSquare, Users, Home, Baby } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useCurrentOrganisation } from '../../hooks/useCurrentOrganisation';
@@ -458,6 +458,14 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle, mode }) => {
                                             >
                                                 <Users className="h-4 w-4 text-blue-500" />
                                                 Espace membre
+                                            </Link>
+                                            <Link
+                                                to="/club/famille"
+                                                className="flex items-center gap-3 px-4 py-3 text-slate-700 transition hover:bg-indigo-50 dark:text-slate-200 dark:hover:bg-slate-800/70"
+                                                onClick={closeMenu}
+                                            >
+                                                <Baby className="h-4 w-4 text-pink-500" />
+                                                Ma famille
                                             </Link>
                                             <Link
                                                 to="/club/notifications"
