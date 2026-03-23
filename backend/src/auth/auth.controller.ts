@@ -13,7 +13,7 @@ import {
   Param,
   Query,
 } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 
 import { AuthService } from './auth.service';
@@ -24,6 +24,7 @@ import { LocalAuthGuard } from './guards/local-auth.guard';
 
 @Controller('auth')
 @UseGuards(ThrottlerGuard)
+@Throttle({ default: { ttl: 60000, limit: 10 } }) // 10 tentatives par minute
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
@@ -134,7 +135,7 @@ export class AuthController {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? 'strict' : 'lax',
-      maxAge: 15 * 60 * 1000, // 15 minutes
+      maxAge: 2 * 60 * 60 * 1000, // 8 hours
       path: '/',
     });
 

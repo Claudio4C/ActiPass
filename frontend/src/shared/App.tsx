@@ -30,6 +30,8 @@ import CoachBillingPage from '../pages/coach/BillingPage';
 import CoachMessagesPage from '../pages/coach/MessagesPage';
 import CoachMessageDetailPage from '../pages/coach/MessageDetailPage';
 import CoachesDirectoryPage from '../pages/club/CoachesDirectoryPage';
+import FamilyPage from '../pages/club/FamilyPage';
+import FamilyDashboardPage from '../pages/club/FamilyDashboardPage';
 import HomePage from '../pages/HomePage';
 import DiscoverPage from '../pages/DiscoverPage';
 import CoachDetailPage from '../pages/CoachDetailPage';
@@ -40,6 +42,9 @@ import EventsPage from '../pages/dashboard/EventsPage';
 import EventCreatePage from '../pages/dashboard/EventCreatePage';
 import EventEditPage from '../pages/dashboard/EventEditPage';
 import EventDetailPage from '../pages/dashboard/EventDetailPage';
+import AttendancePage from '../pages/dashboard/AttendancePage';
+import AttendanceDetailPage from '../pages/dashboard/AttendanceDetailPage';
+import AttendanceStatsPage from '../pages/dashboard/AttendanceStatsPage';
 
 interface AppProps {
     mode: AppMode;
@@ -125,6 +130,23 @@ const AppContent: React.FC<{
                     element={
                         <ProtectedRoute requiredMode={mode}>
                             <DashboardComponent />
+                        </ProtectedRoute>
+                    }
+                />
+                {/* Famille */}
+                <Route
+                    path="/club/famille"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <FamilyPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/club/famille/planning"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <FamilyDashboardPage />
                         </ProtectedRoute>
                     }
                 />
@@ -306,6 +328,31 @@ const AppContent: React.FC<{
                     element={
                         <ProtectedRoute requiredMode={mode}>
                             <EventEditPage />
+                        </ProtectedRoute>
+                    }
+                />
+                {/* Routes Présences */}
+                <Route
+                    path="/dashboard/:organisationId/attendance"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <AttendancePage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/:organisationId/attendance/:eventId"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <AttendanceDetailPage />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/dashboard/:organisationId/attendance/stats"
+                    element={
+                        <ProtectedRoute requiredMode={mode}>
+                            <AttendanceStatsPage />
                         </ProtectedRoute>
                     }
                 />

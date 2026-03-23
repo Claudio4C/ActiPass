@@ -5,7 +5,9 @@ import { ThrottlerModule } from '@nestjs/throttler';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AttendanceModule } from './attendance/attendance.module';
 import { AuthModule } from './auth/auth.module';
+import { FamilyModule } from './family/family.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { SuperAdminThrottlerGuard } from './auth/guards/super-admin-throttler.guard';
 import { EmailModule } from './email/email.module';
@@ -22,13 +24,8 @@ import { UsersModule } from './users/users.module';
     }),
     ThrottlerModule.forRoot([
       {
-        ttl: 60, // 60 secondes
-        limit: 50, // 50 requêtes par minute (augmenté de 10 pour permettre une navigation normale)
-      },
-      {
-        name: 'auth',
-        ttl: 60,
-        limit: 10, // 10 tentatives de connexion par minute (augmenté de 5)
+        ttl: 60000, // 60 secondes (en ms)
+        limit: 1000, // 1000 requêtes par minute
       },
     ]),
     PrismaModule,
@@ -37,6 +34,8 @@ import { UsersModule } from './users/users.module';
     OrganisationsModule,
     EventsModule,
     EmailModule,
+    AttendanceModule,
+    FamilyModule,
   ],
   controllers: [AppController],
   providers: [

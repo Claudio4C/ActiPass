@@ -6,7 +6,6 @@ import { PrismaClient } from '@prisma/client';
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   constructor(private configService: ConfigService) {
     super({
-      datasourceUrl: configService.get<string>('DATABASE_URL'),
       log: ['query', 'info', 'warn', 'error'],
       errorFormat: 'pretty',
     });

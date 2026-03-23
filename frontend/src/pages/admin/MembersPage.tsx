@@ -26,11 +26,8 @@ const MembersPage: React.FC = () => {
     const loadMembers = async () => {
         try {
             setLoading(true);
-            // Pour l'instant, on charge depuis /users/me et les organisations
-            // TODO: Utiliser l'endpoint approprié selon le rôle
-            const data = await api.get<Member[]>('/users/me');
-            // Mock data pour l'instant - à remplacer par l'API réelle
-            setMembers([]);
+            const data = await api.get<Member[]>('/users/me/members');
+            setMembers(data);
         } catch (error) {
             console.error('Error loading members:', error);
             setMembers([]);

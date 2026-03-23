@@ -1,16 +1,16 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../node_modules/.prisma/client"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
   id                         String             @id @default(uuid())
   email                      String             @unique
-  password                   String
+  password                   String?
   firstname                  String
   lastname                   String
   phone                      String?
@@ -19,6 +19,7 @@ model User {
   avatar_url                 String?
   username                   String             @unique
   is_email_verified          Boolean            @default(false)
+  is_minor                   Boolean            @default(false)
   last_login_at              DateTime?
   status                     UserStatus         @default(pending)
   created_at                 DateTime           @default(now())
@@ -28,16 +29,19 @@ model User {
   email_verification_token   String?            @unique
   failed_login_attempts      Int                @default(0)
   locked_until               DateTime?
-  is_super_admin             Boolean            @default(false)
   password_reset_expires     DateTime?
   password_reset_token       String?            @unique
   refresh_token_hash         String?
   two_factor_enabled         Boolean            @default(false)
   two_factor_secret          String?
+  is_super_admin             Boolean            @default(false)
   attendancesChecked         Attendance[]       @relation("AttendanceCheckedBy")
+  attendancesCorrected       Attendance[]       @relation("AttendanceCorrectedBy")
   attendances                Attendance[]       @relation("UserAttendances")
+  auditLogs                  AuditLog[]
   availabilityCreated        AvailabilitySlot[] @relation("AvailabilityCreatedBy")
   availabilitySlots          AvailabilitySlot[] @relation("UserAvailabilitySlots")
+  childLinks                 FamilyLink[]       @relation("ChildLinks")
   ConflictCheck              ConflictCheck[]
   documents_uploaded         Document[]
   documents_validated        Document[]         @relation("DocumentValidatedBy")
@@ -46,15 +50,32 @@ model User {
   listings_created           Listing[]
   memberships                Membership[]
   organisations_created      Organisation[]
+  parentLinks                FamilyLink[]       @relation("ParentLinks")
   payments_created_manual    Payment[]          @relation("PaymentsCreated")
   payments_made              Payment[]          @relation("PaymentsMade")
   Penalty                    Penalty[]
   privateCoursesAsStudent    PrivateCourse[]    @relation("StudentCourses")
   privateCoursesAsTutor      PrivateCourse[]    @relation("TutorCourses")
   subscriptions              Subscription[]
-  auditLogs                  AuditLog[]
 
   @@map("users")
+}
+
+model FamilyLink {
+  id                 String             @id @default(uuid())
+  parent_id          String
+  child_id           String
+  relationship       FamilyRelationship @default(parent)
+  is_primary_contact Boolean            @default(true)
+  created_at         DateTime           @default(now())
+  updated_at         DateTime           @updatedAt
+  parent             User               @relation("ParentLinks", fields: [parent_id], references: [id], onDelete: Cascade)
+  child              User               @relation("ChildLinks", fields: [child_id], references: [id], onDelete: Cascade)
+
+  @@unique([parent_id, child_id])
+  @@index([parent_id])
+  @@index([child_id])
+  @@map("family_links")
 }
 
 model Role {
@@ -64,11 +85,11 @@ model Role {
   description String?
   is_default  Boolean          @default(false)
   level       Int
-  space       UserSpace
-  type        RoleType
   created_at  DateTime         @default(now())
   deleted_at  DateTime?
   updated_at  DateTime         @updatedAt
+  space       UserSpace
+  type        RoleType
   memberships Membership[]
   permissions RolePermission[]
 
@@ -76,30 +97,28 @@ model Role {
 }
 
 model Permission {
-  id          String    @id @default(uuid())
-  name        String    @unique
-  slug        String    @unique
-  description String?
-  resource    String // 'events', 'members', 'payments', etc.
-  action      String // 'create', 'read', 'update', 'delete', 'manage'
-  scope       String // 'own', 'organisation', 'global'
-  created_at  DateTime  @default(now())
-  updated_at  DateTime  @updatedAt
-  deleted_at  DateTime?
-
+  id              String           @id @default(uuid())
+  name            String           @unique
+  slug            String           @unique
+  description     String?
+  resource        String
+  action          String
+  scope           String
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+  deleted_at      DateTime?
   rolePermissions RolePermission[]
 
   @@map("permissions")
 }
 
 model RolePermission {
-  id            String   @id @default(uuid())
+  id            String     @id @default(uuid())
   role_id       String
   permission_id String
-  created_at    DateTime @default(now())
-
-  role       Role       @relation(fields: [role_id], references: [id], onDelete: Cascade)
-  permission Permission @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+  created_at    DateTime   @default(now())
+  permission    Permission @relation(fields: [permission_id], references: [id], onDelete: Cascade)
+  role          Role       @relation(fields: [role_id], references: [id], onDelete: Cascade)
 
   @@unique([role_id, permission_id])
   @@map("role_permissions")
@@ -229,7 +248,6 @@ model Event {
   id                    String             @id @default(uuid())
   organisation_id       String
   linked_listing_id     String?
-  parent_event_id       String? // Pour les séries récurrentes : référence l'événement parent
   title                 String
   description           String?
   event_type            EventType
@@ -242,12 +260,13 @@ model Event {
   registration_required Boolean            @default(false)
   price                 Float              @default(0)
   is_recurring          Boolean            @default(false)
-  recurrence_pattern    String? // JSON string pour la récurrence
+  recurrence_pattern    String?
   status                EventStatus        @default(draft)
   cover_url             String?
   created_at            DateTime           @default(now())
   updated_at            DateTime           @updatedAt
   deleted_at            DateTime?
+  parent_event_id       String?
   Attendance            Attendance[]
   AvailabilitySlot      AvailabilitySlot[]
   EventCategory         EventCategory[]
@@ -482,12 +501,21 @@ model Attendance {
   type              AttendanceType   @default(manual)
   comment           String?
   created_at        DateTime         @default(now())
+  correction_by     String?
+  correction_date   DateTime?
+  correction_note   String?
+  updated_at        DateTime         @updatedAt
+  validated_at      DateTime?
+  qr_code           String?
   checker           User?            @relation("AttendanceCheckedBy", fields: [checked_in_by], references: [id])
+  corrector         User?            @relation("AttendanceCorrectedBy", fields: [correction_by], references: [id])
   event             Event            @relation(fields: [event_id], references: [id])
   user              User             @relation("UserAttendances", fields: [user_id], references: [id])
 
   @@unique([user_id, event_id])
   @@index([event_id, status])
+  @@index([validated_at])
+  @@index([qr_code])
   @@map("attendances")
 }
 
@@ -551,8 +579,8 @@ model Penalty {
 model AuditLog {
   id              String   @id @default(uuid())
   user_id         String
-  action          String // create, update, delete, export, approve, login, etc.
-  resource_type   String // events, members, payments, etc.
+  action          String
+  resource_type   String
   resource_id     String?
   organisation_id String?
   details         Json?
@@ -781,21 +809,24 @@ enum PenaltyType {
   admin
 }
 
+enum FamilyRelationship {
+  parent
+  tuteur
+  autre
+}
+
 enum UserSpace {
-  club_360 // Espace 360° (associatif/privé)
-  municipality // Portail Propriétaire (Mairie)
+  club_360
+  municipality
 }
 
 enum RoleType {
-  // Espace 360° - Rôles optimisés
-  club_owner // Propriétaire (tous droits)
-  club_manager // Gestionnaire (gestion opérationnelle)
-  treasurer // Trésorier (finances uniquement)
-  coach // Coach (ses cours + présences)
-  member // Membre (lecture + réservations)
-
-  // Portail Propriétaire - Rôles municipaux
-  municipal_admin // Admin municipal (tous droits)
-  municipal_manager // Gestionnaire (équipements + subventions)
-  municipal_viewer // Lecteur (données agrégées)
+  club_owner
+  club_manager
+  treasurer
+  coach
+  member
+  municipal_admin
+  municipal_manager
+  municipal_viewer
 }

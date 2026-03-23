@@ -25,6 +25,7 @@ import { SuperAdminService } from './super-admin.service';
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
+      // @ts-expect-error - expiresIn accepts string values like '15m', '2h', '7d' but TypeScript expects StringValue type
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
         signOptions: {

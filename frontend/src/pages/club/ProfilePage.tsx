@@ -1,6 +1,7 @@
 import React from 'react';
 import Layout from '../../components/layout/Layout';
 import { useAuth } from '../../contexts/AuthContext';
+import { useCurrentOrganisation } from '../../hooks/useCurrentOrganisation';
 import { Camera, Mail, Phone, Shield, MapPin, Activity, Calendar, Bell, Lock } from 'lucide-react';
 
 type ToggleRowProps = {
@@ -55,6 +56,7 @@ const SectionCard: React.FC<{ title: string; description?: string; children: Rea
 
 const ProfilePage: React.FC = () => {
     const { user } = useAuth();
+    const { organisation, role } = useCurrentOrganisation();
 
     const [newsletter, setNewsletter] = React.useState(true);
     const [reminders, setReminders] = React.useState(true);
@@ -172,21 +174,21 @@ const ProfilePage: React.FC = () => {
                                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Organisation principale</span>
                                 <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                     <MapPin className="h-4 w-4 text-indigo-500" />
-                                    Gracie Nova Lyon
+                                    {organisation?.name ?? '—'}
                                 </div>
                             </label>
                             <label className="flex flex-col gap-2">
                                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Discipline favorite</span>
                                 <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                     <Activity className="h-4 w-4 text-emerald-500" />
-                                    Jiu-jitsu brésilien
+                                    —
                                 </div>
                             </label>
                             <label className="flex flex-col gap-2">
                                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Rôle actuel</span>
                                 <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                                     <Shield className="h-4 w-4 text-sky-500" />
-                                    Membre
+                                    {role ?? '—'}
                                 </div>
                             </label>
                         </div>

@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getMockMembership } from '../../utils/mockRoles';
-import type { Membership, RoleType } from '../../types';
+import { useOrganisationMembership } from '../../hooks/useOrganisationMembership';
+import type { RoleType } from '../../types';
 
 interface RoleBasedRouteProps {
     children: React.ReactNode;
@@ -17,40 +17,11 @@ const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
 }) => {
     const { user } = useAuth();
     const { organisationId } = useParams<{ organisationId: string }>();
-    const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { roleType, loading } = useOrganisationMembership(organisationId);
 
-    useEffect(() => {
-        checkAuthorization();
-    }, [organisationId, user?.id]);
-
-    const checkAuthorization = async () => {
-        if (!user?.id || !organisationId) {
-            setIsAuthorized(false);
-            setLoading(false);
-            return;
-        }
-
-        try {
-            // TODO: Remplacer par l'endpoint réel qui récupère le membership avec rôle
-            // Pour l'instant, on utilise des données mockées selon l'organisation
-            // const memberships = await api.get<Membership[]>(`/users/${user.id}/memberships`);
-            // const membership = memberships.find(m => m.organisationId === organisationId);
-
-            // Mock data temporaire - rôle différent selon l'organisation
-            const mockMembership = getMockMembership(organisationId);
-
-            const userRole = mockMembership.role?.type;
-            const hasAccess = allowedRoles.includes(userRole);
-
-            setIsAuthorized(hasAccess);
-        } catch (error) {
-            console.error('Error checking authorization:', error);
-            setIsAuthorized(false);
-        } finally {
-            setLoading(false);
-        }
-    };
+    if (!user) {
+        return <Navigate to="/login" replace />;
+    }
 
     if (loading) {
         return (
@@ -63,6 +34,8 @@ const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
         );
     }
 
+    const isAuthorized = roleType !== null && allowedRoles.includes(roleType);
+
     if (!isAuthorized) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-950">
@@ -74,7 +47,9 @@ const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
                     </div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Accès refusé</h2>
                     <p className="text-gray-600 dark:text-gray-400 mb-6">
-                        Vous n'avez pas les permissions nécessaires pour accéder à cette page.
+                        {roleType === null
+                            ? "Vous n'êtes pas membre de cette organisation."
+                            : "Vous n'avez pas les permissions nécessaires pour accéder à cette page."}
                     </p>
                     <button
                         onClick={() => window.location.href = fallbackPath}
@@ -91,4 +66,3 @@ const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
 };
 
 export default RoleBasedRoute;
-

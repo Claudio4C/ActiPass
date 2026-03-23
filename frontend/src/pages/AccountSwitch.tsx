@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Loader2, AlertCircle, Building2, UserPlus, BadgeCheck } from 'lucide-react';
+import { MapPin, Loader2, AlertCircle, Building2, UserPlus, BadgeCheck, Shield } from 'lucide-react';
 import Layout from '../components/layout/Layout';
 import { api } from '../lib/api';
 import type { RoleType } from '../types';
@@ -37,52 +37,6 @@ const ImgWithFallback: React.FC<{ src: string; alt: string; className?: string; 
     );
 };
 
-const mockOrgs: Organisation[] = [
-    {
-        id: 'org-1',
-        name: 'Gracie Nova',
-        role: 'membre',
-        type: 'club',
-        coverQuery: 'brazilian jiu jitsu,dojo,mats,training',
-        avatarQuery: 'bjj logo,emblem',
-        subtitle: "Espace membres officiel de l’académie Gracie Nova, quartier de la Croix-Rousse",
-        description:
-            'Club historique de Lyon spécialisé en jiu-jitsu brésilien, cours tous niveaux et préparation compétition.',
-    },
-    {
-        id: 'org-2',
-        name: 'Grappling Lyon',
-        role: 'coach',
-        type: 'association',
-        coverQuery: 'brazilian jiu jitsu,gi training,grappling',
-        avatarQuery: 'martial arts logo,minimal',
-        subtitle: 'Association dédiée au grappling no-gi et à la lutte moderne dans le 7ᵉ arrondissement.',
-        description:
-            'Séances intensives en no-gi, ateliers lutte et conditionnement physique pour compétiteurs et passionnés.',
-    },
-    {
-        id: 'org-3',
-        name: 'No-Gi Academy',
-        role: 'gestionnaire',
-        type: 'club',
-        coverQuery: 'no-gi grappling,training,dojo',
-        avatarQuery: 'minimal logo,abstract',
-        subtitle: 'Académie spécialisée dans les disciplines no-gi et le travail en mobilité.',
-        description:
-            'Coaching personnalisé, mobilité et fluidité au sol pour grapplers souhaitant progresser sans kimono.',
-    },
-    {
-        id: 'org-4',
-        name: 'Studio Flow Privé',
-        role: 'independant',
-        type: 'independant',
-        coverQuery: 'personal trainer home coaching living room minimal',
-        avatarQuery: 'coach portrait lifestyle',
-        subtitle: 'Profil freelance dédié à mes cours visio et à domicile',
-        description:
-            'Diffusez vos créneaux privés, automatisez les paiements et laissez les clubs vous solliciter pour animer un stage.',
-    },
-];
 
 const primarySection = 'bg-white/80 dark:bg-slate-900/80 backdrop-blur rounded-3xl border border-white/60 dark:border-slate-800 shadow-lg';
 const secondarySection = 'bg-white/70 dark:bg-slate-900/70 backdrop-blur rounded-3xl border border-white/60 dark:border-slate-800 shadow-sm';
@@ -271,15 +225,21 @@ const AccountSwitch: React.FC = () => {
         });
     }, [organisations, search, roleFilter, typeFilter]);
 
+    // Vérifier si l'utilisateur a au moins une organisation avec un rôle admin/owner/coach
+    const hasAdminAccess = React.useMemo(() => {
+        const adminRoleTypes: RoleType[] = ['club_owner', 'club_manager', 'coach'];
+        return organisations.some(org => adminRoleTypes.includes(org.roleType));
+    }, [organisations]);
+
     const stats = React.useMemo(() => {
-        const total = mockOrgs.length;
-        const clubs = mockOrgs.filter((org) => org.type === 'club').length;
-        const associations = mockOrgs.filter((org) => org.type === 'association').length;
-        const independants = mockOrgs.filter((org) => org.type === 'independant').length;
-        const coachRoles = mockOrgs.filter((org) => org.role === 'coach').length;
-        const freelanceRoles = mockOrgs.filter((org) => org.role === 'independant').length;
+        const total = organisations.length;
+        const clubs = organisations.filter((org) => org.type === 'club').length;
+        const associations = organisations.filter((org) => org.type === 'association').length;
+        const independants = organisations.filter((org) => org.type === 'independant').length;
+        const coachRoles = organisations.filter((org) => org.role === 'coach').length;
+        const freelanceRoles = organisations.filter((org) => org.role === 'independant').length;
         return { total, clubs, associations, independants, coachRoles, freelanceRoles };
-    }, []);
+    }, [organisations]);
 
     const handleDiscoverNearby = React.useCallback(() => {
         if (typeof window === 'undefined') return;
@@ -388,6 +348,41 @@ const AccountSwitch: React.FC = () => {
             mode="club"
         >
             <div className="space-y-10">
+                {hasAdminAccess && (
+                    <section className="bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-indigo-900/20 dark:to-blue-900/20 backdrop-blur-sm border border-indigo-200 dark:border-indigo-500/60 rounded-3xl p-6 sm:p-8 shadow-sm transition-colors">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div>
+                                <p className="text-sm uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-300">Accès administrateur</p>
+                                <h2 className="text-2xl font-semibold text-slate-900 dark:text-white mt-1">Portail Admin</h2>
+                                <p className="text-sm text-slate-600 dark:text-slate-300 mt-2 max-w-xl">
+                                    Accédez au tableau de bord administrateur pour gérer vos organisations. Vous avez des droits d'administration sur au moins une organisation.
+                                </p>
+                            </div>
+                            <div className="flex-shrink-0">
+                                <Button
+                                    variant="primary"
+                                    size="md"
+                                    className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/30 border border-indigo-500/40"
+                                    onClick={() => {
+                                        // Trouver la première organisation avec un rôle admin
+                                        const adminOrg = organisations.find(org =>
+                                            ['club_owner', 'club_manager', 'coach'].includes(org.roleType)
+                                        );
+                                        if (adminOrg) {
+                                            navigate(`/dashboard/${adminOrg.id}/overview`);
+                                        } else {
+                                            navigate('/accounts');
+                                        }
+                                    }}
+                                >
+                                    <Shield className="w-4 h-4 mr-2" />
+                                    Accéder au portail
+                                </Button>
+                            </div>
+                        </div>
+                    </section>
+                )}
+
                 <section className="bg-white/40 dark:bg-slate-900/60 backdrop-blur-sm border border-white/60 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-sm transition-colors">
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div>
@@ -459,11 +454,10 @@ const AccountSwitch: React.FC = () => {
                                     key={roleKey}
                                     type="button"
                                     onClick={() => setRoleFilter(roleKey)}
-                                    className={`rounded-full px-4 py-2 text-xs font-medium transition shadow-sm border ${
-                                        roleFilter === roleKey
-                                            ? 'bg-indigo-500 text-white border-indigo-500'
-                                            : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-200 hover:text-indigo-600'
-                                    }`}
+                                    className={`rounded-full px-4 py-2 text-xs font-medium transition shadow-sm border ${roleFilter === roleKey
+                                        ? 'bg-indigo-500 text-white border-indigo-500'
+                                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-200 hover:text-indigo-600'
+                                        }`}
                                 >
                                     {roleKey === 'all' ? 'Tous les rôles' : formatRoleLabel(roleKey)}
                                 </button>

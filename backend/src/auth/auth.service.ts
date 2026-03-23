@@ -45,6 +45,7 @@ export class AuthService {
         avatar_url: true,
         username: true,
         is_email_verified: true,
+        is_minor: true,
         last_login_at: true,
         status: true,
         refresh_token_hash: true,
@@ -67,12 +68,20 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (user.is_minor) {
+      throw new ForbiddenException('Les comptes enfants ne peuvent pas se connecter directement');
+    }
+
     if (!user.is_email_verified) {
       throw new UnauthorizedException('Email not verified');
     }
 
     if (user.status !== 'active') {
       throw new UnauthorizedException('Account is not active');
+    }
+
+    if (!user.password) {
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -324,7 +333,9 @@ export class AuthService {
       : this.configService.get<string>('JWT_EXPIRES_IN', '15m');
 
     const [accessToken, refreshToken] = await Promise.all([
+      // @ts-expect-error - expiresIn accepts string values like '15m', '2h', '7d'
       this.jwtService.signAsync(payload, { expiresIn }),
+      // @ts-expect-error - expiresIn accepts string values like '15m', '2h', '7d'
       this.jwtService.signAsync(refreshPayload, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
         expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d'),

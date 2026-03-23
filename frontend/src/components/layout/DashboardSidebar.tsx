@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard,
@@ -10,13 +10,12 @@ import {
     Settings,
     Menu,
     X,
-    Bell,
     MessageSquare,
-    UserCog
+    UserCog,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { getMockMembership } from '../../utils/mockRoles';
-import type { Membership, RoleType } from '../../types';
+import { useOrganisationMembership } from '../../hooks/useOrganisationMembership';
+import type { RoleType } from '../../types';
 
 interface MenuItem {
     icon: React.ComponentType<{ className?: string }>;
@@ -34,54 +33,16 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
     const { user } = useAuth();
     const location = useLocation();
     const [isMobileOpen, setIsMobileOpen] = useState(false);
-    const [membership, setMembership] = useState<Membership | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { roleType, roleName, loading } = useOrganisationMembership(organisationId);
 
-    useEffect(() => {
-        loadMembership();
-    }, [organisationId, user?.id]);
+    const currentRole: RoleType = roleType ?? 'member';
 
-    const loadMembership = async () => {
-        if (!user?.id) return;
-        try {
-            setLoading(true);
-            // TODO: Remplacer par l'endpoint réel qui récupère le membership avec rôle
-            // Pour l'instant, on utilise des données mockées selon l'organisation
-            // const memberships = await api.get<Membership[]>(`/users/${user.id}/memberships`, undefined, { useCache: true, cacheTTL: 60000 });
-            // const currentMembership = memberships.find(m => m.organisationId === organisationId);
-
-            // Mock data temporaire - rôle différent selon l'organisation
-            const mockMembership = getMockMembership(organisationId);
-            setMembership(mockMembership);
-        } catch (error) {
-            console.error('Error loading membership:', error);
-            // En cas d'erreur, on utilise un rôle par défaut pour permettre l'accès
-            const defaultMembership: Membership = {
-                id: 'default-membership',
-                organisationId: organisationId,
-                role: {
-                    id: 'default-role',
-                    name: 'Membre',
-                    type: 'member',
-                    level: 20
-                },
-                joined_at: new Date().toISOString()
-            };
-            setMembership(defaultMembership);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const currentRole: RoleType = membership?.role?.type || 'member';
-
-    // Menu items selon le rôle
     const getMenuItems = (): MenuItem[] => {
         const allItems: MenuItem[] = [
             { icon: LayoutDashboard, label: "Vue d'ensemble", path: `/dashboard/${organisationId}/overview`, roles: ['club_owner', 'club_manager', 'treasurer'] },
             { icon: Users, label: "Membres", path: `/dashboard/${organisationId}/members`, roles: ['club_owner', 'club_manager'] },
             { icon: Calendar, label: "Événements", path: `/dashboard/${organisationId}/events`, roles: ['club_owner', 'club_manager'] },
-            { icon: ClipboardCheck, label: "Présences", path: `/dashboard/${organisationId}/attendance`, roles: ['club_owner', 'club_manager'] },
+            { icon: ClipboardCheck, label: "Présences", path: `/dashboard/${organisationId}/attendance`, roles: ['club_owner', 'club_manager', 'coach'] },
             { icon: Euro, label: "Finances", path: `/dashboard/${organisationId}/payments`, roles: ['club_owner', 'club_manager', 'treasurer'] },
             { icon: FileText, label: "Documents", path: `/dashboard/${organisationId}/documents`, roles: ['club_owner', 'club_manager'] },
             { icon: MessageSquare, label: "Communication", path: `/dashboard/${organisationId}/communication`, roles: ['club_owner', 'club_manager'] },
@@ -179,7 +140,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
                                 {user?.firstName} {user?.lastName}
                             </div>
                             <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                {membership?.role?.name || 'Membre'}
+                                {roleName || 'Membre'}
                             </div>
                         </div>
                     </div>
@@ -198,4 +159,3 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
 };
 
 export default DashboardSidebar;
-

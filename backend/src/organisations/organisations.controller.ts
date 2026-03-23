@@ -130,6 +130,22 @@ export class OrganisationsController {
   }
 
   /**
+   * Détail d'un membre avec ses tuteurs si mineur (P1-5)
+   */
+  @Get(':id/members/:memberId')
+  async getMemberById(
+    @Param('id') organisationId: string,
+    @Param('memberId') memberId: string,
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) {
+      throw new Error('Utilisateur non authentifié');
+    }
+    return this.organisationsService.getMemberById(organisationId, memberId, userId);
+  }
+
+  /**
    * Changer le rôle d'un membre (seulement si je suis propriétaire)
    */
   @Put(':id/members/:memberId/role')

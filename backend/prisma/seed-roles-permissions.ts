@@ -156,6 +156,13 @@ async function seedRolesAndPermissions() {
       scope: 'own',
     },
     {
+      name: 'Lire les présences',
+      slug: 'attendance:read',
+      resource: 'attendance',
+      action: 'read',
+      scope: 'organisation',
+    },
+    {
       name: 'Gérer les présences',
       slug: 'attendance:manage',
       resource: 'attendance',
@@ -415,6 +422,7 @@ async function seedRolesAndPermissions() {
         'auth:manage',
         'audit:read',
         'organisation:*',
+        'attendance:*',
       ],
     },
     {
@@ -433,6 +441,7 @@ async function seedRolesAndPermissions() {
         'case:*',
         'document:*',
         'report:*',
+        'attendance:*',
       ],
     },
     {
@@ -458,6 +467,7 @@ async function seedRolesAndPermissions() {
         'events:create',
         'events:update',
         'booking:read',
+        'attendance:read',
         'attendance:manage',
         'comm:message',
         'case:read',
@@ -471,7 +481,13 @@ async function seedRolesAndPermissions() {
       type: 'member',
       level: 20,
       is_default: true,
-      permissions: ['booking:create', 'booking:update', 'booking:cancel', 'document:upload'],
+      permissions: [
+        'booking:create',
+        'booking:update',
+        'booking:cancel',
+        'document:upload',
+        'events:read',
+      ],
     },
   ];
 

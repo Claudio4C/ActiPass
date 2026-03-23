@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
 
 import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -278,6 +278,9 @@ export class OrganisationsService {
             firstname: true,
             lastname: true,
             username: true,
+            phone: true,
+            birthdate: true,
+            is_minor: true,
             created_at: true,
           },
         },
@@ -303,6 +306,9 @@ export class OrganisationsService {
       firstname: member.user.firstname,
       lastname: member.user.lastname,
       username: member.user.username,
+      phone: member.user.phone,
+      birthdate: member.user.birthdate,
+      is_minor: member.user.is_minor,
       role: member.role,
       joined_at: member.joined_at,
     }));
@@ -802,6 +808,73 @@ export class OrganisationsService {
     return {
       csv: csvContent,
       filename: `membres_${organisationId}_${new Date().toISOString().split('T')[0]}.csv`,
+    };
+  }
+
+  /**
+   * Récupérer le détail d'un membre avec ses parents/tuteurs si mineur (P1-5)
+   */
+  async getMemberById(organisationId: string, memberId: string, requesterId: string) {
+    const requesterMembership = await this.prisma.membership.findFirst({
+      where: { user_id: requesterId, organisation_id: organisationId, left_at: null },
+    });
+    if (!requesterMembership) {
+      throw new ForbiddenException("Vous n'êtes pas membre de cette organisation");
+    }
+
+    const membership = await this.prisma.membership.findFirst({
+      where: { user_id: memberId, organisation_id: organisationId, left_at: null, deleted_at: null },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstname: true,
+            lastname: true,
+            username: true,
+            phone: true,
+            birthdate: true,
+            gender: true,
+            avatar_url: true,
+            is_minor: true,
+            created_at: true,
+            childLinks: {
+              include: {
+                parent: {
+                  select: {
+                    id: true,
+                    firstname: true,
+                    lastname: true,
+                    email: true,
+                    phone: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        role: { select: { id: true, name: true, type: true, level: true } },
+      },
+    });
+
+    if (!membership) {
+      throw new NotFoundException('Membre introuvable dans cette organisation');
+    }
+
+    const { childLinks, ...userWithoutLinks } = membership.user;
+
+    return {
+      ...userWithoutLinks,
+      role: membership.role,
+      membership_status: membership.status,
+      docs_status: membership.docs_status,
+      payment_status: membership.payment_status,
+      joined_at: membership.joined_at,
+      guardians: childLinks.map((link) => ({
+        ...link.parent,
+        relationship: link.relationship,
+        is_primary_contact: link.is_primary_contact,
+      })),
     };
   }
 }

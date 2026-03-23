@@ -1,10 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Calendar, Shield, Trash2, User } from 'lucide-react';
+import { ArrowLeft, Mail, Calendar, Shield, Trash2, User, Phone, Baby, Users } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import RoleBasedRoute from '../../components/shared/RoleBasedRoute';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
+
+interface Guardian {
+    id: string;
+    firstname: string;
+    lastname: string;
+    email: string;
+    phone: string | null;
+    relationship: string;
+    is_primary_contact: boolean;
+}
 
 interface MemberDetail {
     id: string;
@@ -12,13 +22,20 @@ interface MemberDetail {
     firstname: string;
     lastname: string;
     username: string;
+    phone: string | null;
+    birthdate: string | null;
+    is_minor: boolean;
     role: {
         id: string;
         name: string;
         type: string;
         level: number;
     };
+    membership_status: string;
+    docs_status: string;
+    payment_status: string;
     joined_at: string;
+    guardians: Guardian[];
 }
 
 const MemberDetailPage: React.FC = () => {
@@ -42,38 +59,11 @@ const MemberDetailPage: React.FC = () => {
         if (!organisationId || !memberId) return;
         try {
             setLoading(true);
-            // Récupérer tous les membres et trouver celui qui correspond
-            const members = await api.get<MemberDetail[]>(`/organisations/${organisationId}/members`);
-            const foundMember = members.find(m => m.id === memberId);
-            if (foundMember) {
-                setMember(foundMember);
-                setSelectedRoleType(foundMember.role.type);
-            }
+            const data = await api.get<MemberDetail>(`/organisations/${organisationId}/members/${memberId}`);
+            setMember(data);
+            setSelectedRoleType(data.role.type);
         } catch (error) {
             console.error('Error loading member:', error);
-            // Si erreur, utiliser des données mockées pour tester
-            if (error && typeof error === 'object' && 'response' in error) {
-                const apiError = error as { response?: { status?: number } };
-                if (apiError.response?.status === 404 || apiError.response?.status === 403) {
-                    // Données mockées pour tester
-                    const mockMember: MemberDetail = {
-                        id: memberId,
-                        email: 'jean.dupont@example.com',
-                        firstname: 'Jean',
-                        lastname: 'Dupont',
-                        username: 'jdupont',
-                        role: {
-                            id: 'role-1',
-                            name: 'Membre',
-                            type: 'member',
-                            level: 20
-                        },
-                        joined_at: new Date().toISOString()
-                    };
-                    setMember(mockMember);
-                    setSelectedRoleType(mockMember.role.type);
-                }
-            }
         } finally {
             setLoading(false);
         }
@@ -83,28 +73,6 @@ const MemberDetailPage: React.FC = () => {
         if (!organisationId || !memberId || !member) return;
         try {
             setActionLoading(true);
-            // Si c'est un membre mocké, simuler le changement
-            if (memberId.startsWith('mock-member-')) {
-                const roleOptions = [
-                    { value: 'club_owner', label: 'Propriétaire' },
-                    { value: 'club_manager', label: 'Gestionnaire' },
-                    { value: 'treasurer', label: 'Trésorier' },
-                    { value: 'coach', label: 'Coach' },
-                    { value: 'member', label: 'Membre' }
-                ];
-                setMember({
-                    ...member,
-                    role: {
-                        ...member.role,
-                        type: selectedRoleType,
-                        name: roleOptions.find(r => r.value === selectedRoleType)?.label || member.role.name
-                    }
-                });
-                setShowRoleModal(false);
-                setActionLoading(false);
-                return;
-            }
-
             await api.put(`/organisations/${organisationId}/members/${memberId}/role`, {
                 roleType: selectedRoleType
             });
@@ -122,12 +90,6 @@ const MemberDetailPage: React.FC = () => {
         if (!organisationId || !memberId) return;
         try {
             setActionLoading(true);
-            // Si c'est un membre mocké, simuler la suppression
-            if (memberId.startsWith('mock-member-')) {
-                navigate(`/dashboard/${organisationId}/members`);
-                return;
-            }
-
             await api.delete(`/organisations/${organisationId}/members/${memberId}`);
             navigate(`/dashboard/${organisationId}/members`);
         } catch (error) {
@@ -145,7 +107,7 @@ const MemberDetailPage: React.FC = () => {
         { value: 'member', label: 'Membre', level: 20, description: 'Accès de base (réservations, lecture)' }
     ];
 
-    const canManageRoles = true; // TODO: Vérifier depuis l'API
+    const canManageRoles = true;
 
     if (loading) {
         return (
@@ -238,14 +200,34 @@ const MemberDetailPage: React.FC = () => {
                                     Informations personnelles
                                 </h2>
                                 <div className="space-y-2">
+                                    {member.is_minor && (
+                                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 w-fit mb-3">
+                                            <Baby className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                            <span className="text-xs font-medium text-amber-700 dark:text-amber-400">Membre mineur</span>
+                                        </div>
+                                    )}
                                     <div className="flex items-center gap-3 text-sm">
                                         <Mail className="h-4 w-4 text-gray-400" />
                                         <span className="text-gray-600 dark:text-gray-400">{member.email}</span>
                                     </div>
+                                    {member.phone && (
+                                        <div className="flex items-center gap-3 text-sm">
+                                            <Phone className="h-4 w-4 text-gray-400" />
+                                            <span className="text-gray-600 dark:text-gray-400">{member.phone}</span>
+                                        </div>
+                                    )}
                                     {member.username && (
                                         <div className="flex items-center gap-3 text-sm">
                                             <User className="h-4 w-4 text-gray-400" />
                                             <span className="text-gray-600 dark:text-gray-400">@{member.username}</span>
+                                        </div>
+                                    )}
+                                    {member.birthdate && (
+                                        <div className="flex items-center gap-3 text-sm">
+                                            <Calendar className="h-4 w-4 text-gray-400" />
+                                            <span className="text-gray-600 dark:text-gray-400">
+                                                Né(e) le {new Date(member.birthdate).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                            </span>
                                         </div>
                                     )}
                                     <div className="flex items-center gap-3 text-sm">
@@ -283,6 +265,53 @@ const MemberDetailPage: React.FC = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Guardians Card — visible only for minors */}
+                {member.is_minor && member.guardians.length > 0 && (
+                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-amber-200 dark:border-amber-800/40 p-6">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Users className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                Parent{member.guardians.length > 1 ? 's' : ''} / Tuteur{member.guardians.length > 1 ? 's' : ''}
+                            </h3>
+                        </div>
+                        <div className="space-y-3">
+                            {member.guardians.map((guardian) => (
+                                <div key={guardian.id} className="flex items-start gap-4 p-3 rounded-xl bg-amber-50/50 dark:bg-amber-900/10">
+                                    <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
+                                        <span className="text-amber-700 dark:text-amber-300 font-semibold text-sm">
+                                            {guardian.firstname[0]}{guardian.lastname[0]}
+                                        </span>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <p className="font-medium text-gray-900 dark:text-white text-sm">
+                                                {guardian.firstname} {guardian.lastname}
+                                            </p>
+                                            {guardian.is_primary_contact && (
+                                                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300">
+                                                    Contact principal
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="space-y-1 mt-1">
+                                            <p className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
+                                                <Mail className="h-3 w-3" />
+                                                {guardian.email}
+                                            </p>
+                                            {guardian.phone && (
+                                                <p className="flex items-center gap-2 text-xs text-gray-500 dark:text-slate-400">
+                                                    <Phone className="h-3 w-3" />
+                                                    {guardian.phone}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Change Role Modal */}
                 {showRoleModal && (
