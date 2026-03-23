@@ -33,7 +33,9 @@ async function testSuperAdminLogin() {
 
     // Tester le mot de passe
     const password = 'SuperAdmin123!';
-    const isPasswordValid = await bcrypt.compare(password, superAdmin.password);
+    const isPasswordValid = superAdmin.password
+      ? await bcrypt.compare(password, superAdmin.password)
+      : false;
 
     console.log('\n🔐 Test du mot de passe:');
     console.log('  Mot de passe fourni:', password);
