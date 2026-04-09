@@ -21,7 +21,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     children,
     initialMode = 'club'
 }) => {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<User | null>(() => {
+        try {
+            const saved = localStorage.getItem('user');
+            return saved ? (JSON.parse(saved) as User) : null;
+        } catch {
+            localStorage.removeItem('user');
+            return null;
+        }
+    });
     const [mode, setMode] = useState<AppMode>(() => getInitialMode(initialMode));
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -153,19 +161,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
         localStorage.setItem('appMode', newMode);
     }, []);
 
-    // Vérifier si l'utilisateur est connecté au chargement
-    useEffect(() => {
-        const savedUser = localStorage.getItem('user');
-        if (savedUser) {
-            try {
-                const userData = JSON.parse(savedUser);
-                setUser(userData);
-            } catch (error) {
-                console.error('Error parsing saved user:', error);
-                localStorage.removeItem('user');
-            }
-        }
-    }, []);
 
     const value: AuthContextType = useMemo(() => ({
         user,

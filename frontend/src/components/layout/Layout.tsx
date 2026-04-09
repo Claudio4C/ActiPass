@@ -468,6 +468,14 @@ const Layout: React.FC<LayoutProps> = ({ children, title, subtitle, mode }) => {
                                                 Ma famille
                                             </Link>
                                             <Link
+                                                to="/club/famille/planning"
+                                                className="flex items-center gap-3 px-4 py-3 text-slate-700 transition hover:bg-indigo-50 dark:text-slate-200 dark:hover:bg-slate-800/70"
+                                                onClick={closeMenu}
+                                            >
+                                                <Calendar className="h-4 w-4 text-pink-400" />
+                                                Planning famille
+                                            </Link>
+                                            <Link
                                                 to="/club/notifications"
                                                 className="flex items-center gap-3 px-4 py-3 text-slate-700 transition hover:bg-indigo-50 dark:text-slate-200 dark:hover:bg-slate-800/70"
                                                 onClick={closeMenu}

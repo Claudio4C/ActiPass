@@ -2,7 +2,7 @@ import {
   Controller,
   Get,
   Post,
-  Patch,
+  Put,
   Delete,
   Body,
   Param,
@@ -41,7 +41,7 @@ export class FamilyController {
     return this.familyService.createChild(parentId, dto);
   }
 
-  @Patch('children/:childId')
+  @Put('children/:childId')
   async updateChild(
     @Param('childId') childId: string,
     @Body() dto: UpdateChildDto,
@@ -67,5 +67,27 @@ export class FamilyController {
   ) {
     const parentId = req.user?.['sub'] as string;
     return this.familyService.enrollChild(parentId, childId, dto);
+  }
+
+  @Post('children/:childId/events/:eventId/register')
+  @HttpCode(HttpStatus.CREATED)
+  async registerChildToEvent(
+    @Param('childId') childId: string,
+    @Param('eventId') eventId: string,
+    @Req() req: Request,
+  ) {
+    const parentId = req.user?.['sub'] as string;
+    return this.familyService.registerChildToEvent(parentId, childId, eventId);
+  }
+
+  @Delete('children/:childId/events/:eventId/register')
+  @HttpCode(HttpStatus.OK)
+  async unregisterChildFromEvent(
+    @Param('childId') childId: string,
+    @Param('eventId') eventId: string,
+    @Req() req: Request,
+  ) {
+    const parentId = req.user?.['sub'] as string;
+    return this.familyService.unregisterChildFromEvent(parentId, childId, eventId);
   }
 }

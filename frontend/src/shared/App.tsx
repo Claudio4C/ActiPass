@@ -54,7 +54,7 @@ interface AppProps {
     protectedPath: string;
 }
 
-// Composant pour protéger les routes
+// Route protégée avec vérification de mode
 const ProtectedRoute: React.FC<{
     children: React.ReactNode;
     requiredMode: AppMode;
@@ -65,11 +65,18 @@ const ProtectedRoute: React.FC<{
         return <Navigate to="/login" replace />;
     }
 
-    // Vérifier que l'utilisateur est bien dans le bon mode
     if (mode !== requiredMode) {
-        return <Navigate to="/login" replace />;
+        return <Navigate to="/home" replace />;
     }
 
+    return <>{children}</>;
+};
+
+// Route protégée simple — uniquement authentification, pas de vérification de mode
+// Utilisée pour les pages accessibles à tout utilisateur connecté (famille, profil, etc.)
+const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const { user } = useAuth();
+    if (!user) return <Navigate to="/login" replace />;
     return <>{children}</>;
 };
 
@@ -153,17 +160,17 @@ const AppContent: React.FC<{
                 <Route
                     path="/club/famille"
                     element={
-                        <ProtectedRoute requiredMode={mode}>
+                        <RequireAuth>
                             <FamilyPage />
-                        </ProtectedRoute>
+                        </RequireAuth>
                     }
                 />
                 <Route
                     path="/club/famille/planning"
                     element={
-                        <ProtectedRoute requiredMode={mode}>
+                        <RequireAuth>
                             <FamilyDashboardPage />
-                        </ProtectedRoute>
+                        </RequireAuth>
                     }
                 />
                 <Route
