@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import Layout from '../../components/layout/Layout';
 import Button from '../../components/ui/Button';
 import { ArrowLeft, Calendar, User } from 'lucide-react';
 
@@ -131,11 +130,7 @@ const NewsPage: React.FC = () => {
     }, [selectedCategory]);
 
     return (
-        <Layout
-            title="Actualités"
-            subtitle="Toutes les dernières nouvelles du club, événements et annonces importantes."
-            mode="club"
-        >
+        <>
             <div className="space-y-8">
                 {/* Header */}
                 <section className="flex items-center justify-between">
@@ -240,7 +235,7 @@ const NewsPage: React.FC = () => {
                     )}
                 </section>
             </div>
-        </Layout>
+        </>
     );
 };
 

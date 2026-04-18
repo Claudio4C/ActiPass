@@ -4,9 +4,7 @@ import {
     Users, Bell, MapPin, Activity, Building2, UserPlus,
     BadgeCheck, Construction, ArrowRight
 } from 'lucide-react';
-import Layout from '../components/layout/Layout';
 import { useAuth } from '../contexts/AuthContext';
-import Button from '../components/ui/Button';
 import ComingSoon from '../components/shared/ComingSoon';
 import { api } from '../lib/api';
 import type { RoleType } from '../types';
@@ -121,44 +119,32 @@ const HomePage: React.FC = () => {
     };
 
     return (
-        <Layout
-            title="Tableau de bord"
-            subtitle="Vue d'ensemble de tous vos espaces et activités"
-            mode="club"
-        >
-            <div className="space-y-8">
-                {/* Hero */}
-                <section className="relative rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 text-white p-8 sm:p-12 overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-tr from-black/60 via-black/40 to-transparent" />
-                    <div className="relative z-10">
-                        <div className="flex items-center gap-2 mb-4">
-                            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                            <span className="text-sm font-semibold text-white/90 uppercase tracking-wider">
-                                {user ? `Bienvenue, ${user.firstName || 'Utilisateur'}` : 'Bienvenue sur IKIVIO'}
-                            </span>
-                        </div>
-                        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold mb-4 drop-shadow-lg">
-                            Vos espaces en un coup d'œil
-                        </h1>
-                        <p className="text-lg text-white/90 max-w-2xl mb-6 drop-shadow">
-                            Gérez tous vos clubs, associations et activités depuis un seul endroit.
-                        </p>
-                        <div className="flex flex-wrap gap-4">
-                            <Link to="/accounts">
-                                <Button size="md" className="bg-indigo-50 text-indigo-900 hover:bg-white shadow-lg border border-white/60 px-5">
-                                    <Users className="w-4 h-4 mr-2" />
-                                    Choisir mon profil
-                                </Button>
-                            </Link>
-                            <Link to="/club/notifications">
-                                <Button variant="outline" size="md" className="border-white/30 text-white hover:bg-white/10">
-                                    <Bell className="w-4 h-4 mr-2" />
-                                    Voir les notifications
-                                </Button>
-                            </Link>
-                        </div>
-                    </div>
-                </section>
+        <div className="space-y-8">
+            {/* Hero */}
+            <section>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {user ? `Bonjour, ${user.firstName || 'Utilisateur'}` : 'Bienvenue sur Ikivio'}
+                </h1>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
+                    Gerez vos clubs, associations et activites depuis un seul endroit.
+                </p>
+                <div className="flex flex-wrap gap-3 mt-4">
+                    <Link
+                        to="/accounts"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition"
+                    >
+                        <Users className="w-4 h-4" />
+                        Choisir un espace
+                    </Link>
+                    <Link
+                        to="/club/notifications"
+                        className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition"
+                    >
+                        <Bell className="w-4 h-4" />
+                        Notifications
+                    </Link>
+                </div>
+            </section>
 
                 {/* My organisations */}
                 {loading ? (
@@ -223,8 +209,7 @@ const HomePage: React.FC = () => {
                     title="Activité récente et planning à venir"
                     description="L'historique d'activité et le planning consolidé seront disponibles prochainement."
                 />
-            </div>
-        </Layout>
+        </div>
     );
 };
 

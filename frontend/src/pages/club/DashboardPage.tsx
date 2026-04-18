@@ -1,6 +1,5 @@
 import React from 'react';
 import { Users, Calendar, MessageSquare, Settings, Award, ClipboardList, Wallet, Bell } from 'lucide-react';
-import Layout from '../../components/layout/Layout';
 import Button from '../../components/ui/Button';
 import { Link } from 'react-router-dom';
 import { useCurrentOrganisation } from '../../hooks/useCurrentOrganisation';
@@ -26,10 +25,10 @@ const DashboardPage: React.FC = () => {
 export default DashboardPage;
 
 const MemberDashboard: React.FC<{ metadata: { title: string; subtitle: string } }> = ({ metadata }) => (
-    <Layout title={metadata.title} subtitle={metadata.subtitle} mode="club">
+    <>
         <DefaultStats />
         <DefaultActions />
-    </Layout>
+    </>
 );
 
 const DefaultStats = () => (
@@ -92,7 +91,7 @@ const CoachDashboard: React.FC = () => {
     ];
 
     return (
-        <Layout title="Espace coach" subtitle="Vos créneaux, coachings privés et échanges" mode="club">
+        <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
                 {stats.map((stat) => (
                     <div key={stat.label} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
@@ -142,7 +141,7 @@ const CoachDashboard: React.FC = () => {
                     <CoachAction to="/coach/billing" icon={<Wallet className="w-4 h-4 text-emerald-500" />} title="Rémunérations" description="Revenus, factures, paiements" />
                 </div>
             </div>
-        </Layout>
+        </>
     );
 };
 
@@ -154,7 +153,7 @@ const FreelanceDashboard: React.FC = () => {
     ];
 
     return (
-        <Layout title="Studio indépendant" subtitle="Vos cours privés, disponibilités publiques et clients directs" mode="club">
+        <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
                 {stats.map((stat) => (
                     <div key={stat.label} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
@@ -201,7 +200,7 @@ const FreelanceDashboard: React.FC = () => {
                     <CoachAction to="/coach/billing" icon={<Wallet className="w-4 h-4 text-emerald-500" />} title="Suivre mes revenus" description="Factures & paiements automatiques" />
                 </div>
             </div>
-        </Layout>
+        </>
     );
 };
 
@@ -228,7 +227,7 @@ const ManagerDashboard: React.FC = () => {
     ];
 
     return (
-        <Layout title="Espace gestionnaire" subtitle="Vue consolidée des adhésions, finances et opérations" mode="club">
+        <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
                 {managerStats.map((stat) => (
                     <div key={stat.label} className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-sm">
@@ -245,7 +244,7 @@ const ManagerDashboard: React.FC = () => {
                 ))}
             </div>
             <DefaultActions />
-        </Layout>
+        </>
     );
 };
 

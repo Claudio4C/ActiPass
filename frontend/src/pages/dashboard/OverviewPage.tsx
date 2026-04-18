@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Users, Construction } from 'lucide-react';
-import DashboardLayout from '../../components/layout/DashboardLayout';
 import StatCard from '../../components/dashboard/StatCard';
 import RoleBasedRoute from '../../components/shared/RoleBasedRoute';
 import ComingSoon from '../../components/shared/ComingSoon';
@@ -36,16 +35,16 @@ const OverviewPage: React.FC = () => {
 
     if (loading) {
         return (
-            <DashboardLayout>
+            <>
                 <div className="flex items-center justify-center h-64">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
                 </div>
-            </DashboardLayout>
+            </>
         );
     }
 
     return (
-        <DashboardLayout>
+        <>
             <div className="max-w-7xl mx-auto">
                 <div className="mb-6">
                     <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
@@ -75,7 +74,7 @@ const OverviewPage: React.FC = () => {
                     />
                 </div>
             </div>
-        </DashboardLayout>
+        </>
     );
 };
 

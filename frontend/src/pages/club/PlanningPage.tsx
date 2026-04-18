@@ -1,5 +1,4 @@
 import React from 'react';
-import Layout from '../../components/layout/Layout';
 import { Calendar, MapPin, Users } from 'lucide-react';
 
 type Slot = {
@@ -117,7 +116,7 @@ const PlanningPage: React.FC = () => {
     }, [filteredSlots, visibleDays]);
 
     return (
-        <Layout title={clubInfo.title} subtitle={clubInfo.subtitle ?? defaultClubInfo.subtitle} mode="club">
+        <>
             <div className="space-y-8 text-slate-900 dark:text-slate-100">
                 <section className="rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur border border-slate-100 dark:border-slate-800 shadow-sm p-6 sm:p-8 space-y-6 transition-colors">
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -259,7 +258,7 @@ const PlanningPage: React.FC = () => {
                     ))}
                 </section>
             </div>
-        </Layout>
+        </>
     );
 };
 

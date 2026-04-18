@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Calendar, Clock, MapPin, Users, Euro, CheckCircle, Clock3, XCircle, AlertCircle, UserPlus, Plane } from 'lucide-react';
-import Layout from '../../components/layout/Layout';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Event } from '../../types';
@@ -180,7 +179,7 @@ const EventDetailPage: React.FC = () => {
         : "Détail complet de l'événement du club";
 
     return (
-        <Layout title={event?.title || "Détail de l'événement"} subtitle={subtitle} mode="club">
+        <>
             <div className="max-w-4xl mx-auto space-y-6">
                 <button
                     type="button"
@@ -387,7 +386,7 @@ const EventDetailPage: React.FC = () => {
                     </div>
                 )}
             </div>
-        </Layout>
+        </>
     );
 };
 

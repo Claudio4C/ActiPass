@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Calendar, Plus, Search, Filter, Edit, Trash2, Eye, Users, Clock, MapPin } from 'lucide-react';
-import DashboardLayout from '../../components/layout/DashboardLayout';
 import RoleBasedRoute from '../../components/shared/RoleBasedRoute';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -106,7 +105,7 @@ const EventsPage: React.FC = () => {
 
     return (
         <RoleBasedRoute allowedRoles={['club_owner', 'club_manager', 'coach']}>
-            <DashboardLayout>
+            <>
                 <div className="p-6 space-y-6">
                     {/* Header */}
                     <div className="flex justify-between items-center">
@@ -259,7 +258,7 @@ const EventsPage: React.FC = () => {
                         </div>
                     )}
                 </div>
-            </DashboardLayout>
+            </>
         </RoleBasedRoute>
     );
 };

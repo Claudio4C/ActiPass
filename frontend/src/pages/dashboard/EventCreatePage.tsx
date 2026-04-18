@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Calendar, MapPin, Users, Euro, FileText } from 'lucide-react';
-import DashboardLayout from '../../components/layout/DashboardLayout';
 import RoleBasedRoute from '../../components/shared/RoleBasedRoute';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -65,7 +64,7 @@ const EventCreatePage: React.FC = () => {
 
     return (
         <RoleBasedRoute allowedRoles={['club_owner', 'club_manager', 'coach']}>
-            <DashboardLayout>
+            <>
                 <div className="p-6 max-w-4xl mx-auto">
                     {/* Header */}
                     <div className="flex items-center gap-4 mb-6">
@@ -314,7 +313,7 @@ const EventCreatePage: React.FC = () => {
                         </div>
                     </form>
                 </div>
-            </DashboardLayout>
+            </>
         </RoleBasedRoute>
     );
 };

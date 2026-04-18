@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { BarChart3, TrendingUp, Users, Calendar, Filter, ArrowLeft, AlertCircle } from 'lucide-react';
-import DashboardLayout from '../../components/layout/DashboardLayout';
 import { api } from '../../lib/api';
 
 interface AttendanceStats {
@@ -92,7 +91,7 @@ const AttendanceStatsPage: React.FC = () => {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -288,7 +287,7 @@ const AttendanceStatsPage: React.FC = () => {
           </>
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 };
 

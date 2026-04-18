@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Calendar, MapPin, Users, Euro } from 'lucide-react';
-import DashboardLayout from '../../components/layout/DashboardLayout';
 import RoleBasedRoute from '../../components/shared/RoleBasedRoute';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -112,14 +111,14 @@ const EventEditPage: React.FC = () => {
 
     if (loading) {
         return (
-            <DashboardLayout>
+            <>
                 <div className="p-6">
                     <div className="text-center py-12">
                         <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                         <p className="mt-2 text-gray-600">Chargement de l'événement...</p>
                     </div>
                 </div>
-            </DashboardLayout>
+            </>
         );
     }
 
@@ -129,7 +128,7 @@ const EventEditPage: React.FC = () => {
 
     return (
         <RoleBasedRoute allowedRoles={['club_owner', 'club_manager', 'coach']}>
-            <DashboardLayout>
+            <>
                 <div className="p-6 max-w-4xl mx-auto">
                     {/* Header */}
                     <div className="flex items-center gap-4 mb-6">
@@ -366,7 +365,7 @@ const EventEditPage: React.FC = () => {
                         </div>
                     </form>
                 </div>
-            </DashboardLayout>
+            </>
         </RoleBasedRoute>
     );
 };

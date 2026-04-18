@@ -6,7 +6,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { AttendanceStatus, AttendanceType } from '@prisma/client';
+import { AttendanceStatus, AttendanceType } from '../generated/prisma/client';
 
 import { AuditService } from '../auth/audit.service';
 import { PermissionsService } from '../auth/permissions.service';

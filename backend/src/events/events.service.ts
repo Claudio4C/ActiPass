@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { EventType, EventStatus } from '@prisma/client';
+import { EventType, EventStatus } from '../generated/prisma/client';
 
 import { PermissionsService } from '../auth/permissions.service';
 import { PrismaService } from '../prisma/prisma.service';

@@ -1,5 +1,5 @@
 import { IsString, IsOptional, IsNumber, IsBoolean, IsDateString, IsEnum, IsArray, Min } from 'class-validator';
-import { EventType, EventVisibility, EventStatus } from '@prisma/client';
+import { EventType, EventVisibility, EventStatus } from '../../generated/prisma/client';
 
 export class UpdateEventDto {
   @IsOptional()

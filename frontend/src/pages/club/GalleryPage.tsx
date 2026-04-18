@@ -1,5 +1,4 @@
 import React from 'react';
-import Layout from '../../components/layout/Layout';
 import Button from '../../components/ui/Button';
 import { Link } from 'react-router-dom';
 
@@ -116,11 +115,7 @@ const GalleryPage: React.FC = () => {
     }, [lightboxIndex, closeLightbox, showNext, showPrev]);
 
     return (
-        <Layout
-            title="Galerie photos"
-            subtitle="Revivez les meilleurs moments du club, partagez vos souvenirs et inspirez les nouveaux membres."
-            mode="club"
-        >
+        <>
             <div className="space-y-10">
                 <section className="rounded-3xl bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-600 text-white p-8 relative overflow-hidden">
                     <div className="absolute inset-0 opacity-20 bg-[url('https://source.unsplash.com/random/1600x900/?dojo,training')] bg-cover bg-center" />
@@ -304,7 +299,7 @@ const GalleryPage: React.FC = () => {
                     </div>
                 ) : null}
             </div>
-        </Layout>
+        </>
     );
 };
 

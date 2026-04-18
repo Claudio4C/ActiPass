@@ -1,6 +1,5 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
-import Layout from '../components/layout/Layout';
 import Button from '../components/ui/Button';
 
 const unsplash = (w: number, h: number, query: string, seed: string | number) =>
@@ -124,23 +123,17 @@ const CoachDetailPage: React.FC = () => {
 
     if (!coach) {
         return (
-            <Layout title="Coach introuvable" subtitle="Vérifiez le lien ou explorez les autres coachs disponibles." mode="club">
-                <div className="text-center py-12 space-y-4">
-                    <p className="text-slate-600 dark:text-slate-300">Ce coach n’existe pas ou n’est plus disponible.</p>
-                    <Link to="/club/coaches">
-                        <Button>Retour à l’annuaire des coachs</Button>
-                    </Link>
-                </div>
-            </Layout>
+            <div className="text-center py-12 space-y-4">
+                <p className="text-slate-600 dark:text-slate-300">Ce coach n’existe pas ou n’est plus disponible.</p>
+                <Link to="/club/coaches">
+                    <Button>Retour à l’annuaire des coachs</Button>
+                </Link>
+            </div>
         );
     }
 
     return (
-        <Layout
-            title={coach.name}
-            subtitle={coach.speciality}
-            mode="club"
-        >
+        <>
             <div className="space-y-10">
                 <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
@@ -264,7 +257,7 @@ const CoachDetailPage: React.FC = () => {
                     </div>
                 </section>
             </div>
-        </Layout>
+        </>
     );
 };
 

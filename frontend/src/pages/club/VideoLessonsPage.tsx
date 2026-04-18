@@ -1,5 +1,4 @@
 import React from 'react';
-import Layout from '../../components/layout/Layout';
 
 const unsplash = (w: number, h: number, query: string, seed: string | number) =>
     `https://source.unsplash.com/random/${w}x${h}/?${encodeURIComponent(query)}&sig=${seed}`;
@@ -98,7 +97,7 @@ const VideoLessonsPage: React.FC = () => {
     }, []);
 
     return (
-        <Layout title={clubInfo.title} subtitle={clubInfo.subtitle ?? defaultClubInfo.subtitle} mode="club">
+        <>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
                 {videoLessons.map((lesson) => (
                     <article key={lesson.id} className="rounded-3xl overflow-hidden border border-white/60 bg-white/90 backdrop-blur shadow-sm ring-1 ring-gray-200/60">
@@ -136,7 +135,7 @@ const VideoLessonsPage: React.FC = () => {
                     </article>
                 ))}
             </div>
-        </Layout>
+        </>
     );
 };
 

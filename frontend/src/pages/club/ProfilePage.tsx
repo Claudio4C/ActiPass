@@ -1,5 +1,4 @@
 import React from 'react';
-import Layout from '../../components/layout/Layout';
 import { useAuth } from '../../contexts/AuthContext';
 import { Camera, Mail, Phone, Shield, MapPin, Activity, Calendar, Bell, Lock } from 'lucide-react';
 
@@ -78,11 +77,7 @@ const ProfilePage: React.FC = () => {
     };
 
     return (
-        <Layout
-            title="Mon profil"
-            subtitle="Gérez vos informations personnelles, vos préférences et la sécurité de votre compte."
-            mode="club"
-        >
+        <>
             <div className="space-y-10">
                 <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-500 via-purple-500 to-slate-900 text-white shadow-lg">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.35),transparent_60%)]" />
@@ -301,7 +296,7 @@ const ProfilePage: React.FC = () => {
                     </form>
                 </SectionCard>
             </div>
-        </Layout>
+        </>
     );
 };
 

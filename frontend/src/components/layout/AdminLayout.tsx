@@ -54,7 +54,10 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, active = 'home', is
                 {/* Sidebar */}
                 <aside className="w-72 bg-[#0F2147] text-white flex flex-col p-7">
                     {/* Logo */}
-                    <div className="flex items-center gap-4 mb-10">
+                    <div
+                        onClick={() => navigate('/home')}
+                        className="flex items-center gap-4 mb-10 cursor-pointer hover:opacity-80 transition-opacity"
+                    >
                         <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center">
                             <div className="w-7 h-7 bg-[#0F2147] rounded-xl" />
                         </div>

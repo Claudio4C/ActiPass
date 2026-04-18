@@ -1,6 +1,5 @@
 import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import Layout from '../../components/layout/Layout';
 import Button from '../../components/ui/Button';
 import { ArrowLeft, Calendar, User, Share2 } from 'lucide-react';
 import { newsArticles, type NewsArticle } from './NewsPage';
@@ -43,25 +42,19 @@ const NewsDetailPage: React.FC = () => {
 
     if (!article) {
         return (
-            <Layout title="Article introuvable" subtitle="L'article demandé n'existe pas." mode="club">
-                <div className="text-center py-12">
-                    <p className="text-slate-600 dark:text-slate-400 mb-4">L'article que vous recherchez n'existe pas.</p>
-                    <Link to="/club/actualites">
-                        <Button>Retour aux actualités</Button>
-                    </Link>
-                </div>
-            </Layout>
+            <div className="text-center py-12">
+                <p className="text-slate-600 dark:text-slate-400 mb-4">L'article que vous recherchez n'existe pas.</p>
+                <Link to="/club/actualites">
+                    <Button>Retour aux actualités</Button>
+                </Link>
+            </div>
         );
     }
 
     const relatedArticles = newsArticles.filter((a) => a.id !== article.id && a.category === article.category).slice(0, 3);
 
     return (
-        <Layout
-            title={article.title}
-            subtitle={article.excerpt}
-            mode="club"
-        >
+        <>
             <div className="space-y-8">
                 {/* Navigation */}
                 <section className="flex items-center justify-between">
@@ -184,7 +177,7 @@ const NewsDetailPage: React.FC = () => {
                     </section>
                 )}
             </div>
-        </Layout>
+        </>
     );
 };
 

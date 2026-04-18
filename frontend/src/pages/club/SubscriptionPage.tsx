@@ -1,5 +1,4 @@
 import React from 'react';
-import Layout from '../../components/layout/Layout';
 import { useAuth } from '../../contexts/AuthContext';
 import { CreditCard, Wallet, Receipt, Calendar, AlertCircle, Download } from 'lucide-react';
 
@@ -27,11 +26,7 @@ const SubscriptionPage: React.FC = () => {
     ];
 
     return (
-        <Layout
-            title="Abonnements & paiements"
-            subtitle="Suivez vos échéances, mettez à jour vos moyens de paiement et récupérez vos justificatifs."
-            mode="club"
-        >
+        <>
             <div className="space-y-10">
                 <section className="rounded-3xl bg-gradient-to-br from-indigo-500 via-purple-500 to-slate-900 text-white shadow-lg overflow-hidden">
                     <div className="px-6 sm:px-10 py-10 space-y-8 relative">
@@ -167,7 +162,7 @@ const SubscriptionPage: React.FC = () => {
                     </div>
                 </section>
             </div>
-        </Layout>
+        </>
     );
 };
 

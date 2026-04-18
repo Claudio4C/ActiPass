@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Calendar, Users, Clock, CheckCircle, XCircle, Search, BarChart3, AlertCircle } from 'lucide-react';
-import DashboardLayout from '../../components/layout/DashboardLayout';
 import { api } from '../../lib/api';
 import type { Event } from '../../types';
 
@@ -72,16 +71,16 @@ const AttendancePage: React.FC = () => {
 
   if (loading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="flex items-center justify-center h-64">
           <div className="text-gray-500">Chargement...</div>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -206,7 +205,7 @@ const AttendancePage: React.FC = () => {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 };
 

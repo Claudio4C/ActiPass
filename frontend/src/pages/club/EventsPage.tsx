@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, MapPin, Users, Clock, Euro, CheckCircle, Clock3, XCircle, AlertCircle } from 'lucide-react';
-import Layout from '../../components/layout/Layout';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
 import type { Event } from '../../types';
@@ -188,7 +187,7 @@ const EventsPage: React.FC = () => {
     };
 
     return (
-        <Layout title="Événements" subtitle="Découvrez et inscrivez-vous aux événements du club" mode="club">
+        <>
             <div className="space-y-6">
                 {/* Message d'erreur */}
                 {error && (
@@ -354,7 +353,7 @@ const EventsPage: React.FC = () => {
 
 
             </div>
-        </Layout>
+        </>
     );
 };
 

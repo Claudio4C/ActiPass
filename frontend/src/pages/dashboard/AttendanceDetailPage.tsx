@@ -13,7 +13,6 @@ import {
   Check,
   Users,
 } from 'lucide-react';
-import DashboardLayout from '../../components/layout/DashboardLayout';
 import { api } from '../../lib/api';
 
 type AttendanceStatus = 'present' | 'late' | 'absent' | 'excused';
@@ -246,17 +245,17 @@ const AttendanceDetailPage: React.FC = () => {
 
   if (loading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="flex items-center justify-center h-64">
           <div className="text-gray-500">Chargement...</div>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   if (error || !attendanceData) {
     return (
-      <DashboardLayout>
+      <>
         <div className="space-y-4">
           <Link
             to={`/dashboard/${organisationId}/attendance`}
@@ -270,12 +269,12 @@ const AttendanceDetailPage: React.FC = () => {
             <p className="text-red-800 font-medium">{error || 'Données non disponibles'}</p>
           </div>
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6">
         {/* Notification inline */}
         {notification && (
@@ -547,7 +546,7 @@ const AttendanceDetailPage: React.FC = () => {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </>
   );
 };
 

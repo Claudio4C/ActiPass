@@ -54,6 +54,15 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ organisationId }) => 
         <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6">
             {/* Left: Organisation name */}
             <div className="flex items-center gap-4">
+                <Link to="/home" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                    <div className="w-7 h-7 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center shadow-sm">
+                        <div className="w-3.5 h-3.5 bg-white rounded-full flex items-center justify-center">
+                            <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full" />
+                        </div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-500 dark:text-slate-400 hidden sm:inline">Ikivio</span>
+                </Link>
+                <span className="text-gray-300 dark:text-slate-700 hidden sm:inline">/</span>
                 <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
                     {organisation?.name || 'Organisation'}
                 </h1>

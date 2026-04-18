@@ -1,5 +1,4 @@
 import React from 'react';
-import Layout from '../../components/layout/Layout';
 
 const unsplash = (w: number, h: number, query: string, seed: string | number) =>
     `https://source.unsplash.com/random/${w}x${h}/?${encodeURIComponent(query)}&sig=${seed}`;
@@ -135,7 +134,7 @@ const TeachersPage: React.FC = () => {
     }, [search]);
 
     return (
-        <Layout title={clubInfo.title} subtitle={clubInfo.subtitle ?? defaultClubInfo.subtitle} mode="club">
+        <>
             <div className="space-y-8">
                 <section className="rounded-3xl bg-white/90 backdrop-blur border border-slate-100 shadow-sm p-6 sm:p-8 space-y-6">
                     <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -200,7 +199,7 @@ const TeachersPage: React.FC = () => {
                     </div>
                 </section>
             </div>
-        </Layout>
+        </>
     );
 };
 

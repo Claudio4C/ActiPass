@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Baby, Calendar, MapPin } from 'lucide-react';
-import Layout from '../../components/layout/Layout';
 import { api } from '../../lib/api';
 
 interface UpcomingEvent {
@@ -57,7 +56,7 @@ const FamilyDashboardPage: React.FC = () => {
         : allEvents;
 
     return (
-        <Layout title="Planning famille" subtitle="Événements à venir pour vos enfants" mode="club">
+        <>
             <div className="max-w-4xl mx-auto p-6 space-y-6">
                 <div className="flex items-center gap-3">
                     <Calendar className="h-7 w-7 text-indigo-500" />
@@ -160,7 +159,7 @@ const FamilyDashboardPage: React.FC = () => {
                     </>
                 )}
             </div>
-        </Layout>
+        </>
     );
 };
 

@@ -115,7 +115,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
                 `}
             >
                 {/* Logo */}
-                <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200 dark:border-slate-800">
+                <Link to="/home" className="flex items-center gap-3 px-6 py-4 border-b border-gray-200 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
                     <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
                         <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center">
                             <div className="w-3 h-3 bg-indigo-600 rounded-full" />
@@ -125,7 +125,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
                         <div className="text-lg font-bold text-gray-900 dark:text-white">Ikivio</div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">Dashboard</div>
                     </div>
-                </div>
+                </Link>
 
                 {/* Navigation */}
                 <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-1">

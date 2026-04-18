@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Mail, Calendar, Shield, Trash2, User, Phone, Baby } from 'lucide-react';
-import DashboardLayout from '../../components/layout/DashboardLayout';
 import RoleBasedRoute from '../../components/shared/RoleBasedRoute';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -109,17 +108,17 @@ const MemberDetailPage: React.FC = () => {
 
     if (loading) {
         return (
-            <DashboardLayout>
+            <>
                 <div className="flex items-center justify-center h-64">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
                 </div>
-            </DashboardLayout>
+            </>
         );
     }
 
     if (!member) {
         return (
-            <DashboardLayout>
+            <>
                 <div className="max-w-7xl mx-auto">
                     <div className="text-center py-12">
                         <p className="text-gray-600 dark:text-gray-400">Membre introuvable</p>
@@ -132,12 +131,12 @@ const MemberDetailPage: React.FC = () => {
                         </Link>
                     </div>
                 </div>
-            </DashboardLayout>
+            </>
         );
     }
 
     return (
-        <DashboardLayout>
+        <>
             <div className="max-w-4xl mx-auto space-y-6">
                 {/* Header */}
                 <div className="flex items-center gap-4">
@@ -378,7 +377,7 @@ const MemberDetailPage: React.FC = () => {
                     </div>
                 )}
             </div>
-        </DashboardLayout>
+        </>
     );
 };
 

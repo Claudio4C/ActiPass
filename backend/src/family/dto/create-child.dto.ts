@@ -1,5 +1,5 @@
 import { IsString, IsNotEmpty, IsDateString, IsEnum, IsOptional } from 'class-validator';
-import { Gender } from '@prisma/client';
+import { Gender } from '../../generated/prisma/client';
 
 export class CreateChildDto {
   @IsString()

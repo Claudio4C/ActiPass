@@ -1,5 +1,4 @@
 import React from 'react';
-import Layout from '../../components/layout/Layout';
 
 const cardClass = 'rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur border border-slate-100 dark:border-slate-800 shadow-sm p-6 sm:p-8 space-y-6 transition-colors';
 
@@ -114,7 +113,7 @@ const NotificationsPage: React.FC = () => {
     const unreadCount = notifications.filter((item) => item.unread).length;
 
     return (
-        <Layout title={clubInfo.title} subtitle={clubInfo.subtitle} mode="club">
+        <>
             <div className="space-y-10 text-slate-900 dark:text-slate-100">
                 <section className={cardClass}>
                     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -198,7 +197,7 @@ const NotificationsPage: React.FC = () => {
                     </div>
                 </section>
             </div>
-        </Layout>
+        </>
     );
 };
 

@@ -1,4 +1,4 @@
-import { AttendanceStatus } from "@prisma/client";
+import { AttendanceStatus } from "../../generated/prisma/client";
 import { Type } from "class-transformer";
 import {
   IsArray,

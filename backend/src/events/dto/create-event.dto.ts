@@ -1,4 +1,4 @@
-import { EventType, EventVisibility, EventStatus } from '@prisma/client';
+import { EventType, EventVisibility, EventStatus } from '../../generated/prisma/client';
 import {
   IsString,
   IsOptional,

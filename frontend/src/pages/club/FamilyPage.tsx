@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Edit2, Trash2, UserPlus, Baby, X } from 'lucide-react';
-import Layout from '../../components/layout/Layout';
 import { api } from '../../lib/api';
 
 interface ChildMembership {
@@ -59,7 +58,7 @@ const FamilyPage: React.FC = () => {
         try {
             const [kids, orgs] = await Promise.all([
                 api.get<Child[]>('/family/children'),
-                api.get<{ organisations: Organisation[] }>('/users/me/organisations').then(r => r.organisations).catch(() => []),
+                api.get<{ organisations: Organisation[] }>('/users/me/organisations').then(r => r.organisations ?? []).catch(() => []),
             ]);
             setChildren(kids);
             setOrganisations(orgs);
@@ -94,7 +93,7 @@ const FamilyPage: React.FC = () => {
         setSubmitting(true);
         try {
             if (editChild) {
-                await api.patch(`/family/children/${editChild.id}`, form);
+                await api.put(`/family/children/${editChild.id}`, form);
             } else {
                 await api.post('/family/children', form);
             }
@@ -133,7 +132,7 @@ const FamilyPage: React.FC = () => {
     };
 
     return (
-        <Layout title="Ma famille" subtitle="Gérez les profils de vos enfants" mode="club">
+        <>
             <div className="max-w-4xl mx-auto p-6 space-y-6">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -302,7 +301,7 @@ const FamilyPage: React.FC = () => {
                             onChange={e => setEnrollOrgId(e.target.value)}
                         >
                             <option value="">Choisir un club…</option>
-                            {organisations.map(o => (
+                            {(organisations ?? []).map(o => (
                                 <option key={o.id} value={o.id}>{o.name}</option>
                             ))}
                         </select>
@@ -324,7 +323,7 @@ const FamilyPage: React.FC = () => {
                     </div>
                 </div>
             )}
-        </Layout>
+        </>
     );
 };
 
