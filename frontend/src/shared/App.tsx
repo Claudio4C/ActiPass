@@ -116,7 +116,7 @@ const AppContent: React.FC<{
                 <Route path="/resend-verification" element={<ResendVerification />} />
 
                 {/* ═══════════════════════════════════════
-                    Pages generales (SimpleLayout — header seul)
+                    Accueil + onglets (même layout : header seul, pas de sidebar)
                 ═══════════════════════════════════════ */}
                 <Route
                     element={
@@ -126,6 +126,8 @@ const AppContent: React.FC<{
                     }
                 >
                     <Route path="/home" element={<HomePage />} />
+                    <Route path="/club/planning" element={<PlanningPage />} />
+                    <Route path="/club/coaches" element={<CoachesDirectoryPage />} />
                     <Route path="/accounts" element={<AccountSwitch />} />
                 </Route>
                 <Route path="/discover" element={<DiscoverPage />} />
@@ -142,7 +144,6 @@ const AppContent: React.FC<{
                 >
                     <Route path={protectedPath} element={<DashboardComponent />} />
                     <Route path="/club/members" element={<ClubMembersPage />} />
-                    <Route path="/club/planning" element={<PlanningPage />} />
                     <Route path="/club/events" element={<EventsPageClub />} />
                     <Route path="/club/events/:eventId" element={<EventDetailPageClub />} />
                     <Route path="/club/events/:eventId/create-trip" element={<CreateTripPage />} />
@@ -162,7 +163,6 @@ const AppContent: React.FC<{
                 <Route path="/club/galerie" element={<GalleryPage />} />
                 <Route path="/club/actualites" element={<NewsPage />} />
                 <Route path="/club/actualites/:articleId" element={<NewsDetailPage />} />
-                <Route path="/club/coaches" element={<CoachesDirectoryPage />} />
 
                 {/* ═══════════════════════════════════════
                     Espace coach  (CoachLayout — sidebar emeraude)

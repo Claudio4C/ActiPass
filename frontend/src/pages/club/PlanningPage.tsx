@@ -1,264 +1,255 @@
-import React from 'react';
-import { Calendar, MapPin, Users } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Clock, MapPin, User, Music2, Drama, Activity, Sparkles, Users } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import MemberHomeTabs from '../../components/club/MemberHomeTabs';
+import {
+    useWeeklyFamilySchedule,
+    getWeekBounds,
+    DAY_LABELS,
+    eventTypeStyle,
+    formatTime,
+    formatRange,
+    parentParticipantLabel,
+    type ScheduleItem,
+} from '../../hooks/useWeeklyFamilySchedule';
 
-type Slot = {
-    id: string;
-    day: string;
-    time: string;
-    discipline: string;
-    coach: string;
-    location: string;
-    city: string;
-    level: 'Tous' | 'Débutant' | 'Intermédiaire' | 'Avancé';
-};
+type MemberFilter = 'all' | 'me' | string;
 
-const baseSlots: Slot[] = [
-    { id: 'slot-1', day: 'Lundi', time: '12:30', discipline: 'Luta Livre', coach: 'Youssef', location: 'COSEC Marcel Pagnol', city: 'Villeurbanne', level: 'Intermédiaire' },
-    { id: 'slot-2', day: 'Lundi', time: '14:30', discipline: 'Jiu-jitsu brésilien', coach: 'Youssef', location: 'COSEC Marcel Pagnol', city: 'Villeurbanne', level: 'Tous' },
-    { id: 'slot-3', day: 'Lundi', time: '19:30', discipline: 'Jiu-jitsu brésilien', coach: 'Willy', location: 'COSEC Marcel Pagnol', city: 'Villeurbanne', level: 'Débutant' },
-    { id: 'slot-4', day: 'Lundi', time: '21:30', discipline: 'Judo', coach: 'Youssef', location: 'COSEC Marcel Pagnol', city: 'Villeurbanne', level: 'Intermédiaire' },
-    { id: 'slot-5', day: 'Mardi', time: '07:30', discipline: 'Conditioning No-Gi', coach: 'Hamza', location: 'Studio Croix-Rousse', city: 'Lyon', level: 'Tous' },
-    { id: 'slot-6', day: 'Mardi', time: '19:00', discipline: 'Jiu-jitsu brésilien', coach: 'Fabrice', location: 'Dojo Villeurbanne', city: 'Villeurbanne', level: 'Avancé' },
-    { id: 'slot-7', day: 'Mercredi', time: '12:00', discipline: 'Drills compétition', coach: 'Hamza', location: 'Studio Croix-Rousse', city: 'Lyon', level: 'Intermédiaire' },
-    { id: 'slot-8', day: 'Mercredi', time: '20:30', discipline: 'No-Gi Grappling', coach: 'Youssef', location: 'COSEC Marcel Pagnol', city: 'Villeurbanne', level: 'Tous' },
-    { id: 'slot-9', day: 'Jeudi', time: '18:00', discipline: 'Judo', coach: 'Fabrice', location: 'Dojo Villeurbanne', city: 'Villeurbanne', level: 'Débutant' },
-    { id: 'slot-10', day: 'Jeudi', time: '20:00', discipline: 'Jiu-jitsu brésilien', coach: 'Willy', location: 'Dojo Villeurbanne', city: 'Villeurbanne', level: 'Intermédiaire' },
-    { id: 'slot-11', day: 'Vendredi', time: '07:00', discipline: 'Open mat libre', coach: 'Hamza', location: 'Studio Croix-Rousse', city: 'Lyon', level: 'Tous' },
-    { id: 'slot-12', day: 'Vendredi', time: '19:30', discipline: 'Sparring compétition', coach: 'Youssef', location: 'COSEC Marcel Pagnol', city: 'Villeurbanne', level: 'Avancé' },
-    { id: 'slot-13', day: 'Samedi', time: '10:00', discipline: 'Stage technique', coach: 'Invité', location: 'COSEC Marcel Pagnol', city: 'Villeurbanne', level: 'Tous' },
-    { id: 'slot-14', day: 'Dimanche', time: '11:00', discipline: 'Mobilité & récupération', coach: 'Willy', location: 'Studio Croix-Rousse', city: 'Lyon', level: 'Tous' },
-];
+function ageFromBirthdate(birthdate: string | null): number | null {
+    if (!birthdate) return null;
+    return Math.floor((Date.now() - new Date(birthdate).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+}
 
-const daysOrder = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+function countForLabel(items: ScheduleItem[], label: string) {
+    return items.filter((e) => e.participantLabel === label).length;
+}
 
-const defaultClubInfo = {
-    title: 'Planning complet',
-    subtitle: 'Consultez tous les créneaux de la semaine et filtrez selon vos disponibilités.',
-};
+function matchesMemberFilter(
+    item: ScheduleItem,
+    filter: MemberFilter,
+    parentLabel: string,
+    children: { id: string; firstname: string }[]
+): boolean {
+    if (filter === 'all') return true;
+    if (filter === 'me') return item.participantLabel === parentLabel;
+    const child = children.find((c) => c.id === filter);
+    if (!child) return false;
+    return item.participantLabel === child.firstname;
+}
 
-type ClubMetadata = {
-    name?: string;
-    subtitle?: string;
-};
+function EventGlyph({ eventType }: { eventType?: string }) {
+    const t = eventType || '';
+    if (t === 'workshop' || t === 'meeting') return <Music2 className="w-3.5 h-3.5 text-slate-700" strokeWidth={2} />;
+    if (t === 'match') return <Activity className="w-3.5 h-3.5 text-slate-700" strokeWidth={2} />;
+    if (t === 'other') return <Drama className="w-3.5 h-3.5 text-slate-700" strokeWidth={2} />;
+    if (t === 'training') return <Activity className="w-3.5 h-3.5 text-slate-700" strokeWidth={2} />;
+    return <Sparkles className="w-3.5 h-3.5 text-slate-700" strokeWidth={2} />;
+}
 
 const PlanningPage: React.FC = () => {
-    const [clubInfo, setClubInfo] = React.useState(() => {
-        if (typeof window === 'undefined') return defaultClubInfo;
-        try {
-            const raw = window.localStorage.getItem('selectedOrganisation');
-            if (!raw) return defaultClubInfo;
-            const parsed = JSON.parse(raw) as ClubMetadata | null;
-            if (!parsed) return defaultClubInfo;
-            return {
-                title: parsed.name ? `Planning – ${parsed.name}` : defaultClubInfo.title,
-                subtitle: parsed.subtitle ?? defaultClubInfo.subtitle,
-            };
-        } catch (error) {
-            console.error('Impossible de charger les informations du club actif', error);
-            return defaultClubInfo;
+    const { user } = useAuth();
+    const { scheduleItems, familyMembers, loading } = useWeeklyFamilySchedule(user?.firstName);
+    const [memberFilter, setMemberFilter] = useState<MemberFilter>('all');
+
+    const parentLabel = useMemo(() => parentParticipantLabel(user?.firstName), [user?.firstName]);
+
+    const filteredItems = useMemo(
+        () => scheduleItems.filter((e) => matchesMemberFilter(e, memberFilter, parentLabel, familyMembers)),
+        [scheduleItems, memberFilter, parentLabel, familyMembers]
+    );
+
+    const weekByDay = useMemo(() => {
+        const { monday } = getWeekBounds();
+        const buckets: ScheduleItem[][] = [[], [], [], [], [], [], []];
+        for (const ev of filteredItems) {
+            const st = new Date(ev.start_time);
+            const diff = Math.floor((st.getTime() - monday.getTime()) / (24 * 60 * 60 * 1000));
+            const idx = Math.min(6, Math.max(0, diff));
+            buckets[idx].push(ev);
         }
-    });
+        buckets.forEach((b) => b.sort((a, c) => new Date(a.start_time).getTime() - new Date(c.start_time).getTime()));
+        return buckets;
+    }, [filteredItems]);
 
-    React.useEffect(() => {
-        const handler = () => {
-            try {
-                const raw = window.localStorage.getItem('selectedOrganisation');
-                if (!raw) {
-                    setClubInfo(defaultClubInfo);
-                    return;
-                }
-                const parsed = JSON.parse(raw) as ClubMetadata | null;
-                if (!parsed) {
-                    setClubInfo(defaultClubInfo);
-                    return;
-                }
-                setClubInfo({
-                    title: parsed.name ? `Planning – ${parsed.name}` : defaultClubInfo.title,
-                    subtitle: parsed.subtitle ?? defaultClubInfo.subtitle,
-                });
-            } catch (error) {
-                console.error('Impossible de mettre à jour les informations du club actif', error);
-                setClubInfo(defaultClubInfo);
-            }
-        };
-
-        handler();
-        window.addEventListener('storage', handler);
-        window.addEventListener('organisation:updated', handler);
-        return () => {
-            window.removeEventListener('storage', handler);
-            window.removeEventListener('organisation:updated', handler);
-        };
-    }, []);
-
-    const [disciplineFilter, setDisciplineFilter] = React.useState<'Toutes' | 'Jiu-jitsu brésilien' | 'Luta Livre' | 'Judo' | 'Conditioning No-Gi'>('Toutes');
-    const [levelFilter, setLevelFilter] = React.useState<'Tous' | 'Débutant' | 'Intermédiaire' | 'Avancé'>('Tous');
-    const [searchDay, setSearchDay] = React.useState<'Tous' | typeof daysOrder[number]>('Tous');
-
-    const visibleDays = React.useMemo(() => {
-        if (searchDay === 'Tous') return daysOrder;
-        return daysOrder.filter((day) => day === searchDay);
-    }, [searchDay]);
-
-    const filteredSlots = React.useMemo(() => {
-        return baseSlots.filter((slot) => {
-            const matchesDiscipline = disciplineFilter === 'Toutes' || slot.discipline === disciplineFilter;
-            const matchesLevel = levelFilter === 'Tous' || slot.level === levelFilter;
-            return matchesDiscipline && matchesLevel;
-        });
-    }, [disciplineFilter, levelFilter]);
-
-    const groupedSlots = React.useMemo(() => {
-        return visibleDays.map((day) => ({
-            day,
-            slots: filteredSlots.filter((slot) => slot.day === day),
-        }));
-    }, [filteredSlots, visibleDays]);
+    const totalWeek = scheduleItems.length;
+    const parentCount = countForLabel(scheduleItems, parentLabel);
 
     return (
-        <>
-            <div className="space-y-8 text-slate-900 dark:text-slate-100">
-                <section className="rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur border border-slate-100 dark:border-slate-800 shadow-sm p-6 sm:p-8 space-y-6 transition-colors">
-                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                        <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
-                            <Calendar className="h-5 w-5 text-indigo-500" />
-                            Planning hebdomadaire synthétique
+        <div className="space-y-8 text-slate-900 dark:text-slate-100 w-full min-w-0">
+            <MemberHomeTabs active="planning" />
+
+            <header>
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+                    Planning hebdomadaire
+                </h1>
+                <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm sm:text-base max-w-2xl">
+                    Filtrez par membre de la famille pour voir leurs activités
+                </p>
+            </header>
+
+            <section className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm p-5 sm:p-6">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                    <h2 className="text-base font-bold text-slate-900 dark:text-white">Famille</h2>
+                    <button
+                        type="button"
+                        onClick={() => setMemberFilter('all')}
+                        className="text-sm font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                    >
+                        Tous affichés
+                    </button>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-1 -mx-1 px-1">
+                    <button
+                        type="button"
+                        onClick={() => setMemberFilter('all')}
+                        className={`shrink-0 w-[120px] rounded-xl border p-3 text-center transition-all ${
+                            memberFilter === 'all'
+                                ? 'border-blue-500 ring-2 ring-blue-500/25 bg-slate-50 dark:bg-slate-800/80'
+                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300'
+                        }`}
+                    >
+                        <div className="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-600 dark:to-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-100">
+                            <Users className="w-5 h-5" strokeWidth={2} />
                         </div>
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                            <span className="inline-flex items-center gap-2 rounded-full bg-indigo-100 dark:bg-indigo-500/20 px-3 py-1 text-indigo-600 font-semibold">
-                                {filteredSlots.length} créneaux
-                            </span>
-                            <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-slate-600 dark:text-slate-300">
-                                {disciplineFilter === 'Toutes' ? 'Toutes disciplines' : disciplineFilter}
-                            </span>
-                            <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-slate-600 dark:text-slate-300">
-                                {levelFilter === 'Tous' ? 'Tous niveaux' : `Niveau ${levelFilter}`}
-                            </span>
+                        <p className="font-bold text-slate-900 dark:text-white mt-2 text-sm">Tous</p>
+                        <p className="text-xs text-slate-500 truncate">{totalWeek} cours/sem</p>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setMemberFilter('me')}
+                        className={`shrink-0 w-[120px] rounded-xl border p-3 text-center transition-all ${
+                            memberFilter === 'me'
+                                ? 'border-blue-500 ring-2 ring-blue-500/25 bg-slate-50 dark:bg-slate-800/80'
+                                : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300'
+                        }`}
+                    >
+                        <div className="w-12 h-12 mx-auto rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold">
+                            {user?.firstName?.charAt(0) || 'V'}
                         </div>
-                    </div>
-                </section>
+                        <p className="font-bold text-slate-900 dark:text-white mt-2 text-sm">Vous</p>
+                        <p className="text-xs text-slate-500">Adulte</p>
+                        <p className="text-[11px] text-slate-500 mt-1 truncate">{parentCount} cours/sem</p>
+                    </button>
 
-                <section className="rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur border border-slate-100 dark:border-slate-800 shadow-sm p-6 sm:p-8 space-y-4 transition-colors">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Discipline & niveau</div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                        {(['Toutes', 'Jiu-jitsu brésilien', 'Luta Livre', 'Judo', 'Conditioning No-Gi'] as const).map((disc) => (
+                    {familyMembers.map((c) => {
+                        const age = ageFromBirthdate(c.birthdate);
+                        const cnt = countForLabel(scheduleItems, c.firstname);
+                        const selected = memberFilter === c.id;
+                        return (
                             <button
-                                key={disc}
+                                key={c.id}
                                 type="button"
-                                onClick={() => setDisciplineFilter(disc)}
-                                className={`rounded-full px-4 py-2 text-xs font-semibold transition shadow-sm border ${
-                                    disciplineFilter === disc
-                                        ? 'bg-indigo-500 text-white border-indigo-500'
-                                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-200 hover:text-indigo-600'
+                                onClick={() => setMemberFilter(c.id)}
+                                className={`shrink-0 w-[120px] rounded-xl border p-3 text-center transition-all ${
+                                    selected
+                                        ? 'border-blue-500 ring-2 ring-blue-500/25 bg-slate-50 dark:bg-slate-800/80'
+                                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-slate-300'
                                 }`}
                             >
-                                {disc}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        {(['Tous', 'Débutant', 'Intermédiaire', 'Avancé'] as const).map((lvl) => (
-                            <button
-                                key={lvl}
-                                type="button"
-                                onClick={() => setLevelFilter(lvl)}
-                                className={`rounded-full px-4 py-2 text-xs font-semibold transition shadow-sm border ${
-                                    levelFilter === lvl
-                                        ? 'bg-slate-900 text-white border-slate-900'
-                                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 hover:text-slate-900'
-                                }`}
-                            >
-                                Niveau {lvl.toLowerCase()}
-                            </button>
-                        ))}
-                    </div>
-                </section>
-
-                <section className="rounded-3xl bg-white/90 dark:bg-slate-900/90 backdrop-blur border border-slate-100 dark:border-slate-800 shadow-sm p-6 sm:p-8 space-y-4 transition-colors">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Jour</div>
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setSearchDay('Tous')}
-                            className={`rounded-full px-4 py-2 text-xs font-semibold transition shadow-sm border ${
-                                searchDay === 'Tous'
-                                    ? 'bg-indigo-500 text-white border-indigo-500'
-                                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-200 hover:text-indigo-600'
-                            }`}
-                        >
-                            Tous
-                        </button>
-                        {daysOrder.map((day) => (
-                            <button
-                                key={day}
-                                type="button"
-                                onClick={() => setSearchDay(day)}
-                                className={`rounded-full px-4 py-2 text-xs font-semibold transition shadow-sm border ${
-                                    searchDay === day
-                                        ? 'bg-indigo-500 text-white border-indigo-500'
-                                        : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-indigo-200 hover:text-indigo-600'
-                                }`}
-                            >
-                                {day}
-                            </button>
-                        ))}
-                    </div>
-                </section>
-
-                <section className="space-y-6">
-                    {groupedSlots.map(({ day, slots }) => (
-                        <article key={day} className="rounded-3xl border border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 backdrop-blur shadow-sm transition-colors">
-                            <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 dark:border-slate-800 px-6 py-4">
-                                <div className="text-lg font-semibold text-slate-900 dark:text-white">{day}</div>
-                                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                                    <Users className="h-4 w-4 text-slate-400" />
-                                    {slots.length} créneau{slots.length > 1 ? 'x' : ''}
+                                <div className="w-12 h-12 mx-auto rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-100 font-bold text-sm">
+                                    {c.firstname.charAt(0)}
                                 </div>
-                            </header>
-                            {slots.length === 0 ? (
-                                <div className="px-6 py-5 text-sm text-slate-500 dark:text-slate-400">Aucun cours prévu pour ce jour avec les filtres actuels.</div>
-                            ) : (
-                                <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                                    {slots.map((slot) => (
-                                        <div key={slot.id} className="px-6 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                                            <div className="flex items-center gap-4">
-                                                <div className="h-10 w-10 rounded-full bg-indigo-100 text-indigo-600 font-semibold flex items-center justify-center text-sm">
-                                                    {slot.time}
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-semibold text-slate-900 dark:text-white">{slot.discipline}</p>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400">Avec {slot.coach}</p>
-                                                </div>
+                                <p className="font-bold text-slate-900 dark:text-white mt-2 text-sm truncate">{c.firstname}</p>
+                                <p className="text-xs text-slate-500">{age != null ? `${age} ans` : '—'}</p>
+                                <p className="text-[11px] text-slate-500 mt-1 truncate">{cnt} cours/sem</p>
+                            </button>
+                        );
+                    })}
+                </div>
+                <p className="text-xs text-slate-400 mt-3">
+                    <Link to="/club/famille" className="text-blue-600 hover:underline font-medium">
+                        Gérer la famille
+                    </Link>
+                </p>
+            </section>
+
+            {loading ? (
+                <div className="flex justify-center py-20">
+                    <div className="animate-spin rounded-full h-10 w-10 border-2 border-indigo-600 border-t-transparent" />
+                </div>
+            ) : (
+                <section className="rounded-2xl border border-slate-200/90 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 p-4 sm:p-6">
+                    <div className="flex gap-2 overflow-x-auto pb-2 sm:grid sm:grid-cols-7 sm:overflow-visible sm:gap-3">
+                        {DAY_LABELS.map((label, dayIdx) => {
+                            const dayEvents = weekByDay[dayIdx] || [];
+                            return (
+                                <div key={label} className="min-w-[148px] sm:min-w-0 flex flex-col flex-1">
+                                    <p className="text-center text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 tracking-wide">
+                                        {label}
+                                    </p>
+                                    <div className="space-y-2 flex-1 min-h-[140px]">
+                                        {dayEvents.length === 0 ? (
+                                            <div className="rounded-xl border border-dashed border-slate-200 dark:border-slate-700 bg-white/60 dark:bg-slate-900/40 p-3 flex items-center justify-center min-h-[80px] text-slate-400 text-sm">
+                                                —
                                             </div>
-                                            <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4 text-xs text-slate-500 dark:text-slate-400">
-                                                <span className="inline-flex items-center gap-1">
-                                                    <MapPin className="h-4 w-4 text-rose-500" />
-                                                    {slot.location}
-                                                </span>
-                                                <span className="inline-flex items-center gap-2 rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-slate-600 dark:text-slate-300 font-medium">
-                                                    {slot.city}
-                                                </span>
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-slate-600 dark:text-slate-300 font-medium">
-                                                    Niveau {slot.level.toLowerCase()}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <button type="button" className="text-sm font-semibold text-indigo-600 hover:text-indigo-500">
-                                                    S’inscrire
-                                                </button>
-                                                <button type="button" className="text-xs text-slate-400 hover:text-indigo-500">
-                                                    Ajouter au calendrier
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        ) : (
+                                            dayEvents.map((ev) => {
+                                                const st = new Date(ev.start_time);
+                                                const et = new Date(ev.end_time);
+                                                const sty = eventTypeStyle(ev.event_type);
+                                                const coach = ev.created_by
+                                                    ? `${ev.created_by.firstname} ${ev.created_by.lastname}`
+                                                    : '—';
+                                                return (
+                                                    <div
+                                                        key={ev.id + ev.participantLabel + dayIdx}
+                                                        className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 shadow-sm text-left"
+                                                    >
+                                                        <div className="flex justify-between items-start gap-1 mb-1.5">
+                                                            <div
+                                                                className={`w-8 h-8 rounded-full ${sty.icon} flex items-center justify-center shrink-0`}
+                                                            >
+                                                                <EventGlyph eventType={ev.event_type} />
+                                                            </div>
+                                                            <span className="text-xs font-semibold text-slate-400 tabular-nums">
+                                                                {formatTime(st)}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
+                                                            {ev.title}
+                                                        </p>
+                                                        <div className="mt-2 space-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                                            <p className="flex items-center gap-1">
+                                                                <Clock className="w-3 h-3 shrink-0" />
+                                                                <span>{formatRange(st, et)}</span>
+                                                            </p>
+                                                            {ev.location && (
+                                                                <p className="flex items-center gap-1">
+                                                                    <MapPin className="w-3 h-3 shrink-0" />
+                                                                    <span className="truncate">{ev.location}</span>
+                                                                </p>
+                                                            )}
+                                                            <p className="flex items-center gap-1">
+                                                                <User className="w-3 h-3 shrink-0" />
+                                                                <span className="truncate">{coach}</span>
+                                                            </p>
+                                                        </div>
+                                                        <div className="mt-2 w-7 h-7 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-600 dark:to-slate-700 flex items-center justify-center text-[9px] font-bold text-slate-700 dark:text-slate-100">
+                                                            {ev.participantLabel.slice(0, 2)}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
                                 </div>
-                            )}
-                        </article>
-                    ))}
+                            );
+                        })}
+                    </div>
                 </section>
-            </div>
-        </>
+            )}
+
+            {!loading && scheduleItems.length === 0 && (
+                <p className="text-center text-sm text-slate-500 dark:text-slate-400 py-8">
+                    Aucun créneau dans vos associations pour cette semaine.{' '}
+                    <Link to="/accounts" className="text-blue-600 font-medium hover:underline">
+                        Rejoindre un club
+                    </Link>
+                </p>
+            )}
+        </div>
     );
 };
 
