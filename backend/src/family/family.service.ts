@@ -147,46 +147,175 @@ export class FamilyService {
         child: {
           include: {
             memberships: {
-              where: { left_at: null, deleted_at: null, status: 'active' },
+              where: { left_at: null, deleted_at: null },
               include: {
                 organisation: { select: { id: true, name: true } },
-              },
-            },
-            attendances: {
-              where: {
-                event: { start_time: { gte: new Date() } },
-              },
-              include: {
-                event: {
-                  select: {
-                    id: true,
-                    title: true,
-                    start_time: true,
-                    end_time: true,
-                    location: true,
-                    organisation: { select: { id: true, name: true } },
+                Reservation: {
+                  where: {
+                    status: { in: ['confirmed', 'pending'] },
+                    deleted_at: null,
                   },
+                  select: { event_id: true },
                 },
               },
-              orderBy: { event: { start_time: 'asc' } },
-              take: 5,
             },
           },
         },
       },
     });
 
+    if (links.length === 0) return { children: [] };
+
+    // Récupérer toutes les orgs où au moins un enfant est inscrit
+    const orgIds = [
+      ...new Set(
+        links.flatMap((l) => l.child.memberships.map((m) => m.organisation.id))
+      ),
+    ];
+
+    // Charger les événements à venir de ces orgs en une seule requête
+    const now = new Date();
+    const upcomingEvents = await this.prisma.event.findMany({
+      where: {
+        organisation_id: { in: orgIds },
+        start_time: { gte: now },
+        status: 'published',
+        deleted_at: null,
+      },
+      select: {
+        id: true,
+        title: true,
+        start_time: true,
+        end_time: true,
+        location: true,
+        organisation: { select: { id: true, name: true } },
+      },
+      orderBy: { start_time: 'asc' },
+      take: 50,
+    });
+
     return {
-      children: links.map((link) => ({
-        id: link.child.id,
-        firstname: link.child.firstname,
-        lastname: link.child.lastname,
-        birthdate: link.child.birthdate,
-        relationship: link.relationship,
-        organisations: link.child.memberships.map((m) => m.organisation),
-        upcoming_events: link.child.attendances.map((a) => a.event),
-      })),
+      children: links.map((link) => {
+        // IDs des réservations confirmées/pending de cet enfant
+        const registeredEventIds = new Set(
+          link.child.memberships.flatMap((m) => m.Reservation.map((r) => r.event_id))
+        );
+
+        // Organisations de l'enfant
+        const childOrgIds = new Set(link.child.memberships.map((m) => m.organisation.id));
+
+        // Membership ID par organisation (pour pouvoir inscrire)
+        const membershipByOrg = Object.fromEntries(
+          link.child.memberships.map((m) => [m.organisation.id, m.id])
+        );
+
+        // Événements des clubs de cet enfant avec flag is_registered
+        const events = upcomingEvents
+          .filter((e) => childOrgIds.has(e.organisation.id))
+          .map((e) => ({
+            ...e,
+            is_registered: registeredEventIds.has(e.id),
+            membership_id: membershipByOrg[e.organisation.id],
+          }));
+
+        return {
+          id: link.child.id,
+          firstname: link.child.firstname,
+          lastname: link.child.lastname,
+          birthdate: link.child.birthdate,
+          relationship: link.relationship,
+          organisations: link.child.memberships.map((m) => m.organisation),
+          events,
+        };
+      }),
     };
+  }
+
+  /**
+   * Inscrit un enfant à un événement via son membership
+   */
+  async registerChildToEvent(parentId: string, childId: string, eventId: string) {
+    await this.assertParentOwnsChild(parentId, childId);
+
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      include: {
+        Reservation: {
+          where: { status: { in: ['confirmed', 'pending'] }, deleted_at: null },
+        },
+      },
+    });
+
+    if (!event) throw new NotFoundException("Événement introuvable");
+    if (event.status !== 'published') throw new BadRequestException("Cet événement n'est pas publié");
+
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        user_id: childId,
+        organisation_id: event.organisation_id,
+        left_at: null,
+        deleted_at: null,
+      },
+    });
+
+    if (!membership) {
+      throw new ForbiddenException("L'enfant n'est pas membre de l'organisation de cet événement");
+    }
+
+    // Chercher TOUTE réservation existante (y compris cancelled)
+    const existing = await this.prisma.reservation.findUnique({
+      where: { membership_id_event_id: { membership_id: membership.id, event_id: eventId } },
+    });
+
+    if (existing && ['confirmed', 'pending'].includes(existing.status) && !existing.deleted_at) {
+      throw new ConflictException("L'enfant est déjà inscrit à cet événement");
+    }
+
+    const confirmedCount = event.Reservation.filter((r) => r.status === 'confirmed').length;
+    const newStatus =
+      event.capacity && event.capacity > 0 && confirmedCount >= event.capacity
+        ? 'pending'
+        : 'confirmed';
+
+    // Réactiver la réservation annulée ou en créer une nouvelle
+    const reservation = await this.prisma.reservation.upsert({
+      where: { membership_id_event_id: { membership_id: membership.id, event_id: eventId } },
+      update: { status: newStatus, deleted_at: null },
+      create: { event_id: eventId, membership_id: membership.id, status: newStatus },
+    });
+
+    return { message: 'Enfant inscrit avec succès', reservation_id: reservation.id, status: newStatus };
+  }
+
+  /**
+   * Désinscrit un enfant d'un événement
+   */
+  async unregisterChildFromEvent(parentId: string, childId: string, eventId: string) {
+    await this.assertParentOwnsChild(parentId, childId);
+
+    const membership = await this.prisma.membership.findFirst({
+      where: { user_id: childId, left_at: null, deleted_at: null },
+    });
+
+    if (!membership) throw new NotFoundException("Membership introuvable");
+
+    const reservation = await this.prisma.reservation.findFirst({
+      where: {
+        event_id: eventId,
+        membership_id: membership.id,
+        status: { in: ['confirmed', 'pending'] },
+        deleted_at: null,
+      },
+    });
+
+    if (!reservation) throw new NotFoundException("Inscription introuvable");
+
+    await this.prisma.reservation.update({
+      where: { id: reservation.id },
+      data: { status: 'cancelled', deleted_at: new Date() },
+    });
+
+    return { message: 'Inscription annulée' };
   }
 
   private async assertParentOwnsChild(parentId: string, childId: string) {

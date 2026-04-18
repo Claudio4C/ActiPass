@@ -81,7 +81,7 @@ const ProtectedRoute: React.FC<{
     }
 
     if (mode !== requiredMode) {
-        return <Navigate to="/login" replace />;
+        return <Navigate to="/home" replace />;
     }
 
     return <>{children}</>;

@@ -66,8 +66,30 @@ Chaque phase est ordonnée par dépendance technique et valeur business. On ne p
 | P1-1 | En tant que parent, je veux créer un compte famille et y rattacher mes enfants mineurs | Le parent crée un compte, puis ajoute 1 à N enfants avec nom, prénom, date de naissance. Les enfants n'ont pas de login propre. | ✅ | ✅ |
 | P1-2 | En tant que parent, je veux inscrire un de mes enfants à un club et gérer son adhésion | Depuis le profil famille, le parent sélectionne un enfant et l'inscrit à un club. Le membership est créé au nom de l'enfant. | ✅ | ✅ |
 | P1-3 | En tant que parent, je veux voir le planning et les réservations de tous mes enfants dans un seul dashboard | Vue consolidée avec un filtre par enfant. Les réservations de chaque enfant sont visibles. | ✅ | ✅ |
-| P1-4 | En tant que parent, je veux recevoir les notifications concernant mes enfants (absences, events, paiements) | Toute notification liée à un enfant est envoyée au parent. Email ou in-app. | ✅ | ✅ |
+| P1-4 | En tant que parent, je veux recevoir les notifications concernant mes enfants (absences, events, paiements) | Toute notification liée à un enfant est envoyée au parent. Email ou in-app. | — | — |
 | P1-5 | En tant qu'admin club, je veux voir le parent rattaché à un membre mineur dans la fiche membre | La fiche membre affiche le parent responsable avec ses coordonnées de contact. | ✅ | ✅ |
+
+## Epic 1.1b — Comptes Parents / Famille (Bonus — peaufinage avant 1.2)
+
+> **Pourquoi avant 1.2 :** L'Epic 1.1 couvre le minimum. Mais pour un SaaS multi-domaines (sport, culture, scolaire, social, loisirs…), ces ajouts font la différence entre "un outil" et "l'outil de confiance que les parents recommandent". Ce sont des formulaires avec stockage — faible complexité, fort impact perçu.
+
+| ID | User Story | Critères d'acceptation | Front | Back |
+|----|-----------|------------------------|-------|------|
+| P1-B1 | En tant que parent, je veux renseigner la fiche santé / urgence de chaque enfant (allergies, traitements, groupe sanguin, contact d'urgence secondaire) | Formulaire dans le profil enfant avec les champs santé. Le coach/animateur peut consulter ces infos en 1 clic pendant une séance depuis la fiche de présence. | | |
+| P1-B2 | En tant que parent, je veux signer des autorisations dématérialisées (droit à l'image, autorisation de sortie, décharge médicale) | L'admin définit les autorisations requises. Le parent les signe (checkbox + date + horodatage). L'admin voit le statut signé/non signé par enfant. | | |
+| P1-B3 | En tant que coach/animateur, je veux laisser un commentaire de suivi après chaque séance pour un enfant | Champ texte accessible depuis la page de présences. Le parent voit les commentaires dans un fil chronologique sur le profil de son enfant. | | |
+| P1-B4 | En tant que parent multi-enfants multi-clubs, je veux une vue "semaine famille" consolidée | Calendrier hebdomadaire affichant tous les créneaux de tous les enfants, tous clubs confondus, avec code couleur par enfant. | | |
+| P1-4 | En tant que parent, je veux recevoir les notifications concernant mes enfants (absences, events, paiements) | Toute notification liée à un enfant est envoyée au parent. Email ou in-app. Préférences de notification configurables. | | |
+
+### Recommandation d'ordre d'implémentation
+
+1. **P1-4 Notifications** — attendu par les parents, socle pour tout le reste
+2. **P1-B1 Fiche santé / urgence** — obligation légale dans le sport, colo, scoutisme, MJC, centres aérés
+3. **P1-B2 Autorisations parentales** — élimine le papier pour l'asso ET le parent
+4. **P1-B3 Carnet de suivi** — différenciateur unique, aucun concurrent ne le fait
+5. **P1-B4 Vue semaine famille** — cerise sur le gâteau, UX premium
+
+---
 
 ## Epic 1.2 — Documents & Pièces administratives
 
