@@ -14,6 +14,11 @@ import {
     Sparkles,
     ChevronRight,
     User,
+    Navigation,
+    Phone,
+    Info,
+    FileWarning,
+    GraduationCap,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import ComingSoon from '../components/shared/ComingSoon';
@@ -29,6 +34,11 @@ import {
     type Organisation,
     type ScheduleItem,
 } from '../hooks/useWeeklyFamilySchedule';
+import {
+    useDashboardSignals,
+    formatCountdown,
+    relativeDayBadge,
+} from '../hooks/useDashboardSignals';
 
 const emptyStateActions = [
     {
@@ -98,6 +108,10 @@ const HomePage: React.FC = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const { organisations, scheduleItems, familyMembers, loading } = useWeeklyFamilySchedule(user?.firstName);
+    const { notifications, notificationBadgeCount, proactiveBanners } = useDashboardSignals(
+        scheduleItems,
+        familyMembers
+    );
 
     const handleOrgSelect = (org: Organisation) => {
         localStorage.setItem('selectedOrganisation', JSON.stringify({ id: org.id, name: org.name, type: org.type }));
@@ -162,13 +176,17 @@ const HomePage: React.FC = () => {
 
     const subtitleFamily = useMemo(() => {
         const n = todayItems.length;
-        if (n === 0) return 'Aucune activité prévue aujourd’hui pour votre famille.';
+        if (n === 0) return 'Journée libre — aucune activité prévue pour aujourd’hui.';
         return `${n} activité${n > 1 ? 's' : ''} aujourd’hui pour la famille.`;
     }, [todayItems.length]);
 
     return (
         <div className="space-y-8 text-slate-900 dark:text-slate-100 w-full min-w-0">
-            <MemberHomeTabs active="home" />
+            <MemberHomeTabs
+                active="home"
+                notifications={notifications}
+                notificationBadgeCount={notificationBadgeCount}
+            />
 
             <section>
                 <p className="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase mb-1">
@@ -180,6 +198,66 @@ const HomePage: React.FC = () => {
                 </h1>
                 <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm sm:text-base">{subtitleFamily}</p>
             </section>
+
+            {!loading && proactiveBanners.length > 0 && (
+                <section className="space-y-3" aria-label="Assistance et alertes">
+                    {proactiveBanners.map((b) => {
+                        const shell =
+                            b.variant === 'danger'
+                                ? 'border-red-200 bg-red-50/80 dark:border-red-900/60 dark:bg-red-950/25'
+                                : b.variant === 'warning'
+                                  ? 'border-amber-200 bg-amber-50/80 dark:border-amber-900/50 dark:bg-amber-950/20'
+                                  : b.variant === 'accent'
+                                    ? 'border-blue-200 bg-blue-50/80 dark:border-blue-900/50 dark:bg-blue-950/25'
+                                    : 'border-slate-200 bg-slate-50/90 dark:border-slate-700 dark:bg-slate-900/60';
+                        const Icon =
+                            b.variant === 'danger'
+                                ? FileWarning
+                                : b.variant === 'warning'
+                                  ? FileWarning
+                                  : b.variant === 'accent'
+                                    ? Clock
+                                    : Info;
+                                        const isExternal = Boolean(b.action?.to.startsWith('http'));
+                        return (
+                            <div
+                                key={b.id}
+                                className={`flex flex-col gap-3 rounded-2xl border px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4 ${shell}`}
+                            >
+                                <div className="flex gap-3 min-w-0">
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/80 text-slate-700 shadow-sm dark:bg-slate-800 dark:text-slate-200">
+                                        <Icon className="h-5 w-5" aria-hidden />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{b.title}</p>
+                                        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-0.5 leading-snug">
+                                            {b.description}
+                                        </p>
+                                    </div>
+                                </div>
+                                {b.action &&
+                                    (isExternal ? (
+                                        <a
+                                            href={b.action.to}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="shrink-0 text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400 whitespace-nowrap self-start sm:self-center"
+                                        >
+                                            {b.action.label} →
+                                        </a>
+                                    ) : (
+                                        <Link
+                                            to={b.action.to}
+                                            className="shrink-0 text-sm font-semibold text-blue-600 hover:underline dark:text-blue-400 whitespace-nowrap self-start sm:self-center"
+                                        >
+                                            {b.action.label} →
+                                        </Link>
+                                    ))}
+                            </div>
+                        );
+                    })}
+                </section>
+            )}
 
             {/* Stats */}
             <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -254,41 +332,129 @@ const HomePage: React.FC = () => {
                         {/* Colonne principale */}
                         <div className="lg:col-span-2 space-y-6">
                             {nextActivity ? (
-                                <section>
-                                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Prochaine activité</p>
-                                    <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white p-6 shadow-lg shadow-blue-500/20">
-                                        <div className="flex justify-between items-start mb-4">
-                                            <span className="text-xs font-semibold uppercase opacity-90">À venir</span>
-                                            <span className="text-xs bg-white/20 px-2 py-1 rounded-full">
-                                                {new Date(nextActivity.start_time).toLocaleDateString('fr-FR', { weekday: 'long' })}
-                                            </span>
-                                        </div>
-                                        <h3 className="text-2xl font-bold mb-4">{nextActivity.title}</h3>
-                                        <div className="space-y-2 text-sm opacity-95">
-                                            <p className="flex items-center gap-2">
-                                                <Clock className="w-4 h-4 shrink-0" />
-                                                {formatRange(new Date(nextActivity.start_time), new Date(nextActivity.end_time))}
-                                            </p>
-                                            {nextActivity.location && (
-                                                <p className="flex items-center gap-2">
-                                                    <MapPin className="w-4 h-4 shrink-0" />
-                                                    {nextActivity.location}
-                                                </p>
-                                            )}
-                                            <p className="flex items-center gap-2">
-                                                <User className="w-4 h-4 shrink-0" />
-                                                {nextActivity.created_by
-                                                    ? `${nextActivity.created_by.firstname} ${nextActivity.created_by.lastname}`
-                                                    : '—'}
-                                            </p>
-                                        </div>
-                                        <div className="mt-4 flex items-center gap-2">
-                                            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">
-                                                {nextActivity.participantLabel.slice(0, 2)}
+                                <section className="relative">
+                                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                                        Prochaine activité
+                                    </p>
+                                    {(() => {
+                                        const start = new Date(nextActivity.start_time);
+                                        const delta = start.getTime() - Date.now();
+                                        const cd = formatCountdown(delta);
+                                        return (
+                                            <div className="rounded-3xl bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white p-5 sm:p-7 shadow-xl shadow-blue-600/25 ring-1 ring-white/10">
+                                                <div className="flex justify-end items-start mb-5">
+                                                    <span className="text-xs font-semibold bg-white/20 px-3 py-1.5 rounded-full capitalize">
+                                                        {relativeDayBadge(start)}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex flex-wrap items-end justify-between gap-4 mb-5">
+                                                    <div className="min-w-0 flex-1">
+                                                        <h3 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight break-words">
+                                                            {nextActivity.title}
+                                                        </h3>
+                                                    </div>
+                                                    {cd && delta > 0 && delta <= 3 * 60 * 60_000 && (
+                                                        <div className="rounded-2xl bg-black/25 px-4 py-3 text-center backdrop-blur-sm shrink-0 ring-1 ring-white/15">
+                                                            <p className="text-[10px] font-semibold uppercase tracking-wider text-white/70">
+                                                                Début dans
+                                                            </p>
+                                                            <p className="text-2xl font-bold tabular-nums leading-none mt-1">{cd}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <dl className="grid gap-3 text-sm sm:text-base">
+                                                    <div className="flex gap-3">
+                                                        <dt className="sr-only">Horaires</dt>
+                                                        <dd className="flex min-w-0 flex-1 items-start gap-2 font-medium">
+                                                            <Clock className="mt-0.5 h-5 w-5 shrink-0 opacity-95" aria-hidden />
+                                                            <span>
+                                                                {formatRange(start, new Date(nextActivity.end_time))}
+                                                            </span>
+                                                        </dd>
+                                                    </div>
+                                                    <div className="flex gap-3">
+                                                        <dt className="sr-only">Lieu</dt>
+                                                        <dd className="flex min-w-0 flex-1 items-start gap-2">
+                                                            <MapPin className="mt-0.5 h-5 w-5 shrink-0 opacity-95" aria-hidden />
+                                                            <span className="font-medium">
+                                                                {nextActivity.location || 'Lieu communiqué par le club'}
+                                                            </span>
+                                                        </dd>
+                                                    </div>
+                                                    <div className="flex gap-3">
+                                                        <dt className="sr-only">Participant</dt>
+                                                        <dd className="flex items-center gap-3 flex-wrap">
+                                                            <span className="flex items-center gap-2 font-medium">
+                                                                <User className="h-5 w-5 shrink-0 opacity-95" aria-hidden />
+                                                                {nextActivity.participantLabel}
+                                                            </span>
+                                                            <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">
+                                                                <span
+                                                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-white/25 text-[11px] font-bold"
+                                                                    aria-hidden
+                                                                >
+                                                                    {nextActivity.participantLabel.slice(0, 2)}
+                                                                </span>
+                                                                Concerné
+                                                            </span>
+                                                        </dd>
+                                                    </div>
+                                                    <div className="flex gap-3">
+                                                        <dt className="sr-only">Coach</dt>
+                                                        <dd className="flex min-w-0 flex-1 items-start gap-2 text-white/95">
+                                                            <GraduationCap className="mt-0.5 h-5 w-5 shrink-0 opacity-90" aria-hidden />
+                                                            <span>
+                                                                <span className="block text-[11px] font-semibold uppercase tracking-wide text-white/65">
+                                                                    Coach / intervenant
+                                                                </span>
+                                                                {nextActivity.created_by
+                                                                    ? `${nextActivity.created_by.firstname} ${nextActivity.created_by.lastname}`
+                                                                    : 'À confirmer avec le club'}
+                                                            </span>
+                                                        </dd>
+                                                    </div>
+                                                </dl>
+
+                                                <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                                                    {nextActivity.location?.trim() ? (
+                                                        <a
+                                                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nextActivity.location.trim())}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-blue-700 shadow-sm transition hover:bg-white/95 min-h-[44px]"
+                                                        >
+                                                            <Navigation className="h-4 w-4 shrink-0" aria-hidden />
+                                                            Itinéraire
+                                                        </a>
+                                                    ) : (
+                                                        <Link
+                                                            to="/club/planning"
+                                                            className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-white/90 px-4 py-3 text-sm font-semibold text-blue-800 shadow-sm min-h-[44px]"
+                                                        >
+                                                            <Navigation className="h-4 w-4 shrink-0" aria-hidden />
+                                                            Planning
+                                                        </Link>
+                                                    )}
+                                                    <Link
+                                                        to="/club/coaches"
+                                                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/40 bg-transparent px-4 py-3 text-sm font-semibold text-white min-h-[44px] hover:bg-white/10"
+                                                    >
+                                                        <Phone className="h-4 w-4 shrink-0" aria-hidden />
+                                                        Contacter
+                                                    </Link>
+                                                    <Link
+                                                        to="/club/planning"
+                                                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/40 bg-transparent px-4 py-3 text-sm font-semibold text-white min-h-[44px] hover:bg-white/10"
+                                                    >
+                                                        <Info className="h-4 w-4 shrink-0" aria-hidden />
+                                                        Détails
+                                                    </Link>
+                                                </div>
                                             </div>
-                                            <span className="text-sm">{nextActivity.participantLabel}</span>
-                                        </div>
-                                    </div>
+                                        );
+                                    })()}
                                 </section>
                             ) : (
                                 <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-8 text-center text-slate-500">
@@ -298,18 +464,46 @@ const HomePage: React.FC = () => {
 
                             {nextSecondary.length > 0 && (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    {nextSecondary.map((ev) => (
-                                        <div
-                                            key={ev.id + ev.participantLabel}
-                                            className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm"
-                                        >
-                                            <p className="text-xs text-slate-500 capitalize">
-                                                {new Date(ev.start_time).toLocaleDateString('fr-FR', { weekday: 'long' })}{' '}
-                                                {formatTime(new Date(ev.start_time))}
-                                            </p>
-                                            <p className="font-semibold text-slate-900 dark:text-white mt-1">{ev.title}</p>
-                                        </div>
-                                    ))}
+                                    {nextSecondary.map((ev) => {
+                                        const st = new Date(ev.start_time);
+                                        const coachName = ev.created_by
+                                            ? `${ev.created_by.firstname} ${ev.created_by.lastname}`
+                                            : null;
+                                        return (
+                                            <div
+                                                key={ev.id + ev.participantLabel}
+                                                className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm"
+                                            >
+                                                <div className="flex items-start justify-between gap-2 mb-2">
+                                                    <p className="text-xs font-semibold text-slate-500 capitalize">
+                                                        {relativeDayBadge(st)} · {formatTime(st)}
+                                                    </p>
+                                                    <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-[10px] font-bold text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-200">
+                                                        {ev.participantLabel.slice(0, 2)}
+                                                    </span>
+                                                </div>
+                                                <p className="font-semibold text-slate-900 dark:text-white">{ev.title}</p>
+                                                <div className="mt-3 space-y-1.5 text-xs text-slate-600 dark:text-slate-400">
+                                                    <p className="flex items-center gap-1.5">
+                                                        <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                                        {formatRange(st, new Date(ev.end_time))}
+                                                    </p>
+                                                    {ev.location && (
+                                                        <p className="flex items-center gap-1.5 min-w-0">
+                                                            <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                                            <span className="truncate">{ev.location}</span>
+                                                        </p>
+                                                    )}
+                                                    {coachName && (
+                                                        <p className="flex items-center gap-1.5 min-w-0">
+                                                            <User className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                                                            <span className="truncate">{coachName}</span>
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             )}
 

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Download, LayoutGrid, Calendar, Users } from 'lucide-react';
+import MemberNotificationBell from './MemberNotificationBell';
+import type { DashboardNotification } from '../../hooks/useDashboardSignals';
 
 export type MemberHomeTabId = 'home' | 'planning' | 'coaches';
 
@@ -11,13 +13,20 @@ const linkActive =
 
 type MemberHomeTabsProps = {
     active: MemberHomeTabId;
+    /** Dérivé du planning familial ; absent sur pages sans données */
+    notifications?: DashboardNotification[];
+    notificationBadgeCount?: string;
 };
 
 /**
  * Onglets communs à l’espace « Mon club » : Accueil, Planning, Coachs (+ Sync iPhone).
  * Utilisé sur /home, /club/planning et /club/coaches.
  */
-const MemberHomeTabs: React.FC<MemberHomeTabsProps> = ({ active }) => {
+const MemberHomeTabs: React.FC<MemberHomeTabsProps> = ({
+    active,
+    notifications = [],
+    notificationBadgeCount = '0',
+}) => {
     return (
         <div className="w-full min-w-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 pb-4 border-b border-slate-200/80 dark:border-slate-800">
             <nav
@@ -49,14 +58,17 @@ const MemberHomeTabs: React.FC<MemberHomeTabsProps> = ({ active }) => {
                     Coachs
                 </Link>
             </nav>
-            <button
-                type="button"
-                title="Synchronisation mobile à venir"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500 text-white text-sm font-semibold shadow-sm hover:bg-emerald-600 transition"
-            >
-                <Download className="w-4 h-4 shrink-0" aria-hidden />
-                Sync iPhone
-            </button>
+            <div className="flex shrink-0 items-center justify-end gap-2 sm:gap-3">
+                <MemberNotificationBell notifications={notifications} badgeCount={notificationBadgeCount} />
+                <button
+                    type="button"
+                    title="Synchronisation mobile à venir"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500 text-white text-sm font-semibold shadow-sm hover:bg-emerald-600 transition"
+                >
+                    <Download className="w-4 h-4 shrink-0" aria-hidden />
+                    Sync iPhone
+                </button>
+            </div>
         </div>
     );
 };

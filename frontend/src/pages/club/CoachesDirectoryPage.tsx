@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Mail, Phone } from 'lucide-react';
 import { api } from '../../lib/api';
 import MemberHomeTabs from '../../components/club/MemberHomeTabs';
+import { useAuth } from '../../contexts/AuthContext';
+import { useWeeklyFamilySchedule } from '../../hooks/useWeeklyFamilySchedule';
+import { useDashboardSignals } from '../../hooks/useDashboardSignals';
 import type { RoleType } from '../../types';
 
 type OrgRow = {
@@ -66,6 +69,9 @@ function describeCoach(c: AggregatedCoach) {
 }
 
 const CoachesDirectoryPage: React.FC = () => {
+    const { user } = useAuth();
+    const { scheduleItems, familyMembers } = useWeeklyFamilySchedule(user?.firstName);
+    const { notifications, notificationBadgeCount } = useDashboardSignals(scheduleItems, familyMembers);
     const [coaches, setCoaches] = useState<AggregatedCoach[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -113,7 +119,11 @@ const CoachesDirectoryPage: React.FC = () => {
 
     return (
         <div className="space-y-8 text-slate-900 dark:text-slate-100 w-full min-w-0">
-            <MemberHomeTabs active="coaches" />
+            <MemberHomeTabs
+                active="coaches"
+                notifications={notifications}
+                notificationBadgeCount={notificationBadgeCount}
+            />
 
             <header>
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Nos coachs</h1>

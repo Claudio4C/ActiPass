@@ -13,6 +13,7 @@ import {
     parentParticipantLabel,
     type ScheduleItem,
 } from '../../hooks/useWeeklyFamilySchedule';
+import { useDashboardSignals } from '../../hooks/useDashboardSignals';
 
 type MemberFilter = 'all' | 'me' | string;
 
@@ -50,6 +51,7 @@ function EventGlyph({ eventType }: { eventType?: string }) {
 const PlanningPage: React.FC = () => {
     const { user } = useAuth();
     const { scheduleItems, familyMembers, loading } = useWeeklyFamilySchedule(user?.firstName);
+    const { notifications, notificationBadgeCount } = useDashboardSignals(scheduleItems, familyMembers);
     const [memberFilter, setMemberFilter] = useState<MemberFilter>('all');
 
     const parentLabel = useMemo(() => parentParticipantLabel(user?.firstName), [user?.firstName]);
@@ -77,7 +79,11 @@ const PlanningPage: React.FC = () => {
 
     return (
         <div className="space-y-8 text-slate-900 dark:text-slate-100 w-full min-w-0">
-            <MemberHomeTabs active="planning" />
+            <MemberHomeTabs
+                active="planning"
+                notifications={notifications}
+                notificationBadgeCount={notificationBadgeCount}
+            />
 
             <header>
                 <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
