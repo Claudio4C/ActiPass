@@ -1,191 +1,169 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import {
-    LayoutDashboard,
-    Users,
-    Calendar,
-    ClipboardCheck,
-    Euro,
-    FileText,
-    Settings,
-    Menu,
-    X,
-    Bell,
-    MessageSquare,
-    UserCog
-} from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { api } from '../../lib/api';
-import type { Membership, RoleType } from '../../types';
+  LayoutDashboard, Users, Calendar, ClipboardCheck, Euro,
+  FileText, Settings, Menu, X, MessageSquare, UserCog,
+} from 'lucide-react'
+import { useAuth } from '../../contexts/AuthContext'
+import { api } from '../../lib/api'
+import { cn } from '../../lib/utils'
+import type { Membership, RoleType } from '../../types'
 
 interface MenuItem {
-    icon: React.ComponentType<{ className?: string }>;
-    label: string;
-    path: string;
-    badge?: number | null;
-    roles: RoleType[];
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  path: string;
+  badge?: number | null;
+  roles: RoleType[];
 }
 
 interface DashboardSidebarProps {
-    organisationId: string;
+  organisationId: string;
 }
 
 const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) => {
-    const { user } = useAuth();
-    const location = useLocation();
-    const [isMobileOpen, setIsMobileOpen] = useState(false);
-    const [membership, setMembership] = useState<Membership | null>(null);
-    const [loading, setLoading] = useState(true);
+  const { user } = useAuth()
+  const location = useLocation()
+  const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const [membership, setMembership] = useState<Membership | null>(null)
+  const [loading, setLoading] = useState(true)
 
-    useEffect(() => {
-        loadMembership();
-    }, [organisationId, user?.id]);
-
-    const loadMembership = async () => {
-        if (!user?.id || !organisationId) return;
-        try {
-            setLoading(true);
-            const data = await api.get<{ organisation: { id: string; name: string }; myRole: { id: string; name: string; type: RoleType; level: number } }>(
-                `/organisations/${organisationId}`,
-                undefined,
-                { useCache: true, cacheTTL: 60000 }
-            );
-            setMembership({
-                id: `${organisationId}-${user.id}`,
-                organisationId,
-                role: data.myRole,
-                joined_at: new Date().toISOString(),
-            });
-        } catch (error) {
-            console.error('Error loading membership:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const currentRole: RoleType = membership?.role?.type || 'member';
-
-    // Menu items selon le rôle
-    const getMenuItems = (): MenuItem[] => {
-        const allItems: MenuItem[] = [
-            { icon: LayoutDashboard, label: "Vue d'ensemble", path: `/dashboard/${organisationId}/overview`, roles: ['club_owner', 'club_manager', 'treasurer'] },
-            { icon: Users, label: "Membres", path: `/dashboard/${organisationId}/members`, roles: ['club_owner', 'club_manager'] },
-            { icon: Calendar, label: "Événements", path: `/dashboard/${organisationId}/events`, roles: ['club_owner', 'club_manager'] },
-            { icon: ClipboardCheck, label: "Présences", path: `/dashboard/${organisationId}/attendance`, roles: ['club_owner', 'club_manager'] },
-            { icon: Euro, label: "Finances", path: `/dashboard/${organisationId}/payments`, roles: ['club_owner', 'club_manager', 'treasurer'] },
-            { icon: FileText, label: "Documents", path: `/dashboard/${organisationId}/documents`, roles: ['club_owner', 'club_manager'] },
-            { icon: MessageSquare, label: "Communication", path: `/dashboard/${organisationId}/communication`, roles: ['club_owner', 'club_manager'] },
-            { icon: UserCog, label: "Équipe", path: `/dashboard/${organisationId}/settings/team`, roles: ['club_owner', 'club_manager'] },
-            { icon: Settings, label: "Paramètres", path: `/dashboard/${organisationId}/settings`, roles: ['club_owner', 'club_manager'] },
-        ];
-
-        return allItems.filter(item => item.roles.includes(currentRole));
-    };
-
-    const menuItems = getMenuItems();
-    const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
-
-    if (loading) {
-        return (
-            <div className="w-64 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800 flex items-center justify-center">
-                <div className="text-sm text-gray-500">Chargement...</div>
-            </div>
-        );
+  useEffect(() => {
+    if (!user?.id || !organisationId) {return}
+    const load = async () => {
+      try {
+        setLoading(true)
+        const data = await api.get<{
+          organisation: { id: string; name: string };
+          myRole: { id: string; name: string; type: RoleType; level: number };
+        }>(`/organisations/${organisationId}`, undefined, { useCache: true, cacheTTL: 60000 })
+        setMembership({
+          id: `${organisationId}-${user.id}`,
+          organisationId,
+          role: data.myRole,
+          joined_at: new Date().toISOString(),
+        })
+      } catch {
+        // silently fail
+      } finally {
+        setLoading(false)
+      }
     }
+    load()
+  }, [organisationId, user?.id])
 
+  const currentRole: RoleType = membership?.role?.type || 'member'
+
+  const menuItems: MenuItem[] = [
+    { icon: LayoutDashboard, label: "Vue d'ensemble", path: `/dashboard/${organisationId}/overview`,       roles: ['club_owner', 'club_manager', 'treasurer'] },
+    { icon: Users,           label: 'Membres',         path: `/dashboard/${organisationId}/members`,        roles: ['club_owner', 'club_manager'] },
+    { icon: Calendar,        label: 'Événements',      path: `/dashboard/${organisationId}/events`,         roles: ['club_owner', 'club_manager'] },
+    { icon: ClipboardCheck,  label: 'Présences',       path: `/dashboard/${organisationId}/attendance`,     roles: ['club_owner', 'club_manager'] },
+    { icon: Euro,            label: 'Finances',        path: `/dashboard/${organisationId}/payments`,       roles: ['club_owner', 'club_manager', 'treasurer'] },
+    { icon: FileText,        label: 'Documents',       path: `/dashboard/${organisationId}/documents`,      roles: ['club_owner', 'club_manager'] },
+    { icon: MessageSquare,   label: 'Communication',   path: `/dashboard/${organisationId}/communication`,  roles: ['club_owner', 'club_manager'] },
+    { icon: UserCog,         label: 'Équipe',          path: `/dashboard/${organisationId}/settings/team`,  roles: ['club_owner', 'club_manager'] },
+    { icon: Settings,        label: 'Paramètres',      path: `/dashboard/${organisationId}/settings`,       roles: ['club_owner', 'club_manager'] },
+  ].filter(item => item.roles.includes(currentRole))
+
+  const isActive = (path: string) =>
+    location.pathname === path || location.pathname.startsWith(`${path}/`)
+
+  if (loading) {
     return (
-        <>
-            {/* Mobile menu button */}
-            <button
-                onClick={() => setIsMobileOpen(!isMobileOpen)}
-                className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-sm"
-                aria-label="Toggle menu"
-            >
-                {isMobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
+      <div className="w-64 shrink-0 bg-card border-r border-border flex items-center justify-center">
+        <div className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    )
+  }
 
-            {/* Sidebar */}
-            <aside
-                className={`
-                    fixed lg:static inset-y-0 left-0 z-40
-                    w-64 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800
-                    transform transition-transform duration-300 ease-in-out
-                    ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-                    flex flex-col
-                `}
-            >
-                {/* Logo */}
-                <Link to="/home" className="flex items-center gap-3 px-6 py-4 border-b border-gray-200 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors">
-                    <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
-                        <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center">
-                            <div className="w-3 h-3 bg-indigo-600 rounded-full" />
-                        </div>
-                    </div>
-                    <div>
-                        <div className="text-lg font-bold text-gray-900 dark:text-white">Ikivio</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Dashboard</div>
-                    </div>
-                </Link>
+  return (
+    <>
+      {/* Mobile toggle */}
+      <button
+        onClick={() => setIsMobileOpen(o => !o)}
+        className="lg:hidden fixed top-4 left-4 z-50 w-9 h-9 rounded-xl bg-card border border-border flex items-center justify-center shadow-sm"
+        aria-label="Toggle menu"
+      >
+        {isMobileOpen ? <X className="h-5 w-5 text-foreground" /> : <Menu className="h-5 w-5 text-foreground" />}
+      </button>
 
-                {/* Navigation */}
-                <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-1">
-                    {menuItems.map((item) => {
-                        const Icon = item.icon;
-                        const active = isActive(item.path);
-                        return (
-                            <Link
-                                key={item.path}
-                                to={item.path}
-                                onClick={() => setIsMobileOpen(false)}
-                                className={`
-                                    flex items-center gap-3 px-4 py-3 rounded-lg
-                                    transition-colors
-                                    ${active
-                                        ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 font-medium'
-                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800'
-                                    }
-                                `}
-                            >
-                                <Icon className="h-5 w-5" />
-                                <span className="flex-1">{item.label}</span>
-                                {item.badge !== undefined && item.badge !== null && item.badge > 0 && (
-                                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-red-500 text-white">
-                                        {item.badge}
-                                    </span>
-                                )}
-                            </Link>
-                        );
-                    })}
-                </nav>
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          'fixed lg:static inset-y-0 left-0 z-40',
+          'w-64 shrink-0 bg-card border-r border-border',
+          'transform transition-transform duration-300 ease-in-out',
+          'flex flex-col',
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+        )}
+      >
+        {/* Logo / home link */}
+        <Link
+          to="/home"
+          className="flex items-center gap-3 px-5 py-4 border-b border-border hover:bg-muted transition-colors"
+        >
+          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-sm shrink-0">
+            <span className="text-primary-foreground font-display font-bold text-sm">I</span>
+          </div>
+          <div>
+            <p className="font-display font-bold text-foreground text-sm leading-none">Actipass</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">Dashboard</p>
+          </div>
+        </Link>
 
-                {/* User info */}
-                <div className="px-4 py-4 border-t border-gray-200 dark:border-slate-800">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold">
-                            {user?.firstName?.charAt(0) || 'U'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                                {user?.firstName} {user?.lastName}
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                {membership?.role?.name || 'Membre'}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </aside>
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
+          {menuItems.map(({ path, icon: Icon, label, badge }) => {
+            const active = isActive(path)
+            return (
+              <Link
+                key={path}
+                to={path}
+                onClick={() => setIsMobileOpen(false)}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
+                  active
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                )}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                <span className="flex-1">{label}</span>
+                {badge !== undefined && badge !== null && badge > 0 && (
+                  <span className="w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                    {badge}
+                  </span>
+                )}
+              </Link>
+            )
+          })}
+        </nav>
 
-            {/* Overlay for mobile */}
-            {isMobileOpen && (
-                <div
-                    className="lg:hidden fixed inset-0 bg-black/50 z-30"
-                    onClick={() => setIsMobileOpen(false)}
-                />
-            )}
-        </>
-    );
-};
+        {/* User footer */}
+        <div className="px-4 py-4 border-t border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
+              {user?.firstName?.[0] ?? 'U'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground truncate">
+                {user?.firstName} {user?.lastName}
+              </p>
+              <p className="text-xs text-muted-foreground truncate">
+                {membership?.role?.name || 'Membre'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </aside>
 
-export default DashboardSidebar;
+      {/* Mobile overlay */}
+      {isMobileOpen && (
+        <div className="lg:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setIsMobileOpen(false)} />
+      )}
+    </>
+  )
+}
 
+export default DashboardSidebar

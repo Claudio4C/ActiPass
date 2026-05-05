@@ -1,216 +1,203 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-    Users, Bell, MapPin, Activity, Building2, UserPlus,
-    BadgeCheck, Construction, ArrowRight
-} from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import ComingSoon from '../components/shared/ComingSoon';
-import { api } from '../lib/api';
-import type { RoleType } from '../types';
+import React, { useState, useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Users, Bell, Building2, UserPlus, Plus, ChevronRight, Dumbbell, Music } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
+import { api } from '../lib/api'
+import { cn } from '../lib/utils'
+import type { RoleType } from '../types'
 
 type Organisation = {
-    id: string;
-    name: string;
-    roleType: RoleType;
-    roleName: string;
-    type: 'club' | 'association' | 'independant';
+  id: string;
+  name: string;
+  roleType: RoleType;
+  roleName: string;
+  type: 'club' | 'association' | 'independant';
 };
-
-const emptyStateActions = [
-    {
-        id: 'create-organisation',
-        title: 'Créer une organisation',
-        description: 'Déclarez votre association ou votre club pour activer toutes les fonctionnalités IKIVIO.',
-        ctaLabel: 'Créer mon espace',
-        to: '/accounts?intent=create-organisation',
-        icon: Building2,
-        accent: 'bg-indigo-50 text-indigo-600'
-    },
-    {
-        id: 'join-organisation',
-        title: 'Rejoindre une organisation',
-        description: "Recevez un lien d'invitation ou envoyez une demande d'accès à votre club existant.",
-        ctaLabel: 'Rejoindre un club',
-        to: '/accounts?intent=join-organisation',
-        icon: UserPlus,
-        accent: 'bg-emerald-50 text-emerald-600'
-    },
-    {
-        id: 'coach-independant',
-        title: 'Créer mon profil coach',
-        description: 'Créez un studio indépendant pour vendre vos créneaux privés et gérer vos clients.',
-        ctaLabel: 'Lancer mon studio',
-        to: '/coach/profile?mode=independant',
-        icon: BadgeCheck,
-        accent: 'bg-pink-50 text-pink-600',
-    },
-    {
-        id: 'discover-clubs',
-        title: 'Découvrir des clubs proches',
-        description: 'Parcourez les clubs et associations partenaires pour trouver de nouvelles salles.',
-        ctaLabel: 'Explorer les clubs',
-        to: '/discover',
-        icon: MapPin,
-        accent: 'bg-sky-50 text-sky-600'
-    },
-    {
-        id: 'browse-coaches',
-        title: 'Trouver un coach indépendant',
-        description: 'Accédez aux profils coachs pour organiser des cours privés ou des ateliers.',
-        ctaLabel: 'Voir les coachs',
-        to: '/coach/independants/demo',
-        icon: Activity,
-        accent: 'bg-amber-50 text-amber-600',
-    },
-    {
-        id: 'setup-notifications',
-        title: 'Configurer mes notifications',
-        description: 'Choisissez comment vous souhaitez être prévenu des nouvelles demandes, inscriptions et paiements.',
-        ctaLabel: 'Ajuster les alertes',
-        to: '/club/notifications',
-        icon: Bell,
-        accent: 'bg-slate-50 text-slate-700'
-    }
-];
 
 const getRoleDashboardPath = (roleType: RoleType, orgId: string) => {
-    if (roleType === 'club_owner' || roleType === 'club_manager' || roleType === 'treasurer') {
-        return `/dashboard/${orgId}/overview`;
-    }
-    return `/club/members`;
-};
+  if (roleType === 'club_owner' || roleType === 'club_manager' || roleType === 'treasurer') {
+    return `/dashboard/${orgId}/overview`
+  }
+  // members & coaches → espace membre spécifique au club
+  return `/club/${orgId}`
+}
+
+const ROLE_LABELS: Partial<Record<RoleType, string>> = {
+  club_owner: 'Propriétaire',
+  club_manager: 'Gestionnaire',
+  treasurer: 'Trésorier',
+  coach: 'Coach',
+  member: 'Membre',
+}
 
 const HomePage: React.FC = () => {
-    const { user } = useAuth();
-    const navigate = useNavigate();
-    const [organisations, setOrganisations] = useState<Organisation[]>([]);
-    const [loading, setLoading] = useState(true);
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const [organisations, setOrganisations] = useState<Organisation[]>([])
+  const [loading, setLoading] = useState(true)
 
-    useEffect(() => {
-        const load = async () => {
-            try {
-                const data = await api.get<Array<{
-                    organisation: { id: string; name: string; type: 'club' | 'association' | null };
-                    role: { name: string; type: RoleType };
-                }>>('/organisations/my', {}, { useCache: true, cacheTTL: 60000 });
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await api.get<
+          Array<{
+            organisation: { id: string; name: string; type: 'club' | 'association' | null };
+            role: { name: string; type: RoleType };
+          }>
+        >('/organisations/my', {}, { useCache: true, cacheTTL: 60000 })
 
-                setOrganisations(data.map(item => ({
-                    id: item.organisation.id,
-                    name: item.organisation.name,
-                    type: item.organisation.type || 'club',
-                    roleType: item.role.type,
-                    roleName: item.role.name,
-                })));
-            } catch (err) {
-                console.error('Error loading organisations:', err);
-                setOrganisations([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-        load();
-    }, []);
+        setOrganisations(
+          data.map(item => ({
+            id: item.organisation.id,
+            name: item.organisation.name,
+            type: item.organisation.type || 'club',
+            roleType: item.role.type,
+            roleName: ROLE_LABELS[item.role.type] ?? item.role.name,
+          })),
+        )
+      } catch {
+        setOrganisations([])
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
 
-    const handleOrgSelect = (org: Organisation) => {
-        localStorage.setItem('selectedOrganisation', JSON.stringify({ id: org.id, name: org.name, type: org.type }));
-        window.dispatchEvent(new Event('organisation:updated'));
-        navigate(getRoleDashboardPath(org.roleType, org.id));
-    };
+  const handleOrgSelect = (org: Organisation) => {
+    const storedRole =
+      org.roleType === 'club_owner' || org.roleType === 'club_manager' || org.roleType === 'treasurer'
+        ? 'gestionnaire'
+        : org.roleType === 'coach'
+          ? 'coach'
+          : 'membre'
 
-    return (
-        <div className="space-y-8">
-            {/* Hero */}
-            <section>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {user ? `Bonjour, ${user.firstName || 'Utilisateur'}` : 'Bienvenue sur Ikivio'}
-                </h1>
-                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-                    Gerez vos clubs, associations et activites depuis un seul endroit.
-                </p>
-                <div className="flex flex-wrap gap-3 mt-4">
-                    <Link
-                        to="/accounts"
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition"
-                    >
-                        <Users className="w-4 h-4" />
-                        Choisir un espace
-                    </Link>
-                    <Link
-                        to="/club/notifications"
-                        className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-slate-800 transition"
-                    >
-                        <Bell className="w-4 h-4" />
-                        Notifications
-                    </Link>
-                </div>
-            </section>
+    // Vider tout le cache API au switch d'organisation pour éviter les données obsolètes
+    api.clearCache()
 
-                {/* My organisations */}
-                {loading ? (
-                    <div className="flex justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
-                    </div>
-                ) : organisations.length > 0 ? (
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Mes organisations</h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {organisations.map(org => (
-                                <button
-                                    key={org.id}
-                                    onClick={() => handleOrgSelect(org)}
-                                    className="text-left rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow p-6 group"
-                                >
-                                    <div className="flex items-start justify-between mb-3">
-                                        <div className="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
-                                            <Building2 className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-                                        </div>
-                                        <ArrowRight className="w-5 h-5 text-slate-400 group-hover:text-indigo-600 transition-colors" />
-                                    </div>
-                                    <h3 className="font-semibold text-slate-900 dark:text-white mb-1">{org.name}</h3>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">{org.roleName}</p>
-                                </button>
-                            ))}
-                        </div>
-                    </section>
-                ) : (
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Par où commencer ?</h2>
-                        <p className="text-slate-500 dark:text-slate-400 mb-6">
-                            Vous n'êtes encore membre d'aucune organisation. Choisissez une action pour démarrer.
-                        </p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {emptyStateActions.map(action => {
-                                const Icon = action.icon;
-                                return (
-                                    <Link
-                                        key={action.id}
-                                        to={action.to}
-                                        className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow p-6 group block"
-                                    >
-                                        <div className={`w-10 h-10 rounded-xl ${action.accent} flex items-center justify-center mb-4`}>
-                                            <Icon className="w-5 h-5" />
-                                        </div>
-                                        <h3 className="font-semibold text-slate-900 dark:text-white mb-1">{action.title}</h3>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{action.description}</p>
-                                        <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400 group-hover:underline">
-                                            {action.ctaLabel} →
-                                        </span>
-                                    </Link>
-                                );
-                            })}
-                        </div>
-                    </section>
-                )}
+    localStorage.setItem(
+      'selectedOrganisation',
+      JSON.stringify({ id: org.id, name: org.name, type: org.type, role: storedRole }),
+    )
+    window.dispatchEvent(new Event('organisation:updated'))
+    navigate(getRoleDashboardPath(org.roleType, org.id))
+  }
 
-                {/* Activité récente - coming soon */}
-                <ComingSoon
-                    icon={Construction}
-                    title="Activité récente et planning à venir"
-                    description="L'historique d'activité et le planning consolidé seront disponibles prochainement."
-                />
+  const today = new Date().toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  })
+
+  return (
+    <div className="space-y-6">
+      {/* Hero card */}
+      <div className="relative overflow-hidden bg-gradient-to-br from-primary via-primary to-primary/85 rounded-3xl p-6 text-primary-foreground shadow-xl shadow-primary/30">
+        <div className="absolute -right-6 -top-6 w-32 h-32 bg-primary-foreground/10 rounded-full blur-2xl" />
+        <div className="absolute -left-8 -bottom-8 w-40 h-40 bg-primary-foreground/5 rounded-full blur-2xl" />
+        <div className="relative">
+          <p className="text-[11px] uppercase tracking-wider font-bold text-primary-foreground/70">
+            {today}
+          </p>
+          <h1 className="font-display text-2xl font-bold mt-1">
+            Bonjour, {user?.firstName || 'Utilisateur'} 👋
+          </h1>
+          <p className="text-sm text-primary-foreground/80 mt-1">
+            Gérez vos clubs, associations et activités depuis un seul endroit.
+          </p>
+          <div className="flex flex-wrap gap-3 mt-5">
+            <Link
+              to="/accounts"
+              className="inline-flex items-center gap-2 bg-primary-foreground text-primary text-sm font-bold px-4 py-2.5 rounded-full active:scale-95 transition-transform"
+            >
+              <Users className="w-4 h-4 shrink-0" />
+              Choisir un espace
+            </Link>
+            <Link
+              to="/club/notifications"
+              className="inline-flex items-center gap-2 bg-primary-foreground/15 text-primary-foreground text-sm font-bold px-4 py-2.5 rounded-full active:scale-95 transition-transform border border-primary-foreground/20"
+            >
+              <Bell className="w-4 h-4 shrink-0" />
+              Notifications
+            </Link>
+          </div>
         </div>
-    );
-};
+      </div>
 
-export default HomePage;
+      {/* Mes associations */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">
+            Mes associations
+          </p>
+          {organisations.length > 0 && (
+            <span className="text-xs text-muted-foreground">
+              {organisations.length} club{organisations.length > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          </div>
+        ) : organisations.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {organisations.map(org => {
+              const isAdmin = org.roleType === 'club_owner' || org.roleType === 'club_manager' || org.roleType === 'treasurer'
+              const OrgIcon = org.type === 'association' ? Music : org.type === 'independant' ? Users : Dumbbell
+              const iconBg = org.type === 'association' ? 'bg-cat-music/15 text-cat-music' : org.type === 'independant' ? 'bg-primary/15 text-primary' : 'bg-accent/15 text-accent'
+
+              return (
+                <button
+                  key={org.id}
+                  onClick={() => handleOrgSelect(org)}
+                  className="text-left bg-card border border-border rounded-2xl p-4 flex items-center gap-3 active:scale-[0.99] transition-all hover:border-primary/20 hover:shadow-sm group"
+                >
+                  <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', iconBg)}>
+                    <OrgIcon className="w-5 h-5 shrink-0" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-display font-bold text-foreground text-sm truncate">{org.name}</p>
+                    <p className={cn('text-[10px] font-bold mt-1 px-1.5 py-0.5 rounded-full inline-block', isAdmin ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground')}>
+                      {org.roleName}
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-3xl p-8 text-center space-y-3">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center">
+              <Building2 className="w-7 h-7 text-primary shrink-0" />
+            </div>
+            <h2 className="font-display text-lg font-bold text-foreground">Pas encore de club</h2>
+            <p className="text-sm text-muted-foreground">
+              Vous n'êtes membre d'aucune organisation. Créez ou rejoignez un espace pour commencer.
+            </p>
+            <div className="flex flex-wrap gap-3 justify-center pt-2">
+              <Link
+                to="/accounts?intent=create-organisation"
+                className="inline-flex items-center gap-2 bg-primary text-primary-foreground text-sm font-bold px-4 py-2.5 rounded-full active:scale-95 transition-transform"
+              >
+                <Plus className="w-4 h-4 shrink-0" />
+                Créer un espace
+              </Link>
+              <Link
+                to="/accounts?intent=join-organisation"
+                className="inline-flex items-center gap-2 bg-muted text-foreground text-sm font-semibold px-4 py-2.5 rounded-full active:scale-95 transition-transform border border-border"
+              >
+                <UserPlus className="w-4 h-4 shrink-0" />
+                Rejoindre un club
+              </Link>
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  )
+}
+
+export default HomePage

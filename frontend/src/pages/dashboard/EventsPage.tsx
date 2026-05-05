@@ -1,267 +1,231 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import { Calendar, Plus, Search, Filter, Edit, Trash2, Eye, Users, Clock, MapPin } from 'lucide-react';
-import RoleBasedRoute from '../../components/shared/RoleBasedRoute';
-import { api } from '../../lib/api';
-import { useAuth } from '../../contexts/AuthContext';
-import type { Event, EventStatus, EventType } from '../../types';
+import React, { useState, useEffect } from 'react'
+import { useParams, Link } from 'react-router-dom'
+import {
+  Calendar, Plus, Search, Edit, Trash2, Eye,
+  Users, Clock, MapPin, CalendarPlus,
+} from 'lucide-react'
+import RoleBasedRoute from '../../components/shared/RoleBasedRoute'
+import { api } from '../../lib/api'
+import { cn } from '../../lib/utils'
+import type { Event, EventStatus, EventType } from '../../types'
+
+// ─── meta ────────────────────────────────────────────────────────────────────
+
+const TYPE_META: Record<EventType, { label: string; badge: string }> = {
+  training: { label: 'Entraînement', badge: 'bg-accent/15 text-accent' },
+  match: { label: 'Match', badge: 'bg-destructive/10 text-destructive' },
+  meeting: { label: 'Réunion', badge: 'bg-primary/10 text-primary' },
+  workshop: { label: 'Atelier', badge: 'bg-cat-music/10 text-cat-music' },
+  other: { label: 'Autre', badge: 'bg-muted text-muted-foreground' },
+}
+
+const STATUS_META: Record<EventStatus, { label: string; cls: string }> = {
+  draft: { label: 'Brouillon', cls: 'bg-muted text-muted-foreground' },
+  published: { label: 'Publié', cls: 'bg-accent/15 text-accent' },
+  cancelled: { label: 'Annulé', cls: 'bg-destructive/10 text-destructive' },
+}
+
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+
+// ─── main ────────────────────────────────────────────────────────────────────
 
 const EventsPage: React.FC = () => {
-    const { organisationId } = useParams<{ organisationId: string }>();
-    const { user } = useAuth();
-    const [events, setEvents] = useState<Event[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [statusFilter, setStatusFilter] = useState<EventStatus | 'all'>('all');
-    const [typeFilter, setTypeFilter] = useState<EventType | 'all'>('all');
+  const { organisationId } = useParams<{ organisationId: string }>()
+  const [events, setEvents]           = useState<Event[]>([])
+  const [loading, setLoading]         = useState(true)
+  const [search, setSearch]           = useState('')
+  const [statusFilter, setStatusFilter] = useState<EventStatus | 'all'>('all')
+  const [typeFilter, setTypeFilter]   = useState<EventType | 'all'>('all')
 
-    useEffect(() => {
-        if (organisationId) {
-            loadEvents();
-        }
-    }, [organisationId, statusFilter, typeFilter]);
+  useEffect(() => {
+    if (organisationId) { loadEvents() }
+  }, [organisationId, statusFilter, typeFilter])
 
-    const loadEvents = async () => {
-        if (!organisationId) return;
-        try {
-            setLoading(true);
-            const filters: Record<string, string> = {};
-            if (statusFilter !== 'all') {
-                filters.status = statusFilter;
-            }
-            if (typeFilter !== 'all') {
-                filters.event_type = typeFilter;
-            }
-            const data = await api.get<Event[]>(
-                `/organisations/${organisationId}/events`,
-                filters,
-                { useCache: true, cacheTTL: 30000 }
-            );
-            setEvents(data);
-        } catch (error) {
-            console.error('Error loading events:', error);
-            setEvents([]);
-        } finally {
-            setLoading(false);
-        }
-    };
+  const loadEvents = async () => {
+    if (!organisationId) { return }
+    setLoading(true)
+    try {
+      const filters: Record<string, string> = {}
+      if (statusFilter !== 'all') { filters.status = statusFilter }
+      if (typeFilter !== 'all') { filters.event_type = typeFilter }
+      const data = await api.get<Event[]>(`/organisations/${organisationId}/events`, filters, { useCache: true, cacheTTL: 30000 })
+      setEvents(Array.isArray(data) ? data : [])
+    } catch {
+      setEvents([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
-    const handleDelete = async (eventId: string) => {
-        if (!organisationId) return;
-        if (!confirm('Êtes-vous sûr de vouloir supprimer cet événement ?')) return;
+  const handleDelete = async (eventId: string) => {
+    if (!organisationId) { return }
+    if (!confirm('Supprimer cet événement ?')) { return }
+    try {
+      await api.delete(`/organisations/${organisationId}/events/${eventId}`)
+      api.clearCache(`/organisations/${organisationId}/events`)
+      await loadEvents()
+    } catch {
+      alert('Erreur lors de la suppression')
+    }
+  }
 
-        try {
-            await api.delete(`/organisations/${organisationId}/events/${eventId}`);
-            api.clearCache(`/organisations/${organisationId}/events`);
-            await loadEvents();
-        } catch (error) {
-            console.error('Error deleting event:', error);
-            alert('Erreur lors de la suppression de l\'événement');
-        }
-    };
+  const filtered = events.filter(e =>
+    e.title.toLowerCase().includes(search.toLowerCase()) ||
+    e.description?.toLowerCase().includes(search.toLowerCase()),
+  )
 
-    const filteredEvents = events.filter(event => {
-        const matchesSearch = event.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            event.description?.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesSearch;
-    });
+  const inputCls = 'h-10 rounded-xl border border-border bg-card px-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-colors'
+  const selectCls = `${inputCls} pr-8`
 
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('fr-FR', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-        });
-    };
+  return (
+    <RoleBasedRoute allowedRoles={['club_owner', 'club_manager', 'coach']}>
+      <div className="space-y-6">
 
-    const formatTime = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleTimeString('fr-FR', {
-            hour: '2-digit',
-            minute: '2-digit',
-        });
-    };
+        {/* Header */}
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <h1 className="font-display text-2xl font-bold text-foreground">Événements</h1>
+            <p className="text-sm text-muted-foreground mt-1">Gérez les événements de votre organisation</p>
+          </div>
+          <Link
+            to={`/dashboard/${organisationId}/events/create`}
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground text-sm font-bold px-4 py-2.5 rounded-full active:scale-95 transition-transform shrink-0"
+          >
+            <Plus className="w-4 h-4 shrink-0" /> Créer un événement
+          </Link>
+        </div>
 
-    const getStatusBadge = (status: EventStatus) => {
-        const badges = {
-            draft: 'bg-gray-100 text-gray-800',
-            published: 'bg-green-100 text-green-800',
-            cancelled: 'bg-red-100 text-red-800',
-        };
-        return badges[status] || badges.draft;
-    };
+        {/* Filters */}
+        <div className="bg-card border border-border rounded-2xl p-4 flex flex-wrap gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground shrink-0" />
+            <input
+              type="text"
+              placeholder="Rechercher un événement…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className={`${inputCls} w-full pl-9`}
+            />
+          </div>
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as EventStatus | 'all')} className={selectCls}>
+            <option value="all">Tous les statuts</option>
+            <option value="draft">Brouillon</option>
+            <option value="published">Publié</option>
+            <option value="cancelled">Annulé</option>
+          </select>
+          <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as EventType | 'all')} className={selectCls}>
+            <option value="all">Tous les types</option>
+            <option value="training">Entraînement</option>
+            <option value="match">Match</option>
+            <option value="meeting">Réunion</option>
+            <option value="workshop">Atelier</option>
+            <option value="other">Autre</option>
+          </select>
+        </div>
 
-    const getTypeLabel = (type: EventType) => {
-        const labels: Record<EventType, string> = {
-            training: 'Entraînement',
-            match: 'Match',
-            meeting: 'Réunion',
-            workshop: 'Atelier',
-            other: 'Autre',
-        };
-        return labels[type] || type;
-    };
+        {/* List */}
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-card border border-border rounded-3xl p-12 text-center">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+              <CalendarPlus className="w-7 h-7 text-primary shrink-0" />
+            </div>
+            <h2 className="font-display font-bold text-foreground mb-1">Aucun événement</h2>
+            <p className="text-sm text-muted-foreground">
+              {search || statusFilter !== 'all' || typeFilter !== 'all'
+                ? 'Aucun résultat pour ces filtres.'
+                : 'Créez votre premier événement pour commencer.'}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {filtered.map(event => {
+              const type   = TYPE_META[event.event_type]
+              const status = STATUS_META[event.status]
+              return (
+                <div key={event.id} className="bg-card border border-border rounded-2xl p-5 space-y-4 hover:border-primary/20 hover:shadow-sm transition-all">
 
-    return (
-        <RoleBasedRoute allowedRoles={['club_owner', 'club_manager', 'coach']}>
-            <>
-                <div className="p-6 space-y-6">
-                    {/* Header */}
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Événements</h1>
-                            <p className="text-gray-600 mt-1">Gérez les événements de votre organisation</p>
-                        </div>
-                        <Link
-                            to={`/dashboard/${organisationId}/events/create`}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                            <Plus className="w-5 h-5" />
-                            Créer un événement
-                        </Link>
+                  {/* Type + status */}
+                  <div className="flex items-start justify-between gap-2">
+                    <span className={cn('text-[11px] font-bold uppercase px-2.5 py-1 rounded-full', type.badge)}>
+                      {type.label}
+                    </span>
+                    <span className={cn('text-[11px] font-bold px-2.5 py-1 rounded-full', status.cls)}>
+                      {status.label}
+                    </span>
+                  </div>
+
+                  {/* Title */}
+                  <h3 className="font-display font-bold text-foreground leading-snug">{event.title}</h3>
+
+                  {/* Details */}
+                  <div className="space-y-1.5 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-3.5 h-3.5 shrink-0" />
+                      <span>{fmtDate(event.start_time)}</span>
+                      <Clock className="w-3.5 h-3.5 shrink-0 ml-1" />
+                      <span>{fmtTime(event.start_time)} – {fmtTime(event.end_time)}</span>
                     </div>
-
-                    {/* Filters */}
-                    <div className="bg-white rounded-lg shadow p-4">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {/* Search */}
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                                <input
-                                    type="text"
-                                    placeholder="Rechercher un événement..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            {/* Status Filter */}
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value as EventStatus | 'all')}
-                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            >
-                                <option value="all">Tous les statuts</option>
-                                <option value="draft">Brouillon</option>
-                                <option value="published">Publié</option>
-                                <option value="cancelled">Annulé</option>
-                            </select>
-
-                            {/* Type Filter */}
-                            <select
-                                value={typeFilter}
-                                onChange={(e) => setTypeFilter(e.target.value as EventType | 'all')}
-                                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            >
-                                <option value="all">Tous les types</option>
-                                <option value="training">Entraînement</option>
-                                <option value="match">Match</option>
-                                <option value="meeting">Réunion</option>
-                                <option value="workshop">Atelier</option>
-                                <option value="other">Autre</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Events List */}
-                    {loading ? (
-                        <div className="text-center py-12">
-                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                            <p className="mt-2 text-gray-600">Chargement des événements...</p>
-                        </div>
-                    ) : filteredEvents.length === 0 ? (
-                        <div className="text-center py-12 bg-white rounded-lg shadow">
-                            <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                            <p className="text-gray-600">Aucun événement trouvé</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {filteredEvents.map((event) => (
-                                <div
-                                    key={event.id}
-                                    className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow"
-                                >
-                                    {event.cover_url && (
-                                        <img
-                                            src={event.cover_url}
-                                            alt={event.title}
-                                            className="w-full h-48 object-cover rounded-t-lg"
-                                        />
-                                    )}
-                                    <div className="p-4 space-y-3">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <h3 className="font-semibold text-lg text-gray-900">{event.title}</h3>
-                                                <span className={`inline-block px-2 py-1 text-xs rounded-full ${getStatusBadge(event.status)}`}>
-                                                    {event.status === 'draft' ? 'Brouillon' : event.status === 'published' ? 'Publié' : 'Annulé'}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <p className="text-sm text-gray-600 line-clamp-2">{event.description}</p>
-
-                                        <div className="space-y-2 text-sm text-gray-600">
-                                            <div className="flex items-center gap-2">
-                                                <Clock className="w-4 h-4" />
-                                                <span>{formatDate(event.start_time)} à {formatTime(event.start_time)}</span>
-                                            </div>
-                                            {event.location && (
-                                                <div className="flex items-center gap-2">
-                                                    <MapPin className="w-4 h-4" />
-                                                    <span>{event.location}</span>
-                                                </div>
-                                            )}
-                                            {event.capacity && (
-                                                <div className="flex items-center gap-2">
-                                                    <Users className="w-4 h-4" />
-                                                    <span>
-                                                        {event.current_registrations || 0} / {event.capacity} participants
-                                                        {event.available_spots !== null && event.available_spots > 0 && (
-                                                            <span className="text-green-600 ml-1">({event.available_spots} places disponibles)</span>
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <div className="flex items-center justify-between pt-3 border-t">
-                                            <span className="text-xs text-gray-500">{getTypeLabel(event.event_type)}</span>
-                                            <div className="flex gap-2">
-                                                <Link
-                                                    to={`/dashboard/${organisationId}/events/${event.id}`}
-                                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                    title="Voir les détails"
-                                                >
-                                                    <Eye className="w-4 h-4" />
-                                                </Link>
-                                                <Link
-                                                    to={`/dashboard/${organisationId}/events/${event.id}/edit`}
-                                                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                                                    title="Modifier"
-                                                >
-                                                    <Edit className="w-4 h-4" />
-                                                </Link>
-                                                <button
-                                                    onClick={() => handleDelete(event.id)}
-                                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                    title="Supprimer"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                    {event.location && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{event.location}</span>
+                      </div>
                     )}
+                    {event.capacity && (
+                      <div className="flex items-center gap-2">
+                        <Users className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          {event.current_registrations ?? 0} / {event.capacity} participants
+                          {(event.available_spots ?? 0) > 0 && (
+                            <span className="text-accent ml-1">({event.available_spots} places)</span>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-end gap-1 pt-3 border-t border-border">
+                    <Link
+                      to={`/dashboard/${organisationId}/events/${event.id}`}
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                      title="Voir"
+                    >
+                      <Eye className="w-4 h-4 shrink-0" />
+                    </Link>
+                    <Link
+                      to={`/dashboard/${organisationId}/events/${event.id}/edit`}
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                      title="Modifier"
+                    >
+                      <Edit className="w-4 h-4 shrink-0" />
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(event.id)}
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                      title="Supprimer"
+                    >
+                      <Trash2 className="w-4 h-4 shrink-0" />
+                    </button>
+                  </div>
                 </div>
-            </>
-        </RoleBasedRoute>
-    );
-};
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </RoleBasedRoute>
+  )
+}
 
-export default EventsPage;
-
+export default EventsPage

@@ -1,42 +1,100 @@
 @import 'tailwindcss';
 
+@theme inline {
+  --font-display: 'Plus Jakarta Sans', Inter, system-ui, sans-serif;
+  --font-body: Inter, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-cat-sport: var(--cat-sport);
+  --color-cat-music: var(--cat-music);
+  --color-cat-culture: var(--cat-culture);
+}
+
+@utility scrollbar-none {
+  &::-webkit-scrollbar { display: none; }
+  scrollbar-width: none;
+}
+
 @layer base {
   :root {
+    --background: hsl(210 20% 98%);
+    --foreground: hsl(222 47% 11%);
+    --card: hsl(0 0% 100%);
+    --card-foreground: hsl(222 47% 11%);
+    --muted: hsl(210 40% 96%);
+    --muted-foreground: hsl(215 16% 47%);
+    --primary: hsl(217 91% 60%);
+    --primary-foreground: hsl(0 0% 100%);
+    --accent: hsl(160 84% 39%);
+    --accent-foreground: hsl(0 0% 100%);
+    --destructive: hsl(0 84% 60%);
+    --destructive-foreground: hsl(0 0% 100%);
+    --border: hsl(214 32% 91%);
+    --secondary: hsl(210 40% 96%);
+    --secondary-foreground: hsl(222 47% 11%);
+    --cat-sport: hsl(160 84% 39%);
+    --cat-music: hsl(280 70% 60%);
+    --cat-culture: hsl(340 75% 55%);
+
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background-color: #ffffff;
-    color: #0b1120;
+    background-color: var(--background);
+    color: var(--foreground);
   }
 
-  .dark :root,
-  :root.dark {
-    background-color: #020617;
-  }
-
-  button,
-  a,
-  [role="button"],
-  select,
-  summary,
-  label[for],
-  input[type="checkbox"],
-  input[type="radio"],
-  input[type="submit"],
-  input[type="button"] {
-    cursor: pointer;
-  }
-
-  button:disabled,
-  a[aria-disabled="true"] {
-    cursor: not-allowed;
+  .dark {
+    --background: hsl(222 47% 6%);
+    --foreground: hsl(210 40% 98%);
+    --card: hsl(222 47% 9%);
+    --card-foreground: hsl(210 40% 98%);
+    --muted: hsl(217 33% 15%);
+    --muted-foreground: hsl(215 20% 65%);
+    --primary: hsl(217 91% 60%);
+    --primary-foreground: hsl(0 0% 100%);
+    --accent: hsl(160 84% 39%);
+    --accent-foreground: hsl(0 0% 100%);
+    --destructive: hsl(0 84% 60%);
+    --destructive-foreground: hsl(0 0% 100%);
+    --border: hsl(217 33% 18%);
+    --secondary: hsl(217 33% 17%);
+    --secondary-foreground: hsl(210 40% 98%);
   }
 
   body {
     margin: 0;
-    background-color: #ffffff;
+    background-color: var(--background);
+    color: var(--foreground);
   }
 
-  .dark body {
-    background-color: #020617;
+  button,
+  a,
+  [role='button'],
+  select,
+  summary,
+  label[for],
+  input[type='checkbox'],
+  input[type='radio'],
+  input[type='submit'],
+  input[type='button'] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  a[aria-disabled='true'] {
+    cursor: not-allowed;
   }
 
   .fc-theme {

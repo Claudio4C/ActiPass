@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react'
+import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft,
   CheckCircle,
@@ -12,8 +12,8 @@ import {
   Copy,
   Check,
   Users,
-} from 'lucide-react';
-import { api } from '../../lib/api';
+} from 'lucide-react'
+import { api } from '../../lib/api'
 
 type AttendanceStatus = 'present' | 'late' | 'absent' | 'excused';
 
@@ -63,90 +63,90 @@ const STATUS_LABELS: Record<AttendanceStatus, string> = {
   late: 'En retard',
   absent: 'Absent',
   excused: 'Absent excusé',
-};
+}
 
 const AttendanceDetailPage: React.FC = () => {
-  const { organisationId, eventId } = useParams<{ organisationId: string; eventId: string }>();
+  const { organisationId, eventId } = useParams<{ organisationId: string; eventId: string }>()
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [attendanceData, setAttendanceData] = useState<AttendanceData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [attendanceData, setAttendanceData] = useState<AttendanceData | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const [originalStatuses, setOriginalStatuses] = useState<Record<string, AttendanceStatus | null>>({});
-  const [localAttendances, setLocalAttendances] = useState<Record<string, AttendanceStatus>>({});
-  const [comments, setComments] = useState<Record<string, string>>({});
+  const [originalStatuses, setOriginalStatuses] = useState<Record<string, AttendanceStatus | null>>({})
+  const [localAttendances, setLocalAttendances] = useState<Record<string, AttendanceStatus>>({})
+  const [comments, setComments] = useState<Record<string, string>>({})
 
-  const [showQrModal, setShowQrModal] = useState(false);
-  const [qrCode, setQrCode] = useState<string | null>(null);
-  const [qrCopied, setQrCopied] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false)
+  const [qrCode, setQrCode] = useState<string | null>(null)
+  const [qrCopied, setQrCopied] = useState(false)
 
-  const [notification, setNotification] = useState<Notification | null>(null);
-  const notifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    if (organisationId && eventId) loadAttendance();
-  }, [organisationId, eventId]);
+  const [notification, setNotification] = useState<Notification | null>(null)
+  const notifTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
-    if (!notification) return;
-    if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
-    notifTimerRef.current = setTimeout(() => setNotification(null), 4000);
+    if (organisationId && eventId) {loadAttendance()}
+  }, [organisationId, eventId])
+
+  useEffect(() => {
+    if (!notification) {return}
+    if (notifTimerRef.current) {clearTimeout(notifTimerRef.current)}
+    notifTimerRef.current = setTimeout(() => setNotification(null), 4000)
     return () => {
-      if (notifTimerRef.current) clearTimeout(notifTimerRef.current);
-    };
-  }, [notification]);
+      if (notifTimerRef.current) {clearTimeout(notifTimerRef.current)}
+    }
+  }, [notification])
 
   const showNotif = (type: Notification['type'], message: string) =>
-    setNotification({ type, message });
+    setNotification({ type, message })
 
   const loadAttendance = async () => {
-    if (!organisationId || !eventId) return;
+    if (!organisationId || !eventId) {return}
     try {
-      setLoading(true);
-      setError(null);
+      setLoading(true)
+      setError(null)
       const data = await api.get<AttendanceData>(
-        `/organisations/${organisationId}/events/${eventId}/attendance`
-      );
-      setAttendanceData(data);
+        `/organisations/${organisationId}/events/${eventId}/attendance`,
+      )
+      setAttendanceData(data)
 
-      const originals: Record<string, AttendanceStatus | null> = {};
-      const locals: Record<string, AttendanceStatus> = {};
-      const initialComments: Record<string, string> = {};
+      const originals: Record<string, AttendanceStatus | null> = {}
+      const locals: Record<string, AttendanceStatus> = {}
+      const initialComments: Record<string, string> = {}
 
       data.attendances.forEach((item) => {
         if (item.attendance) {
-          originals[item.user.id] = item.attendance.status;
-          locals[item.user.id] = item.attendance.status;
-          if (item.attendance.comment) initialComments[item.user.id] = item.attendance.comment;
+          originals[item.user.id] = item.attendance.status
+          locals[item.user.id] = item.attendance.status
+          if (item.attendance.comment) {initialComments[item.user.id] = item.attendance.comment}
         } else {
-          originals[item.user.id] = null;
+          originals[item.user.id] = null
         }
-      });
+      })
 
-      setOriginalStatuses(originals);
-      setLocalAttendances(locals);
-      setComments(initialComments);
+      setOriginalStatuses(originals)
+      setLocalAttendances(locals)
+      setComments(initialComments)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erreur lors du chargement';
-      setError(message);
+      const message = err instanceof Error ? err.message : 'Erreur lors du chargement'
+      setError(message)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const handleStatusChange = (userId: string, status: AttendanceStatus) => {
-    setLocalAttendances((prev) => ({ ...prev, [userId]: status }));
-  };
+    setLocalAttendances((prev) => ({ ...prev, [userId]: status }))
+  }
 
   const handleCommentChange = (userId: string, comment: string) => {
-    setComments((prev) => ({ ...prev, [userId]: comment }));
-  };
+    setComments((prev) => ({ ...prev, [userId]: comment }))
+  }
 
   const handleSave = async () => {
-    if (!organisationId || !eventId) return;
+    if (!organisationId || !eventId) {return}
     try {
-      setSaving(true);
+      setSaving(true)
 
       const changedAttendances = Object.entries(localAttendances)
         .filter(([userId, status]) => status !== originalStatuses[userId])
@@ -154,76 +154,76 @@ const AttendanceDetailPage: React.FC = () => {
           user_id,
           status,
           comment: comments[user_id] || undefined,
-        }));
+        }))
 
       if (changedAttendances.length === 0) {
-        showNotif('success', 'Aucun changement à enregistrer.');
-        return;
+        showNotif('success', 'Aucun changement à enregistrer.')
+        return
       }
 
       await api.put(`/organisations/${organisationId}/events/${eventId}/attendance/bulk`, {
         attendances: changedAttendances,
-      });
+      })
 
-      api.clearCache(`/organisations/${organisationId}/events/${eventId}/attendance`);
-      api.clearCache(`/organisations/${organisationId}/attendance/summaries`);
-      await loadAttendance();
-      showNotif('success', 'Présences enregistrées avec succès.');
+      api.clearCache(`/organisations/${organisationId}/events/${eventId}/attendance`)
+      api.clearCache(`/organisations/${organisationId}/attendance/summaries`)
+      await loadAttendance()
+      showNotif('success', 'Présences enregistrées avec succès.')
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erreur lors de l'enregistrement";
-      showNotif('error', message);
+      const message = err instanceof Error ? err.message : "Erreur lors de l'enregistrement"
+      showNotif('error', message)
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
-  };
+  }
 
   const handleValidate = async () => {
-    if (!organisationId || !eventId) return;
-    if (!window.confirm('Valider toutes les présences de cet événement ?')) return;
+    if (!organisationId || !eventId) {return}
+    if (!window.confirm('Valider toutes les présences de cet événement ?')) {return}
     try {
-      await api.post(`/organisations/${organisationId}/events/${eventId}/attendance/validate`);
-      api.clearCache(`/organisations/${organisationId}/events/${eventId}/attendance`);
-      api.clearCache(`/organisations/${organisationId}/attendance/summaries`);
-      await loadAttendance();
-      showNotif('success', 'Présences validées avec succès.');
+      await api.post(`/organisations/${organisationId}/events/${eventId}/attendance/validate`)
+      api.clearCache(`/organisations/${organisationId}/events/${eventId}/attendance`)
+      api.clearCache(`/organisations/${organisationId}/attendance/summaries`)
+      await loadAttendance()
+      showNotif('success', 'Présences validées avec succès.')
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erreur lors de la validation';
-      showNotif('error', message);
+      const message = err instanceof Error ? err.message : 'Erreur lors de la validation'
+      showNotif('error', message)
     }
-  };
+  }
 
   const handleGenerateQrCode = async () => {
-    if (!organisationId || !eventId) return;
+    if (!organisationId || !eventId) {return}
     try {
       const data = await api.post<{ qr_code: string; event_id: string; expires_at: string }>(
-        `/organisations/${organisationId}/events/${eventId}/attendance/qr-code`
-      );
-      setQrCode(data.qr_code);
-      setShowQrModal(true);
-      setQrCopied(false);
+        `/organisations/${organisationId}/events/${eventId}/attendance/qr-code`,
+      )
+      setQrCode(data.qr_code)
+      setShowQrModal(true)
+      setQrCopied(false)
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Erreur lors de la génération du QR code';
-      showNotif('error', message);
+      const message = err instanceof Error ? err.message : 'Erreur lors de la génération du QR code'
+      showNotif('error', message)
     }
-  };
+  }
 
   const handleCopyQrCode = async () => {
-    if (!qrCode) return;
-    await navigator.clipboard.writeText(qrCode);
-    setQrCopied(true);
-    setTimeout(() => setQrCopied(false), 2000);
-  };
+    if (!qrCode) {return}
+    await navigator.clipboard.writeText(qrCode)
+    setQrCopied(true)
+    setTimeout(() => setQrCopied(false), 2000)
+  }
 
   const getStatusIcon = (status: AttendanceStatus) => {
     switch (status) {
       case 'present':
-        return <CheckCircle className="w-5 h-5 text-green-600" />;
+        return <CheckCircle className="w-5 h-5 text-green-600" />
       case 'late':
-        return <Clock className="w-5 h-5 text-yellow-600" />;
+        return <Clock className="w-5 h-5 text-yellow-600" />
       default:
-        return <XCircle className="w-5 h-5 text-red-600" />;
+        return <XCircle className="w-5 h-5 text-red-600" />
     }
-  };
+  }
 
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleDateString('fr-FR', {
@@ -232,16 +232,16 @@ const AttendanceDetailPage: React.FC = () => {
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-    });
+    })
 
   const hasChanges = Object.entries(localAttendances).some(
-    ([userId, status]) => status !== originalStatuses[userId]
-  );
+    ([userId, status]) => status !== originalStatuses[userId],
+  )
 
   const allValidated =
     attendanceData !== null &&
     attendanceData.attendances.length > 0 &&
-    attendanceData.attendances.every((a) => a.attendance?.validated_at);
+    attendanceData.attendances.every((a) => a.attendance?.validated_at)
 
   if (loading) {
     return (
@@ -250,7 +250,7 @@ const AttendanceDetailPage: React.FC = () => {
           <div className="text-gray-500">Chargement...</div>
         </div>
       </>
-    );
+    )
   }
 
   if (error || !attendanceData) {
@@ -270,7 +270,7 @@ const AttendanceDetailPage: React.FC = () => {
           </div>
         </div>
       </>
-    );
+    )
   }
 
   return (
@@ -346,11 +346,13 @@ const AttendanceDetailPage: React.FC = () => {
 
         {/* Avertissement délai 24h */}
         {attendanceData.past_24h && (
-          <div className={`border rounded-lg p-4 flex items-center space-x-2 ${
-            attendanceData.can_modify
-              ? 'bg-blue-50 border-blue-200'
-              : 'bg-yellow-50 border-yellow-200'
-          }`}>
+          <div
+            className={`border rounded-lg p-4 flex items-center space-x-2 ${
+              attendanceData.can_modify
+                ? 'bg-blue-50 border-blue-200'
+                : 'bg-yellow-50 border-yellow-200'
+            }`}
+          >
             <AlertCircle className={`w-5 h-5 flex-shrink-0 ${attendanceData.can_modify ? 'text-blue-600' : 'text-yellow-600'}`} />
             <p className={`text-sm ${attendanceData.can_modify ? 'text-blue-800' : 'text-yellow-800'}`}>
               {attendanceData.can_modify
@@ -388,8 +390,8 @@ const AttendanceDetailPage: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-100">
                   {attendanceData.attendances.map((item) => {
-                    const currentStatus = localAttendances[item.user.id];
-                    const currentComment = comments[item.user.id] ?? '';
+                    const currentStatus = localAttendances[item.user.id]
+                    const currentComment = comments[item.user.id] ?? ''
 
                     return (
                       <tr key={item.user.id} className="hover:bg-indigo-50/50 transition-colors">
@@ -486,7 +488,7 @@ const AttendanceDetailPage: React.FC = () => {
                           )}
                         </td>
                       </tr>
-                    );
+                    )
                   })}
                 </tbody>
               </table>
@@ -547,7 +549,7 @@ const AttendanceDetailPage: React.FC = () => {
         )}
       </div>
     </>
-  );
-};
+  )
+}
 
-export default AttendanceDetailPage;
+export default AttendanceDetailPage
