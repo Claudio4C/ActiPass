@@ -1,155 +1,177 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Bell, LogOut, User, Settings, Moon, Sun } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { api } from '../../lib/api';
-import type { Organisation } from '../../types';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { Link } from 'react-router-dom'
+import { Bell, LogOut, User, Moon, Sun, Menu, ChevronRight, Settings } from 'lucide-react'
+import { useAuth } from '../../contexts/AuthContext'
+import { api } from '../../lib/api'
+import type { Organisation } from '../../types'
 
 interface DashboardHeaderProps {
-    organisationId: string;
+  organisationId: string;
 }
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ organisationId }) => {
-    const { user, logout } = useAuth();
-    const [organisation, setOrganisation] = useState<Organisation | null>(null);
-    const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [isDarkMode, setIsDarkMode] = useState(() => {
-        if (typeof window === 'undefined') return false;
-        return document.documentElement.classList.contains('dark');
-    });
+  const { user, logout, isLoading } = useAuth()
+  const [organisation, setOrganisation] = useState<Organisation | null>(null)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const menuRef = useRef<HTMLDivElement | null>(null)
 
-    useEffect(() => {
-        loadOrganisation();
-    }, [organisationId]);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window === 'undefined') {return false}
+    return document.documentElement.classList.contains('dark')
+  })
 
-    useEffect(() => {
-        if (typeof document === 'undefined') return;
-        const root = document.documentElement;
-        if (isDarkMode) {
-            root.classList.add('dark');
-            localStorage.setItem('theme', 'dark');
-        } else {
-            root.classList.remove('dark');
-            localStorage.setItem('theme', 'light');
-        }
-    }, [isDarkMode]);
+  useEffect(() => {
+    const root = document.documentElement
+    if (isDarkMode) {
+      root.classList.add('dark')
+      localStorage.setItem('theme', 'dark')
+    } else {
+      root.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
+    }
+  }, [isDarkMode])
 
-    const loadOrganisation = async () => {
-        try {
-            // Utiliser le cache avec un TTL de 5 minutes pour les infos d'organisation
-            const org = await api.get<Organisation>(
-                `/organisations/${organisationId}`,
-                undefined,
-                { useCache: true, cacheTTL: 300000 } // 5 minutes
-            );
-            setOrganisation(org);
-        } catch (error) {
-            console.error('Error loading organisation:', error);
-        }
-    };
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const org = await api.get<Organisation>(
+          `/organisations/${organisationId}`,
+          undefined,
+          { useCache: true, cacheTTL: 300000 },
+        )
+        setOrganisation(org)
+      } catch {
+        // silently fail — name stays null
+      }
+    }
+    load()
+  }, [organisationId])
 
-    const initials = `${user?.firstName?.charAt(0) || ''}${user?.lastName?.charAt(0) || ''}`.toUpperCase() || 'U';
+  const closeMenu = useCallback(() => setIsMenuOpen(false), [])
 
-    return (
-        <header className="h-16 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6">
-            {/* Left: Organisation name */}
-            <div className="flex items-center gap-4">
-                <Link to="/home" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-                    <div className="w-7 h-7 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center shadow-sm">
-                        <div className="w-3.5 h-3.5 bg-white rounded-full flex items-center justify-center">
-                            <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full" />
-                        </div>
-                    </div>
-                    <span className="text-sm font-bold text-gray-500 dark:text-slate-400 hidden sm:inline">Ikivio</span>
-                </Link>
-                <span className="text-gray-300 dark:text-slate-700 hidden sm:inline">/</span>
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    {organisation?.name || 'Organisation'}
-                </h1>
+  useEffect(() => {
+    if (!isMenuOpen) {return}
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {closeMenu()}
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isMenuOpen, closeMenu])
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    closeMenu()
+    try {
+      await logout()
+    } catch (e) {
+      console.error('Logout failed:', e)
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
+
+  const initials = useMemo(() => {
+    const f = user?.firstName?.charAt(0) ?? ''
+    const l = user?.lastName?.charAt(0) ?? ''
+    return (f + l || user?.email?.charAt(0) || 'U').toUpperCase()
+  }, [user])
+
+  return (
+    <header className="h-16 border-b border-border bg-background/95 backdrop-blur-sm flex items-center justify-between px-4 sm:px-6 sticky top-0 z-10 transition-colors">
+      {/* Left: Ikivio / Org breadcrumb */}
+      <div className="flex items-center gap-2 min-w-0">
+        <Link to="/home" className="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0">
+          <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shadow-sm shrink-0">
+            <span className="text-primary-foreground font-display font-bold text-xs">I</span>
+          </div>
+          <span className="font-display font-bold text-muted-foreground text-sm hidden sm:inline">
+            Actipass
+          </span>
+        </Link>
+        <ChevronRight className="w-4 h-4 text-muted-foreground hidden sm:block shrink-0" />
+        <h1 className="font-display text-base font-bold text-foreground truncate">
+          {organisation?.name ?? 'Organisation'}
+        </h1>
+      </div>
+
+      {/* Right: Actions */}
+      <div className="flex items-center gap-1.5">
+        {/* Dark mode toggle */}
+        <button
+          onClick={() => setIsDarkMode(d => !d)}
+          className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors active:scale-95 transition-transform"
+          aria-label={isDarkMode ? 'Activer le thème clair' : 'Activer le thème sombre'}
+        >
+          {isDarkMode ? <Sun className="w-4 h-4 shrink-0" /> : <Moon className="w-4 h-4 shrink-0" />}
+        </button>
+
+        {/* Notifications */}
+        <Link
+          to={`/dashboard/${organisationId}/notifications`}
+          className="relative w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors active:scale-95 transition-transform"
+        >
+          <Bell className="w-4 h-4 shrink-0" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-destructive rounded-full" />
+        </Link>
+
+        {/* User menu */}
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setIsMenuOpen(p => !p)}
+            className="flex items-center gap-2 rounded-full border border-border bg-card px-1.5 py-1 shadow-sm hover:border-primary/30 transition active:scale-95 transition-transform"
+          >
+            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold shrink-0">
+              {initials}
             </div>
+            <Menu className="w-4 h-4 text-muted-foreground shrink-0" />
+          </button>
 
-            {/* Right: Actions */}
-            <div className="flex items-center gap-3">
-                {/* Theme toggle */}
-                <button
-                    onClick={() => setIsDarkMode(!isDarkMode)}
-                    className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
-                    aria-label={isDarkMode ? 'Activer le thème clair' : 'Activer le thème sombre'}
-                >
-                    {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-                </button>
+          {isMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={closeMenu} />
+              <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-border bg-card shadow-xl overflow-hidden z-20">
+                {user && (
+                  <div className="px-4 py-3 border-b border-border bg-muted/50">
+                    <p className="text-sm font-semibold text-foreground">
+                      {user.firstName} {user.lastName}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  </div>
+                )}
+                <nav className="py-1 text-sm">
+                  <Link
+                    to="/account/profile"
+                    onClick={closeMenu}
+                    className="flex items-center gap-3 px-4 py-2.5 text-foreground hover:bg-muted transition-colors"
+                  >
+                    <User className="w-4 h-4 text-muted-foreground shrink-0" />
+                    Mon profil
+                  </Link>
+                  <Link
+                    to="/accounts"
+                    onClick={closeMenu}
+                    className="flex items-center gap-3 px-4 py-2.5 text-foreground hover:bg-muted transition-colors"
+                  >
+                    <Settings className="w-4 h-4 text-muted-foreground shrink-0" />
+                    Changer d'organisation
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    disabled={isLoggingOut || isLoading}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-destructive hover:bg-destructive/5 transition-colors disabled:opacity-50"
+                  >
+                    <LogOut className="w-4 h-4 shrink-0" />
+                    {isLoggingOut ? 'Déconnexion...' : 'Déconnexion'}
+                  </button>
+                </nav>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </header>
+  )
+}
 
-                {/* Notifications */}
-                <Link
-                    to={`/dashboard/${organisationId}/notifications`}
-                    className="relative p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
-                >
-                    <Bell className="h-5 w-5" />
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-                </Link>
-
-                {/* User menu */}
-                <div className="relative">
-                    <button
-                        onClick={() => setIsMenuOpen(!isMenuOpen)}
-                        className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
-                    >
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-sm font-semibold">
-                            {initials}
-                        </div>
-                    </button>
-
-                    {isMenuOpen && (
-                        <>
-                            <div
-                                className="fixed inset-0 z-10"
-                                onClick={() => setIsMenuOpen(false)}
-                            />
-                            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-lg shadow-lg border border-gray-200 dark:border-slate-800 z-20">
-                                <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-800">
-                                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                        {user?.firstName} {user?.lastName}
-                                    </p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                        {user?.email}
-                                    </p>
-                                </div>
-                                <div className="py-1">
-                                    <Link
-                                        to="/account/profile"
-                                        className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800"
-                                        onClick={() => setIsMenuOpen(false)}
-                                    >
-                                        <User className="h-4 w-4" />
-                                        Mon profil
-                                    </Link>
-                                    <Link
-                                        to="/accounts"
-                                        className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-800"
-                                        onClick={() => setIsMenuOpen(false)}
-                                    >
-                                        <Settings className="h-4 w-4" />
-                                        Changer d'organisation
-                                    </Link>
-                                    <button
-                                        onClick={async () => {
-                                            setIsMenuOpen(false);
-                                            await logout();
-                                        }}
-                                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                    >
-                                        <LogOut className="h-4 w-4" />
-                                        Déconnexion
-                                    </button>
-                                </div>
-                            </div>
-                        </>
-                    )}
-                </div>
-            </div>
-        </header>
-    );
-};
-
-export default DashboardHeader;
-
+export default DashboardHeader

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import {
   Calendar, Clock, MapPin, Users, Euro,
   CheckCircle2, Clock3, XCircle, AlertCircle, CalendarPlus,
@@ -34,36 +34,20 @@ const fmtTime = (iso: string) =>
 
 // ─── main ────────────────────────────────────────────────────────────────────
 
-const ClubEventsPage: React.FC = () => {
+const ClubOrgEventsPage: React.FC = () => {
+  const { orgId } = useParams<{ orgId: string }>()
   const navigate = useNavigate()
-  const [events, setEvents]         = useState<EventWithRegistration[]>([])
-  const [loading, setLoading]       = useState(true)
+  const [events, setEvents]           = useState<EventWithRegistration[]>([])
+  const [loading, setLoading]         = useState(true)
   const [registering, setRegistering] = useState<string | null>(null)
-  const [error, setError]           = useState<string | null>(null)
-  const [orgId, setOrgId]           = useState<string | null>(null)
-
-  // Load org from localStorage
-  useEffect(() => {
-    const load = () => {
-      try {
-        const raw = window.localStorage.getItem('selectedOrganisation')
-        if (raw) {
-          const org = JSON.parse(raw)
-          if (org?.id) setOrgId(org.id)
-        }
-      } catch { /* noop */ }
-    }
-    load()
-    window.addEventListener('storage', load)
-    window.addEventListener('organisation:updated', load)
-    return () => {
-      window.removeEventListener('storage', load)
-      window.removeEventListener('organisation:updated', load)
-    }
-  }, [])
+  const [error, setError]             = useState<string | null>(null)
 
   useEffect(() => {
-    if (orgId) { loadEvents() } else { setLoading(false) }
+    if (orgId) {
+      loadEvents()
+    } else {
+      setLoading(false)
+    }
   }, [orgId])
 
   const loadEvents = async () => {
@@ -92,27 +76,44 @@ const ClubEventsPage: React.FC = () => {
     try {
       setRegistering(eventId)
       setError(null)
-      const result = await api.post<{ message: string; reservation: { id: string; status: 'confirmed' | 'pending' } }>(
-        `/organisations/${orgId}/events/${eventId}/register`,
+      const result = await api.post<{
+        message: string
+        reservation: { id: string; status: 'confirmed' | 'pending' }
+      }>(`/organisations/${orgId}/events/${eventId}/register`)
+      setEvents(prev =>
+        prev.map(e =>
+          e.id === eventId
+            ? {
+                ...e,
+                myReservation: result.reservation,
+                current_registrations:
+                  result.reservation.status === 'confirmed'
+                    ? (e.current_registrations ?? 0) + 1
+                    : (e.current_registrations ?? 0),
+              }
+            : e,
+        ),
       )
-      setEvents(prev => prev.map(e => e.id === eventId
-        ? { ...e, myReservation: result.reservation, current_registrations: result.reservation.status === 'confirmed' ? (e.current_registrations ?? 0) + 1 : (e.current_registrations ?? 0) }
-        : e,
-      ))
       await loadEvents()
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ?? 'Erreur lors de l\'inscription'
+      const msg =
+        (err as { response?: { data?: { message?: string } }; message?: string })?.response?.data
+          ?.message ?? "Erreur lors de l'inscription"
       setError(msg)
     } finally {
       setRegistering(null)
     }
   }
 
-  const getStatus = (ev: EventWithRegistration) => {
+  const getRegStatus = (ev: EventWithRegistration) => {
     if (!ev.myReservation) { return null }
     const s = ev.myReservation.status
-    if (s === 'confirmed') { return { label: 'Inscrit', icon: CheckCircle2, cls: 'text-accent bg-accent/10' } }
-    if (s === 'pending')   { return { label: 'En attente', icon: Clock3, cls: 'text-amber-600 bg-amber-500/10' } }
+    if (s === 'confirmed') {
+      return { label: 'Inscrit', icon: CheckCircle2, cls: 'text-accent bg-accent/10' }
+    }
+    if (s === 'pending') {
+      return { label: 'En attente', icon: Clock3, cls: 'text-amber-600 bg-amber-500/10' }
+    }
     return { label: 'Annulé', icon: XCircle, cls: 'text-muted-foreground bg-muted' }
   }
 
@@ -122,12 +123,12 @@ const ClubEventsPage: React.FC = () => {
     ev.status === 'published' &&
     !(ev.capacity && (ev.available_spots ?? 1) <= 0)
 
-  const availabilityText = (ev: EventWithRegistration) => {
+  const availabilityText = (ev: EventWithRegistration): string | null => {
     if (!ev.registration_required) { return 'Accès libre' }
     if (ev.visibility === 'members_only') { return 'Membres uniquement' }
     if (ev.visibility === 'private') { return 'Sur invitation' }
     if (ev.capacity) {
-      const spots = ev.available_spots ?? (ev.capacity - (ev.current_registrations ?? 0))
+      const spots = ev.available_spots ?? ev.capacity - (ev.current_registrations ?? 0)
       if (spots <= 0) { return 'Complet' }
       return `${spots} place${spots > 1 ? 's' : ''} restante${spots > 1 ? 's' : ''}`
     }
@@ -148,7 +149,10 @@ const ClubEventsPage: React.FC = () => {
         <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
           <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
           <p className="text-sm text-destructive flex-1">{error}</p>
-          <button onClick={() => setError(null)} className="text-destructive hover:opacity-70">
+          <button
+            onClick={() => setError(null)}
+            className="text-destructive hover:opacity-70 shrink-0"
+          >
             <XCircle className="w-4 h-4 shrink-0" />
           </button>
         </div>
@@ -170,9 +174,9 @@ const ClubEventsPage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {events.map(ev => {
-            const type  = TYPE_META[ev.event_type]
-            const avail = availabilityText(ev)
-            const status = getStatus(ev)
+            const type   = TYPE_META[ev.event_type]
+            const avail  = availabilityText(ev)
+            const status = getRegStatus(ev)
             const StatusIcon = status?.icon
 
             return (
@@ -192,7 +196,9 @@ const ClubEventsPage: React.FC = () => {
                 </div>
 
                 {/* Title */}
-                <h3 className="font-display font-bold text-foreground text-lg leading-snug">{ev.title}</h3>
+                <h3 className="font-display font-bold text-foreground text-lg leading-snug">
+                  {ev.title}
+                </h3>
 
                 {/* Details inline */}
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
@@ -225,7 +231,7 @@ const ClubEventsPage: React.FC = () => {
                   )}
                 </div>
 
-                {/* Registration status badge */}
+                {/* Registration status */}
                 {status && StatusIcon && (
                   <div className={cn('inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full', status.cls)}>
                     <StatusIcon className="w-3.5 h-3.5 shrink-0" />
@@ -237,14 +243,17 @@ const ClubEventsPage: React.FC = () => {
                 {canRegister(ev) ? (
                   <button
                     type="button"
-                    onClick={e => { e.stopPropagation(); void handleRegister(ev.id) }}
+                    onClick={e => {
+                      e.stopPropagation()
+                      void handleRegister(ev.id)
+                    }}
                     disabled={registering === ev.id}
                     className="w-full bg-primary text-primary-foreground text-sm font-bold py-2.5 rounded-full active:scale-95 transition-transform disabled:opacity-50"
                   >
-                    {registering === ev.id ? 'Inscription…' : 'S\'inscrire'}
+                    {registering === ev.id ? 'Inscription…' : "S'inscrire"}
                   </button>
-                ) : ev.myReservation ? null : (
-                  ev.registration_required && (
+                ) : (
+                  ev.registration_required && !ev.myReservation && (
                     <p className="text-center text-xs text-muted-foreground pt-1">
                       {(ev.available_spots ?? 1) <= 0 ? 'Complet' : 'Inscription non disponible'}
                     </p>
@@ -259,4 +268,4 @@ const ClubEventsPage: React.FC = () => {
   )
 }
 
-export default ClubEventsPage
+export default ClubOrgEventsPage

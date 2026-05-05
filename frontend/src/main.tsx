@@ -30,7 +30,7 @@ if (path.startsWith('/superadmin') || envTarget === 'superadmin') {
 }
 
 // Définir le titre de la page
-document.title = import.meta.env.VITE_APP_TITLE || 'IKIVIO'
+document.title = import.meta.env.VITE_APP_TITLE || 'Actipass'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
