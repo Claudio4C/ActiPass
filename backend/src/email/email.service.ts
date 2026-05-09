@@ -206,8 +206,14 @@ export class EmailService {
     });
   }
 
+  private get frontendBaseUrl(): string {
+    return this.configService
+      .get<string>('FRONTEND_URL', 'http://localhost:5173')
+      .replace(/\/$/, '');
+  }
+
   private getVerificationEmailTemplate(userId: string, token: string): EmailTemplate {
-    const verificationUrl = `${this.configService.get<string>('FRONTEND_URL', 'http://localhost:5173')}/verify-email/${userId}/${token}`;
+    const verificationUrl = `${this.frontendBaseUrl}/verify-email/${userId}/${token}`;
 
     return {
       subject: '🔐 Vérifiez votre compte Ikivio',
@@ -283,7 +289,7 @@ export class EmailService {
   }
 
   private getPasswordResetEmailTemplate(token: string): EmailTemplate {
-    const resetUrl = `${this.configService.get<string>('FRONTEND_URL', 'http://localhost:5173')}/reset-password?token=${token}`;
+    const resetUrl = `${this.frontendBaseUrl}/reset-password?token=${token}`;
 
     return {
       subject: '🔑 Réinitialisation de votre mot de passe Ikivio',
@@ -370,7 +376,7 @@ export class EmailService {
   }
 
   private getWelcomeEmailTemplate(firstname: string): EmailTemplate {
-    const dashboardUrl = `${this.configService.get<string>('FRONTEND_URL', 'http://localhost:5173')}/dashboard`;
+    const dashboardUrl = `${this.frontendBaseUrl}/dashboard`;
 
     return {
       subject: '🎉 Bienvenue sur Ikivio !',

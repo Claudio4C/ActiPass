@@ -14,7 +14,7 @@ import {
 import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CreateChildDto, UpdateChildDto, EnrollChildDto } from './dto';
+import { CreateChildDto, UpdateChildDto, EnrollChildDto, UpsertChildHealthDto } from './dto';
 import { FamilyService } from './family.service';
 
 @Controller('family')
@@ -89,5 +89,53 @@ export class FamilyController {
   ) {
     const parentId = req.user?.['sub'] as string;
     return this.familyService.unregisterChildFromEvent(parentId, childId, eventId);
+  }
+
+  // ─── Health info ──────────────────────────────────────────────────────────
+
+  @Get('children/:childId/health')
+  async getChildHealth(@Param('childId') childId: string, @Req() req: Request) {
+    const parentId = req.user?.['sub'] as string;
+    return this.familyService.getChildHealth(parentId, childId);
+  }
+
+  @Put('children/:childId/health')
+  async upsertChildHealth(
+    @Param('childId') childId: string,
+    @Body() dto: UpsertChildHealthDto,
+    @Req() req: Request,
+  ) {
+    const parentId = req.user?.['sub'] as string;
+    return this.familyService.upsertChildHealth(parentId, childId, dto);
+  }
+
+  // ─── Authorizations ───────────────────────────────────────────────────────
+
+  @Get('children/:childId/authorizations')
+  async getChildAuthorizations(@Param('childId') childId: string, @Req() req: Request) {
+    const parentId = req.user?.['sub'] as string;
+    return this.familyService.getChildAuthorizations(parentId, childId);
+  }
+
+  @Post('children/:childId/authorizations/:type/sign')
+  @HttpCode(HttpStatus.OK)
+  async signAuthorization(
+    @Param('childId') childId: string,
+    @Param('type') type: string,
+    @Req() req: Request,
+  ) {
+    const parentId = req.user?.['sub'] as string;
+    return this.familyService.signAuthorization(parentId, childId, type);
+  }
+
+  @Delete('children/:childId/authorizations/:type/sign')
+  @HttpCode(HttpStatus.OK)
+  async unsignAuthorization(
+    @Param('childId') childId: string,
+    @Param('type') type: string,
+    @Req() req: Request,
+  ) {
+    const parentId = req.user?.['sub'] as string;
+    return this.familyService.unsignAuthorization(parentId, childId, type);
   }
 }

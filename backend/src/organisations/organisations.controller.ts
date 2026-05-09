@@ -44,6 +44,21 @@ export class OrganisationsController {
   }
 
   /**
+   * Lister tous les clubs publics (annuaire — accessible à tout utilisateur connecté)
+   */
+  @Get('public')
+  async listPublicOrganisations(
+    @Query('search') search?: string,
+    @Query('type') type?: string,
+    @Query('city') city?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.organisationsService.listPublicOrganisations({
+      search, type, city, limit: parseInt(limit ?? '50'),
+    });
+  }
+
+  /**
    * Lister mes organisations (celles où je suis membre)
    */
   @Get('my')

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Clock, MapPin, User, Dumbbell, Music, Trophy, Users,
-  Bookmark, CheckCircle2, AlertCircle, Calendar, Building2,
-  Navigation, Info, ShieldCheck, ArrowRight, ChevronRight,
+  Clock, MapPin, User, Dumbbell, Music, Trophy, Users, Bookmark,
+  Calendar, Building2, CheckCircle2, AlertCircle, Navigation, Info,
+  ShieldCheck, ArrowRight, ChevronRight,
 } from 'lucide-react'
 import type { RoleType } from '../../types'
 import { useAuth } from '../../contexts/AuthContext'
@@ -12,22 +12,49 @@ import { api } from '../../lib/api'
 import { cn } from '../../lib/utils'
 import type { Event, EventType } from '../../types'
 
-// ─── constants ───────────────────────────────────────────────────────────────
+// ─── constants ────────────────────────────────────────────────────────────────
 
 const DAYS_SHORT = ['LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM', 'DIM']
 
 const EVENT_META: Record<EventType, {
   label: string;
   Icon: React.ComponentType<{ className?: string }>;
-  bg: string;
-  text: string;
+  bg: string; text: string;
 }> = {
-  training: { label: 'Entraînement', Icon: Dumbbell, bg: 'bg-accent/15',     text: 'text-accent' },
-  match: { label: 'Match',        Icon: Trophy,   bg: 'bg-destructive/10', text: 'text-destructive' },
-  meeting: { label: 'Réunion',      Icon: Users,    bg: 'bg-primary/10',     text: 'text-primary' },
-  workshop: { label: 'Atelier',      Icon: Music,    bg: 'bg-cat-music/10',   text: 'text-cat-music' },
-  other: { label: 'Autre',        Icon: Bookmark, bg: 'bg-muted',          text: 'text-muted-foreground' },
+  training: { label: 'Entraînement', Icon: Dumbbell,  bg: 'bg-accent/15',     text: 'text-accent' },
+  match:    { label: 'Match',        Icon: Trophy,    bg: 'bg-destructive/10', text: 'text-destructive' },
+  meeting:  { label: 'Réunion',      Icon: Users,     bg: 'bg-primary/10',     text: 'text-primary' },
+  workshop: { label: 'Atelier',      Icon: Music,     bg: 'bg-cat-music/10',   text: 'text-cat-music' },
+  other:    { label: 'Autre',        Icon: Bookmark,  bg: 'bg-muted',          text: 'text-muted-foreground' },
 }
+
+const MEMBER_COLORS = [
+  'hsl(222,47%,20%)',  // parent
+  'hsl(217,91%,60%)', 'hsl(280,70%,60%)', 'hsl(25,95%,53%)',
+  'hsl(160,84%,39%)', 'hsl(340,75%,55%)',
+]
+
+// ─── types ────────────────────────────────────────────────────────────────────
+
+interface FamilyChildEvent {
+  id: string; title: string; start_time: string; end_time: string | null;
+  location: string | null; organisation: { id: string; name: string };
+  is_registered: boolean; membership_id: string;
+}
+interface FamilyChild {
+  id: string; firstname: string; lastname: string; birthdate: string | null;
+  organisations: { id: string; name: string }[]; events: FamilyChildEvent[];
+}
+
+interface DisplayEvent {
+  id: string; title: string; start_time: string; end_time: string;
+  location: string | null; event_type: EventType;
+  created_by?: { firstname: string; lastname: string } | null;
+  memberId: string; memberName: string; memberColor: string;
+  extraMembers?: { id: string; name: string; color: string }[];
+}
+
+type OrgItem = { id: string; name: string; type: 'club' | 'association' | 'independant'; roleType: RoleType; roleName: string }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -35,9 +62,7 @@ const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
 const isSameDay = (a: Date, b: Date) =>
-  a.getFullYear() === b.getFullYear() &&
-  a.getMonth()    === b.getMonth()    &&
-  a.getDate()     === b.getDate()
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 
 const getWeekDays = (): Date[] => {
   const now = new Date()
@@ -45,29 +70,29 @@ const getWeekDays = (): Date[] => {
   const monday = new Date(now)
   monday.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1))
   monday.setHours(0, 0, 0, 0)
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday)
-    d.setDate(monday.getDate() + i)
-    return d
-  })
+  return Array.from({ length: 7 }, (_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); return d })
 }
 
 const getGreeting = () => {
   const h = new Date().getHours()
-  if (h >= 5  && h < 12) {return 'Bonjour'}
-  if (h >= 12 && h < 18) {return 'Bon après-midi'}
-  if (h >= 18 && h < 22) {return 'Bonsoir'}
-  return 'Bonne nuit'
+  if (h >= 5  && h < 12) { return 'Bonjour' }
+  if (h >= 12 && h < 18) { return 'Bon après-midi' }
+  return 'Bonsoir'
+}
+
+const getAge = (birthdate: string | null) => {
+  if (!birthdate) { return null }
+  return Math.floor((Date.now() - new Date(birthdate).getTime()) / (1000 * 60 * 60 * 24 * 365))
 }
 
 const overlaps = (a: Event, b: Event) =>
   new Date(a.start_time) < new Date(b.end_time) &&
   new Date(b.start_time) < new Date(a.end_time)
 
-// ─── sub-components ──────────────────────────────────────────────────────────
+// ─── CategoryBubble ───────────────────────────────────────────────────────────
 
 const CategoryBubble: React.FC<{ type: EventType }> = ({ type }) => {
-  const meta = EVENT_META[type]
+  const meta = EVENT_META[type] ?? EVENT_META.other
   const Icon = meta.Icon
   return (
     <div className={cn('w-8 h-8 rounded-full flex items-center justify-center shrink-0', meta.bg, meta.text)}>
@@ -76,24 +101,23 @@ const CategoryBubble: React.FC<{ type: EventType }> = ({ type }) => {
   )
 }
 
-/** Card dans la grille hebdomadaire (colonne) */
-const WeeklyCard: React.FC<{ event: Event; isToday: boolean }> = ({ event, isToday }) => {
-  const coachInitials = event.created_by
-    ? `${event.created_by.firstname[0]}${event.created_by.lastname[0]}`.toUpperCase()
-    : '?'
+// ─── WeeklyCard ───────────────────────────────────────────────────────────────
 
+const WeeklyCard: React.FC<{ event: DisplayEvent; isToday: boolean; showMember: boolean }> = ({
+  event, isToday, showMember,
+}) => {
+  const meta = EVENT_META[event.event_type] ?? EVENT_META.other
+  const Icon = meta.Icon
   return (
-    <div
-      className={cn(
-        'bg-card border rounded-2xl p-3 space-y-2.5 cursor-pointer active:scale-[0.99] transition-all hover:shadow-sm',
-        isToday ? 'border-primary/25' : 'border-border',
-      )}
-    >
+    <div className={cn(
+      'bg-card border rounded-2xl p-3 space-y-2 cursor-pointer active:scale-[0.99] transition-all hover:shadow-sm',
+      isToday ? 'border-primary/25' : 'border-border',
+    )}>
       <div className="flex items-center justify-between">
-        <CategoryBubble type={event.event_type} />
-        <span className="text-xs font-bold text-foreground tabular-nums">
-          {fmtTime(event.start_time)}
-        </span>
+        <div className={cn('w-8 h-8 rounded-full flex items-center justify-center shrink-0', meta.bg, meta.text)}>
+          <Icon className="w-4 h-4 shrink-0" />
+        </div>
+        <span className="text-xs font-bold text-foreground tabular-nums">{fmtTime(event.start_time)}</span>
       </div>
       <p className="font-display font-bold text-sm text-foreground leading-snug">{event.title}</p>
       <div className="space-y-1">
@@ -114,53 +138,78 @@ const WeeklyCard: React.FC<{ event: Event; isToday: boolean }> = ({ event, isTod
           </div>
         )}
       </div>
-      {event.created_by && (
-        <div className="w-7 h-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[10px] font-bold">
-          {coachInitials}
+      {showMember && (
+        <div className="flex items-center gap-1 pt-0.5">
+          {[{ id: event.memberId, name: event.memberName, color: event.memberColor }, ...(event.extraMembers ?? [])].map((m) => (
+            <div key={m.id} title={m.name}
+              className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0 ring-1 ring-card"
+              style={{ backgroundColor: m.color }}
+            >
+              {m.name.charAt(0)}
+            </div>
+          ))}
         </div>
       )}
     </div>
   )
 }
 
-/** Ligne dans la section "Aujourd'hui" */
-const TodayRow: React.FC<{ event: Event }> = ({ event }) => (
+// ─── TodayRow ─────────────────────────────────────────────────────────────────
+
+const TodayRow: React.FC<{ event: DisplayEvent; showMember: boolean }> = ({ event, showMember }) => (
   <div className="flex items-center gap-4 py-3 border-b border-border last:border-0">
-    {/* Heure */}
     <div className="text-right shrink-0 w-12">
       <p className="text-sm font-bold text-foreground tabular-nums">{fmtTime(event.start_time)}</p>
       <p className="text-[10px] text-muted-foreground tabular-nums">{fmtTime(event.end_time)}</p>
     </div>
-    {/* Category */}
     <CategoryBubble type={event.event_type} />
-    {/* Info */}
     <div className="flex-1 min-w-0">
       <p className="font-semibold text-sm text-foreground truncate">{event.title}</p>
       <p className="text-xs text-muted-foreground truncate">
-        {[event.location, event.created_by
-          ? `${event.created_by.firstname} ${event.created_by.lastname}`
-          : null]
-          .filter(Boolean).join(' · ')}
+        {[event.location, event.created_by ? `${event.created_by.firstname} ${event.created_by.lastname}` : null].filter(Boolean).join(' · ')}
       </p>
     </div>
-    {/* Avatar */}
-    {event.created_by && (
-      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary text-xs font-bold shrink-0">
-        {event.created_by.firstname[0]}{event.created_by.lastname[0]}
+    {showMember && (
+      <div className="flex -space-x-1 shrink-0">
+        {[{ id: event.memberId, name: event.memberName, color: event.memberColor }, ...(event.extraMembers ?? [])].map((m) => (
+          <div key={m.id} title={m.name}
+            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-card shrink-0"
+            style={{ backgroundColor: m.color }}
+          >
+            {m.name.charAt(0)}
+          </div>
+        ))}
       </div>
     )}
   </div>
 )
 
-// ─── main ────────────────────────────────────────────────────────────────────
+// ─── FamilyMemberCard ─────────────────────────────────────────────────────────
 
-type OrgItem = {
-  id: string;
-  name: string;
-  type: 'club' | 'association' | 'independant';
-  roleType: RoleType;
-  roleName: string;
-};
+const FamilyMemberCard: React.FC<{
+  name: string; subtitle: string; color: string; coursesPerWeek: number;
+  active: boolean; onClick: () => void;
+}> = ({ name, subtitle, color, coursesPerWeek, active, onClick }) => (
+  <button
+    onClick={onClick}
+    className={cn(
+      'flex flex-col items-center gap-2 p-3 rounded-2xl border-2 transition-all active:scale-[0.98]',
+      active ? 'border-primary bg-primary/5' : 'border-border bg-background/40 hover:border-primary/40',
+    )}
+  >
+    <div
+      className="w-12 h-12 rounded-full flex items-center justify-center font-display font-bold text-base text-white ring-2 ring-card"
+      style={{ backgroundColor: color }}
+    >
+      {name.charAt(0)}
+    </div>
+    <p className={cn('text-xs font-bold', active ? 'text-primary' : 'text-foreground')}>{name}</p>
+    <p className="text-[10px] text-muted-foreground">{subtitle}</p>
+    <p className="text-[10px] font-semibold text-muted-foreground">{coursesPerWeek} cours/sem</p>
+  </button>
+)
+
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 const ClubMembersPage: React.FC = () => {
   const { user } = useAuth()
@@ -168,89 +217,179 @@ const ClubMembersPage: React.FC = () => {
   const orgId = organisation?.id
   const isManager = role === 'manager'
 
-  const [events,      setEvents]      = useState<Event[]>([])
-  const [memberCount, setMemberCount] = useState(0)
-  const [myOrgs,      setMyOrgs]      = useState<OrgItem[]>([])
-  const [loading,     setLoading]     = useState(true)
+  const [myEvents,     setMyEvents]     = useState<Event[]>([])
+  const [children,     setChildren]     = useState<FamilyChild[]>([])
+  const [memberCount,  setMemberCount]  = useState(0)
+  const [myOrgs,       setMyOrgs]       = useState<OrgItem[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [activeFilter, setActiveFilter] = useState<string>('all') // 'all' | 'me' | childId
 
-  useEffect(() => {
-    if (!orgId) { setLoading(false); return }
-    const load = async () => {
-      setLoading(true)
-      try {
-        const [evtsData, membsData, orgsData] = await Promise.all([
-          api.get<Event[]>(`/organisations/${orgId}/events`, { status: 'published' }, { useCache: true, cacheTTL: 60000 }),
-          api.get<{ id: string }[]>(`/organisations/${orgId}/members`, undefined, { useCache: true, cacheTTL: 120000 }),
-          api.get<{ organisation: { id: string; name: string; type: string | null }; role: { name: string; type: RoleType } }[]>('/organisations/my', {}, { useCache: true, cacheTTL: 60000 }),
-        ])
-        setEvents(Array.isArray(evtsData) ? evtsData : [])
-        setMemberCount(Array.isArray(membsData) ? membsData.length : 0)
-        setMyOrgs(
-          Array.isArray(orgsData)
-            ? orgsData.map(item => ({
-              id: item.organisation.id,
-              name: item.organisation.name,
-              type: (item.organisation.type ?? 'club') as 'club' | 'association' | 'independant',
-              roleType: item.role.type,
-              roleName: item.role.name,
-            }))
-            : [],
-        )
-      } catch {
-        setEvents([])
-      } finally {
-        setLoading(false)
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      // Catches individuels : un 403 sur events/members (org obsolète) ne bloque pas le reste
+      const clearStaleOrg = (e: unknown) => {
+        const status = (e as any)?.statusCode ?? (e as any)?.response?.status
+        if (status === 403) { localStorage.removeItem('selectedOrganisation') }
+        return []
       }
+      const [evtsData, membsData, orgsData, famData] = await Promise.all([
+        orgId
+          ? api.get<Event[]>(`/organisations/${orgId}/events`, { status: 'published' }, { useCache: true, cacheTTL: 60000 }).catch(clearStaleOrg)
+          : Promise.resolve([] as Event[]),
+        orgId
+          ? api.get<{ id: string }[]>(`/organisations/${orgId}/members`, undefined, { useCache: true, cacheTTL: 120000 }).catch(clearStaleOrg)
+          : Promise.resolve([] as { id: string }[]),
+        api.get<{ organisation: { id: string; name: string; type: string | null }; role: { name: string; type: RoleType } }[]>('/organisations/my', {}, { useCache: true, cacheTTL: 60000 }).catch(() => []),
+        api.get<{ children: FamilyChild[] }>('/family/dashboard').catch(() => ({ children: [] })),
+      ])
+      setMyEvents(Array.isArray(evtsData) ? evtsData : [])
+      setMemberCount(Array.isArray(membsData) ? membsData.length : 0)
+      setMyOrgs(
+        Array.isArray(orgsData)
+          ? orgsData.map((item) => ({
+            id: item.organisation.id,
+            name: item.organisation.name,
+            type: (item.organisation.type ?? 'club') as 'club' | 'association' | 'independant',
+            roleType: item.role.type,
+            roleName: item.role.name,
+          }))
+          : [],
+      )
+      setChildren(famData.children ?? [])
+    } catch {
+      setMyEvents([])
+    } finally {
+      setLoading(false)
     }
-    load()
   }, [orgId])
+
+  useEffect(() => { load() }, [load])
+
+  // Marque l'espace membre comme visité pour la MemberChecklistCard (étape 3)
+  useEffect(() => { localStorage.setItem('ikivio_visited_activity', '1') }, [])
 
   const today    = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
   const weekDays = useMemo(() => getWeekDays(), [])
-  const todayIdx = weekDays.findIndex(d => isSameDay(d, today))
+  const todayIdx = weekDays.findIndex((d) => isSameDay(d, today))
 
-  const upcomingEvents = useMemo(() =>
-    events
-      .filter(e => new Date(e.start_time) >= today)
+  const firstName = (user as any)?.firstname ?? user?.firstName ?? 'Vous'
+
+  // ── Build display events ─────────────────────────────────────────────────
+
+  const allDisplayEvents = useMemo((): DisplayEvent[] => {
+    const mine: DisplayEvent[] = myEvents.map((e) => ({
+      id: e.id, title: e.title, start_time: e.start_time, end_time: e.end_time,
+      location: e.location ?? null, event_type: e.event_type,
+      created_by: e.created_by ?? null,
+      memberId: 'me', memberName: firstName, memberColor: MEMBER_COLORS[0],
+    }))
+    // Index parent events by id for deduplication
+    const mineById = new Map(mine.map((e) => [e.id, e]))
+    const result: DisplayEvent[] = [...mine]
+
+    children.forEach((child, idx) => {
+      const color = MEMBER_COLORS[idx + 1] ?? MEMBER_COLORS[1]
+      child.events
+        .filter((e) => e.is_registered)
+        .forEach((e) => {
+          const existing = mineById.get(e.id)
+          if (existing) {
+            // Même événement : on ajoute l'enfant comme membre supplémentaire
+            if (!existing.extraMembers) { existing.extraMembers = [] }
+            if (!existing.extraMembers.find((m) => m.id === child.id)) {
+              existing.extraMembers.push({ id: child.id, name: child.firstname, color })
+            }
+          } else {
+            const ev: DisplayEvent = {
+              id: e.id, title: e.title,
+              start_time: e.start_time, end_time: e.end_time ?? e.start_time,
+              location: e.location, event_type: 'training' as EventType,
+              memberId: child.id, memberName: child.firstname, memberColor: color,
+            }
+            mineById.set(e.id, ev)
+            result.push(ev)
+          }
+        })
+    })
+    return result
+  }, [myEvents, children, firstName])
+
+  const filteredEvents = useMemo(() => {
+    if (activeFilter === 'all') { return allDisplayEvents }
+    return allDisplayEvents.filter((e) =>
+      e.memberId === activeFilter ||
+      e.extraMembers?.some((m) => m.id === activeFilter),
+    )
+  }, [allDisplayEvents, activeFilter])
+
+  const upcomingFiltered = useMemo(() =>
+    filteredEvents.filter((e) => new Date(e.start_time) >= today)
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()),
-  [events, today],
-  )
+  [filteredEvents, today])
 
   const todayEvents = useMemo(() =>
-    upcomingEvents.filter(e => isSameDay(new Date(e.start_time), today)),
-  [upcomingEvents, today],
-  )
+    upcomingFiltered.filter((e) => isSameDay(new Date(e.start_time), today)),
+  [upcomingFiltered, today])
 
   const nextEvent = useMemo(() =>
-    upcomingEvents.find(e => !isSameDay(new Date(e.start_time), today)) ?? upcomingEvents[0] ?? null,
-  [upcomingEvents, today],
-  )
+    upcomingFiltered.find((e) => !isSameDay(new Date(e.start_time), today)) ?? upcomingFiltered[0] ?? null,
+  [upcomingFiltered, today])
 
   const nextTwo = useMemo(() =>
-    upcomingEvents.filter(e => !isSameDay(new Date(e.start_time), today)).slice(1, 3),
-  [upcomingEvents, today],
-  )
+    upcomingFiltered.filter((e) => !isSameDay(new Date(e.start_time), today)).slice(1, 3),
+  [upcomingFiltered, today])
 
   const weekEnd = useMemo(() => { const d = new Date(today); d.setDate(d.getDate() + 7); return d }, [today])
-  const weekEvents = useMemo(() =>
-    events.filter(e => { const d = new Date(e.start_time); return d >= today && d < weekEnd }),
-  [events, today, weekEnd],
-  )
 
-  const disciplines = useMemo(() => [...new Set(events.map(e => e.event_type))], [events])
-  const conflict    = todayEvents.some((a, i) => todayEvents.slice(i + 1).some(b => overlaps(a, b)))
-
-  const eventsByDay = useMemo(() =>
-    weekDays.map(day =>
-      events
-        .filter(e => isSameDay(new Date(e.start_time), day))
+  const weekEventsByDay = useMemo(() =>
+    weekDays.map((day) =>
+      filteredEvents
+        .filter((e) => isSameDay(new Date(e.start_time), day))
         .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()),
     ),
-  [events, weekDays],
-  )
+  [filteredEvents, weekDays])
 
+  const weekCount = useMemo(() =>
+    filteredEvents.filter((e) => { const d = new Date(e.start_time); return d >= today && d < weekEnd }).length,
+  [filteredEvents, today, weekEnd])
+
+  const eventsPerWeekByMember = useMemo(() => {
+    const counts: Record<string, number> = {}
+    allDisplayEvents.forEach((e) => {
+      const d = new Date(e.start_time)
+      if (d >= today && d < weekEnd) {
+        counts[e.memberId] = (counts[e.memberId] ?? 0) + 1
+        e.extraMembers?.forEach((m) => { counts[m.id] = (counts[m.id] ?? 0) + 1 })
+      }
+    })
+    return counts
+  }, [allDisplayEvents, today, weekEnd])
+
+  const myUpcoming = useMemo(() =>
+    myEvents.filter((e) => new Date(e.start_time) >= today)
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()),
+  [myEvents, today])
+
+  const conflict = useMemo(() =>
+    myUpcoming.filter((e) => isSameDay(new Date(e.start_time), today))
+      .some((a, i, arr) => arr.slice(i + 1).some((b) => overlaps(a, b))),
+  [myUpcoming, today])
+
+  const disciplines = useMemo(() => [...new Set(myEvents.map((e) => e.event_type))], [myEvents])
+
+  const dayName   = today.toLocaleDateString('fr-FR', { weekday: 'long' }).toUpperCase()
   const todayLabel = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
-  const dayName    = today.toLocaleDateString('fr-FR', { weekday: 'long' }).toUpperCase()
+
+  const showMemberBadge = activeFilter === 'all' && children.length > 0
+
+  const ORG_CARD_META = {
+    club:       { Icon: Dumbbell, bg: 'bg-cat-sport/15', text: 'text-cat-sport' },
+    association:{ Icon: Music,    bg: 'bg-cat-music/15', text: 'text-cat-music' },
+    independant:{ Icon: Users,    bg: 'bg-primary/15',   text: 'text-primary' },
+  } as const
+
+  const userInitials = `${(user as any)?.firstname?.[0] ?? user?.firstName?.[0] ?? ''}${(user as any)?.lastname?.[0] ?? user?.lastName?.[0] ?? ''}`.toUpperCase() || 'U'
 
   if (loading) {
     return (
@@ -260,156 +399,80 @@ const ClubMembersPage: React.FC = () => {
     )
   }
 
-  // ── Mes associations widget ──────────────────────────────────────────────
-  const ORG_CARD_META = {
-    club: { Icon: Dumbbell, bg: 'bg-cat-sport/15', text: 'text-cat-sport', label: 'Sport' },
-    association: { Icon: Music, bg: 'bg-cat-music/15', text: 'text-cat-music', label: 'Musique' },
-    independant: { Icon: Users, bg: 'bg-primary/15', text: 'text-primary', label: 'Coach' },
-  } as const
-
-  const userInitials = user
-    ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase()
-    : 'U'
-
-  const AssociationsWidget = () => (
-    <div className="bg-card border border-border rounded-2xl p-5 sticky top-4">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-display text-lg font-bold text-foreground">Mes associations</h2>
-        {myOrgs.length > 0 && (
-          <span className="text-xs text-muted-foreground">
-            {myOrgs.length} club{myOrgs.length > 1 ? 's' : ''}
-          </span>
-        )}
-      </div>
-
-      {myOrgs.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-6">Aucune association.</p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {myOrgs.map(org => {
-            const isAdm = org.roleType === 'club_owner' || org.roleType === 'club_manager' || org.roleType === 'treasurer'
-            const meta = ORG_CARD_META[org.type] ?? ORG_CARD_META.club
-            const OrgIc = meta.Icon
-            const dest = isAdm ? `/dashboard/${org.id}/overview` : `/club/${org.id}`
-
-            return (
-              <Link
-                key={org.id}
-                to={dest}
-                className="group flex items-center gap-3 p-3 rounded-xl border border-border bg-background/40 hover:border-primary/40 hover:bg-background/80 transition-all"
-              >
-                {/* Category icon */}
-                <div className={cn('rounded-xl flex items-center justify-center w-10 h-10 shrink-0', meta.bg)}>
-                  <OrgIc className={cn('w-5 h-5 shrink-0', meta.text)} />
-                </div>
-
-                {/* Name + subtitle + avatar */}
-                <div className="flex-1 min-w-0">
-                  <p className="font-display font-bold text-sm text-foreground truncate group-hover:text-primary transition-colors">
-                    {org.name.split(' ')[0]?.charAt(0)}.
-                  </p>
-                  <div className="flex -space-x-1.5 mt-1">
-                    <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[9px] font-bold ring-2 ring-card shrink-0">
-                      {userInitials}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-0.5 text-[11px] text-muted-foreground mt-1">
-                    <MapPin className="w-3 h-3 shrink-0" />
-                    <span className="truncate">{isAdm ? 'Admin' : `${meta.label}`}</span>
-                  </div>
-                </div>
-
-                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
-              </Link>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-
   return (
     <div className="space-y-5">
 
-      {/* ── Portail admin (gestionnaires uniquement) ────────────────────────── */}
+      {/* Portail admin */}
       {isManager && orgId && (
-          <div className="rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/20 p-4 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Accès gestionnaire</p>
-                <p className="font-display font-bold text-foreground text-sm">Tableau de bord admin</p>
-              </div>
+        <div className="rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/20 p-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
             </div>
-            <Link
-              to={`/dashboard/${orgId}/overview`}
-              className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-bold px-3 py-2 rounded-full active:scale-95 transition-transform shrink-0"
-            >
-              Portail admin <ArrowRight className="w-3.5 h-3.5 shrink-0" />
-            </Link>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Accès gestionnaire</p>
+              <p className="font-display font-bold text-foreground text-sm">Tableau de bord admin</p>
+            </div>
           </div>
-        )}
+          <Link
+            to={`/dashboard/${orgId}/overview`}
+            className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-bold px-3 py-2 rounded-full active:scale-95 transition-transform shrink-0"
+          >
+            Portail admin <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+          </Link>
+        </div>
+      )}
 
-        {/* ── Greeting + status ───────────────────────────────────────────────── */}
-        <div>
-          <h1 className="font-display text-3xl font-bold text-foreground">
-            {getGreeting()}, {user?.firstName || 'Vous'} 👋
-          </h1>
-          <p className="text-muted-foreground mt-1 flex items-center gap-1.5">
-            ✨ {todayEvents.length === 0
-              ? 'Aucune activité prévue aujourd\'hui.'
-              : `${todayEvents.length} activité${todayEvents.length > 1 ? 's' : ''} aujourd'hui pour vous.`}
-          </p>
-
-          {/* Status row */}
-          <div className="flex items-center justify-between mt-3">
-            <span
-              className={cn(
-                'inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border',
-                conflict
-                  ? 'text-destructive border-destructive/30 bg-destructive/5'
-                  : 'text-accent border-accent/30 bg-accent/5',
-              )}
-            >
-              {conflict
-                ? <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                : <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
-              {conflict ? 'Conflit détecté' : 'Aucun conflit'}
+      {/* Greeting */}
+      <div>
+        <h1 className="font-display text-3xl font-bold text-foreground">
+          {getGreeting()}, {firstName} 👋
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          ✨ {todayEvents.length === 0
+            ? 'Aucune activité prévue aujourd\'hui.'
+            : `${todayEvents.length} activité${todayEvents.length > 1 ? 's' : ''} aujourd'hui.`}
+        </p>
+        <div className="flex items-center justify-between mt-3">
+          <span className={cn(
+            'inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border',
+            conflict ? 'text-destructive border-destructive/30 bg-destructive/5' : 'text-accent border-accent/30 bg-accent/5',
+          )}>
+            {conflict ? <AlertCircle className="w-3.5 h-3.5 shrink-0" /> : <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
+            {conflict ? 'Conflit détecté' : 'Aucun conflit'}
+          </span>
+          {weekCount > 0 && (
+            <span className="text-sm text-muted-foreground">
+              {weekCount} activité{weekCount > 1 ? 's' : ''}/sem
             </span>
-            {weekEvents.length > 0 && (
-              <span className="text-sm text-muted-foreground">
-                Mode solo · {weekEvents.length} activité{weekEvents.length > 1 ? 's' : ''}/sem
-              </span>
-            )}
-          </div>
+          )}
         </div>
+      </div>
 
-        {/* ── Stats row ───────────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { icon: Calendar,   value: weekEvents.length, label: 'Activités/sem' },
-            { icon: Users,      value: memberCount,        label: 'Membres' },
-            { icon: Building2,  value: myOrgs.length,       label: 'Associations' },
-            { icon: Bookmark,   value: disciplines.length, label: 'Disciplines' },
-          ].map(({ icon: Icon, value, label }) => (
-            <div key={label} className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Icon className="w-5 h-5 text-primary shrink-0" />
-              </div>
-              <div>
-                <p className="font-display text-2xl font-bold text-foreground leading-none">{value}</p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
-              </div>
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { icon: Calendar,  value: weekCount,        label: 'Activités/sem' },
+          { icon: Users,     value: memberCount,       label: 'Membres' },
+          { icon: Building2, value: myOrgs.length,     label: 'Associations' },
+          { icon: Bookmark,  value: disciplines.length, label: 'Disciplines' },
+        ].map(({ icon: Icon, value, label }) => (
+          <div key={label} className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Icon className="w-5 h-5 text-primary shrink-0" />
             </div>
-          ))}
-        </div>
+            <div>
+              <p className="font-display text-2xl font-bold text-foreground leading-none">{value}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
 
-      {/* ── Grid : [Prochaine activité + Cours du jour] | [Mes associations] ── */}
+      {/* ── Grid : [Events] | [Famille + Associations] ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-        {/* Colonne gauche : events */}
+        {/* Colonne gauche */}
         <div className="lg:col-span-2 space-y-4">
 
           {/* Prochaine activité */}
@@ -419,17 +482,30 @@ const ClubMembersPage: React.FC = () => {
               <div className="relative">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-[10px] uppercase tracking-widest font-bold text-primary-foreground/70">⚡ Prochaine activité</p>
-                  <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-primary-foreground/20 text-primary-foreground">
-                    {isSameDay(new Date(nextEvent.start_time), today)
-                      ? "Aujourd'hui"
-                      : new Date(nextEvent.start_time).toLocaleDateString('fr-FR', { weekday: 'long' }).replace(/^\w/, c => c.toUpperCase())}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {nextEvent.extraMembers && nextEvent.extraMembers.length > 0 && (
+                      <div className="flex -space-x-1">
+                        {[{ id: nextEvent.memberId, name: nextEvent.memberName, color: nextEvent.memberColor }, ...nextEvent.extraMembers].map((m) => (
+                          <div key={m.id}
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold border-2 border-primary-foreground/30"
+                            style={{ backgroundColor: m.color }}
+                          >
+                            {m.name.charAt(0)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-primary-foreground/20 text-primary-foreground">
+                      {isSameDay(new Date(nextEvent.start_time), today)
+                        ? "Aujourd'hui"
+                        : new Date(nextEvent.start_time).toLocaleDateString('fr-FR', { weekday: 'long' }).replace(/^\w/, (c) => c.toUpperCase())}
+                    </span>
+                  </div>
                 </div>
                 <h2 className="font-display text-2xl font-bold text-primary-foreground mb-3">{nextEvent.title}</h2>
                 <div className="grid grid-cols-2 gap-2 text-sm text-primary-foreground/85">
                   <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 shrink-0" />
-                    {fmtTime(nextEvent.start_time)} – {fmtTime(nextEvent.end_time)}
+                    <Clock className="w-4 h-4 shrink-0" />{fmtTime(nextEvent.start_time)} – {fmtTime(nextEvent.end_time)}
                   </div>
                   {nextEvent.location && (
                     <div className="flex items-center gap-2"><MapPin className="w-4 h-4 shrink-0" />{nextEvent.location}</div>
@@ -453,9 +529,9 @@ const ClubMembersPage: React.FC = () => {
                         <Navigation className="w-3.5 h-3.5 shrink-0" /> Itinéraire
                       </button>
                     )}
-                    <Link to={`/club/events/${nextEvent.id}`} className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-primary-foreground text-primary active:scale-95 transition-transform">
+                    <button className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-primary-foreground text-primary active:scale-95 transition-transform">
                       <Info className="w-3.5 h-3.5 shrink-0" /> Détails
-                    </Link>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -465,15 +541,27 @@ const ClubMembersPage: React.FC = () => {
           {/* Deux prochains mini-cards */}
           {nextTwo.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
-              {nextTwo.map(ev => (
+              {nextTwo.map((ev) => (
                 <div key={ev.id} className="bg-card border border-border rounded-2xl p-3 flex items-center gap-3 active:scale-[0.99] transition-all hover:border-primary/20">
                   <CategoryBubble type={ev.event_type} />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm text-foreground truncate">{ev.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(ev.start_time).toLocaleDateString('fr-FR', { weekday: 'long' }).replace(/^\w/, c => c.toUpperCase())} · {fmtTime(ev.start_time)}
+                      {new Date(ev.start_time).toLocaleDateString('fr-FR', { weekday: 'long' }).replace(/^\w/, (c) => c.toUpperCase())} · {fmtTime(ev.start_time)}
                     </p>
                   </div>
+                  {showMemberBadge && (
+                    <div className="flex -space-x-1 shrink-0">
+                      {[{ id: ev.memberId, name: ev.memberName, color: ev.memberColor }, ...(ev.extraMembers ?? [])].map((m) => (
+                        <div key={m.id} title={m.name}
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold ring-2 ring-card"
+                          style={{ backgroundColor: m.color }}
+                        >
+                          {m.name.charAt(0)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -484,9 +572,7 @@ const ClubMembersPage: React.FC = () => {
             <div className="px-4 py-3 border-b border-border flex items-center justify-between">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{dayName}</p>
-                <h2 className="font-display text-lg font-bold text-foreground">
-                  {isSameDay(today, today) ? "Aujourd'hui" : todayLabel}
-                </h2>
+                <h2 className="font-display text-lg font-bold text-foreground">Aujourd'hui</h2>
               </div>
               {todayEvents.length > 0 && (
                 <span className="text-[11px] font-bold text-primary px-2.5 py-1 rounded-full bg-primary/10">
@@ -498,27 +584,150 @@ const ClubMembersPage: React.FC = () => {
               {todayEvents.length === 0 ? (
                 <p className="py-5 text-sm text-muted-foreground text-center">Pas de cours prévu aujourd'hui.</p>
               ) : (
-                todayEvents.map(ev => <TodayRow key={ev.id} event={ev} />)
+                todayEvents.map((ev) => <TodayRow key={ev.id} event={ev} showMember={showMemberBadge} />)
               )}
             </div>
           </div>
 
         </div>
 
-        {/* Colonne droite : Mes associations */}
-        <div className="lg:col-span-1">
-          <AssociationsWidget />
-        </div>
+        {/* Colonne droite */}
+        <div className="lg:col-span-1 space-y-4">
 
+          {/* Widget Famille */}
+          {children.length > 0 && (
+            <div className="bg-card border border-border rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-display text-lg font-bold text-foreground">Famille</h2>
+                <button
+                  onClick={() => setActiveFilter('all')}
+                  className={cn(
+                    'text-xs font-semibold transition-colors',
+                    activeFilter === 'all' ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  Tous affichés
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {/* Moi */}
+                <FamilyMemberCard
+                  name={firstName}
+                  subtitle="Adulte"
+                  color={MEMBER_COLORS[0]}
+                  coursesPerWeek={eventsPerWeekByMember['me'] ?? 0}
+                  active={activeFilter === 'me'}
+                  onClick={() => setActiveFilter(activeFilter === 'me' ? 'all' : 'me')}
+                />
+                {/* Enfants */}
+                {children.map((child, idx) => {
+                  const age = getAge(child.birthdate)
+                  return (
+                    <FamilyMemberCard
+                      key={child.id}
+                      name={child.firstname}
+                      subtitle={age !== null ? `${age} ans` : 'Enfant'}
+                      color={MEMBER_COLORS[idx + 1] ?? MEMBER_COLORS[1]}
+                      coursesPerWeek={eventsPerWeekByMember[child.id] ?? 0}
+                      active={activeFilter === child.id}
+                      onClick={() => setActiveFilter(activeFilter === child.id ? 'all' : child.id)}
+                    />
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Mes associations */}
+          <div className="bg-card border border-border rounded-2xl p-5 sticky top-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-display text-lg font-bold text-foreground">Mes associations</h2>
+              {myOrgs.length > 0 && (
+                <span className="text-xs text-muted-foreground">{myOrgs.length} club{myOrgs.length > 1 ? 's' : ''}</span>
+              )}
+            </div>
+            {myOrgs.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">Aucune association.</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {myOrgs.map((org) => {
+                  const isAdm = org.roleType === 'club_owner' || org.roleType === 'club_manager' || org.roleType === 'treasurer'
+                  const meta = ORG_CARD_META[org.type] ?? ORG_CARD_META.club
+                  const OrgIc = meta.Icon
+                  const dest = isAdm ? `/dashboard/${org.id}/overview` : `/club/${org.id}`
+                  return (
+                    <Link
+                      key={org.id}
+                      to={dest}
+                      className="group flex items-center gap-3 p-3 rounded-xl border border-border bg-background/40 hover:border-primary/40 hover:bg-background/80 transition-all"
+                    >
+                      <div className={cn('rounded-xl flex items-center justify-center w-10 h-10 shrink-0', meta.bg)}>
+                        <OrgIc className={cn('w-5 h-5 shrink-0', meta.text)} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-display font-bold text-sm text-foreground truncate group-hover:text-primary transition-colors">
+                          {org.name.split(' ').slice(0, 2).join(' ')}
+                        </p>
+                        <div className="flex -space-x-1.5 mt-1">
+                          <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-[9px] font-bold ring-2 ring-card shrink-0">
+                            {userInitials}
+                          </div>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          {isAdm ? 'Admin' : meta.text.replace('text-', '')}
+                        </p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+        </div>
       </div>
 
-      {/* ── Mes activités — grille hebdo (full width) ───────────────────────── */}
+      {/* ── Grille hebdo ── */}
       <section>
-        <h2 className="font-display text-xl font-bold text-foreground mb-4">Mes activités</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display text-xl font-bold text-foreground">
+            {activeFilter === 'all'
+              ? 'Planning de la famille'
+              : activeFilter === 'me'
+              ? `Mes activités`
+              : `Activités de ${children.find((c) => c.id === activeFilter)?.firstname ?? ''}`}
+          </h2>
+          {(children.length > 0) && (
+            <div className="flex gap-1.5 flex-wrap">
+              {[
+                { id: 'all', label: 'Tous', color: '' },
+                { id: 'me', label: firstName, color: MEMBER_COLORS[0] },
+                ...children.map((c, idx) => ({ id: c.id, label: c.firstname, color: MEMBER_COLORS[idx + 1] ?? MEMBER_COLORS[1] })),
+              ].map(({ id, label, color }) => (
+                <button
+                  key={id}
+                  onClick={() => setActiveFilter(id)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-2.5 h-7 rounded-full text-xs font-semibold border transition-colors',
+                    activeFilter === id
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card text-foreground border-border hover:border-primary/40',
+                  )}
+                >
+                  {color && (
+                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                  )}
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <div className="overflow-x-auto pb-2">
           <div className="grid grid-cols-7 gap-3 min-w-[700px]">
             {weekDays.map((day, i) => {
-              const dayEvts = eventsByDay[i]
+              const dayEvts = weekEventsByDay[i]
               const isToday = i === todayIdx
               return (
                 <div key={i}>
@@ -529,8 +738,8 @@ const ClubMembersPage: React.FC = () => {
                     <p className="text-center text-xl text-muted-foreground/40 font-light select-none">—</p>
                   ) : (
                     <div className="space-y-3">
-                      {dayEvts.map(ev => (
-                        <WeeklyCard key={ev.id} event={ev} isToday={isToday} />
+                      {dayEvts.map((ev) => (
+                        <WeeklyCard key={ev.id} event={ev} isToday={isToday} showMember={showMemberBadge} />
                       ))}
                     </div>
                   )}

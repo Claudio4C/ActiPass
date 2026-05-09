@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { AuthContextType, AppMode, User, RegisterData } from '../types';
 import { authService } from '../services/auth.service';
 import { ApiError, NetworkError } from '../lib/errors';
+import { api } from '../lib/api';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -68,6 +69,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
             setUser(user);
             localStorage.setItem('user', JSON.stringify(user));
+
+            // Nettoyage conditionnel si l'utilisateur connecté est différent du précédent
+            const previousUserId = localStorage.getItem('ikivio_last_user_id')
+            const currentUserId = user.id
+            if (previousUserId && previousUserId !== currentUserId) {
+                localStorage.removeItem('ikivio_welcome_seen')
+                localStorage.removeItem('ikivio_onboarding_page_done')
+                localStorage.removeItem('ikivio_checklist_minimized')
+                localStorage.removeItem('ikivio_visited_activity')
+                localStorage.removeItem('ikivio_profile_mode')
+            }
+            localStorage.setItem('ikivio_last_user_id', currentUserId)
+
+            // Fetch avatar en arrière-plan pour affichage immédiat dans les headers
+            api.get<{ user: { avatar_url?: string | null } }>('/users/me', undefined, { useCache: false })
+              .then((data) => {
+                if (data?.user?.avatar_url) {
+                  localStorage.setItem('user_avatar_url', data.user.avatar_url)
+                  window.dispatchEvent(new Event('avatar:updated'))
+                }
+              })
+              .catch(() => {})
+
         } catch (error) {
             console.error('Login error:', error);
 
@@ -149,6 +173,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
             setUser(null);
             setError(null);
             localStorage.removeItem('user');
+            localStorage.removeItem('user_avatar_url');
+            localStorage.removeItem('ikivio_last_user_id');
+            // ikivio_onboarding_type et ikivio_welcome_seen appartiennent à l'appareil — non effacés
         }
     }, []);
 

@@ -20,8 +20,10 @@ import ResendVerification from '../pages/ResendVerification'
 import HomePage from '../pages/HomePage'
 import DiscoverPage from '../pages/DiscoverPage'
 import AccountSwitch from '../pages/AccountSwitch'
+import OnboardingPage from '../pages/OnboardingPage'
 
 // Club member space (org-specific)
+import ClubsPage from '../pages/club/ClubsPage'
 import ClubHomePage from '../pages/club/ClubHomePage'
 import ClubPlanningPage from '../pages/club/ClubPlanningPage'
 import ClubOrgEventsPage from '../pages/club/ClubOrgEventsPage'
@@ -46,6 +48,7 @@ import TripViewPage from '../pages/club/TripViewPage'
 import LoyaltyPage from '../pages/club/LoyaltyPage'
 import FamilyPage from '../pages/club/FamilyPage'
 import FamilyDashboardPage from '../pages/club/FamilyDashboardPage'
+import ChildDetailPage from '../pages/club/ChildDetailPage'
 import CoachesDirectoryPage from '../pages/club/CoachesDirectoryPage'
 
 // Coach pages
@@ -68,6 +71,7 @@ import EventDetailPage from '../pages/dashboard/EventDetailPage'
 import AttendancePage from '../pages/dashboard/AttendancePage'
 import AttendanceDetailPage from '../pages/dashboard/AttendanceDetailPage'
 import AttendanceStatsPage from '../pages/dashboard/AttendanceStatsPage'
+import SettingsPage from '../pages/dashboard/SettingsPage'
 
 interface AppProps {
     mode: AppMode;
@@ -103,6 +107,12 @@ const AppContent: React.FC<{
 }> = ({ mode, LoginComponent, RegisterComponent, DashboardComponent, protectedPath }) => {
   const { user } = useAuth()
 
+  const postLoginTarget = (): string => {
+    if (localStorage.getItem('ikivio_onboarding_page_done') === '1') { return '/home' }
+    const t = localStorage.getItem('ikivio_onboarding_type')
+    return t && t !== 'member' ? '/onboarding' : '/home'
+  }
+
   return (
     <Router>
       <Routes>
@@ -111,11 +121,11 @@ const AppContent: React.FC<{
                 ═══════════════════════════════════════ */}
         <Route
           path="/login"
-          element={user ? <Navigate to="/home" replace /> : <LoginComponent />}
+          element={user ? <Navigate to={postLoginTarget()} replace /> : <LoginComponent />}
         />
         <Route
           path="/register"
-          element={user ? <Navigate to="/home" replace /> : <RegisterComponent />}
+          element={user ? <Navigate to={postLoginTarget()} replace /> : <RegisterComponent />}
         />
         <Route path="/verify-email/:userId/:token" element={<VerifyEmail />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -135,6 +145,17 @@ const AppContent: React.FC<{
           <Route path="/home" element={<HomePage />} />
           <Route path="/accounts" element={<AccountSwitch />} />
         </Route>
+
+        {/* Onboarding — logo seul, sans navigation */}
+        <Route
+          element={
+            <ProtectedRoute requiredMode={mode}>
+              <SimpleLayout hideNav />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/onboarding" element={<OnboardingPage />} />
+        </Route>
         <Route path="/discover" element={<DiscoverPage />} />
 
         {/* ═══════════════════════════════════════
@@ -147,15 +168,18 @@ const AppContent: React.FC<{
             </ProtectedRoute>
           }
         >
-          <Route path={protectedPath} element={<DashboardComponent />} />
+          {/* /club redirige vers /club/members (contenu réel) */}
+          <Route path={protectedPath} element={<Navigate to="/club/members" replace />} />
           <Route path="/club/members" element={<ClubMembersPage />} />
           <Route path="/club/planning" element={<PlanningPage />} />
           <Route path="/club/events" element={<EventsPageClub />} />
           <Route path="/club/events/:eventId" element={<EventDetailPageClub />} />
           <Route path="/club/events/:eventId/create-trip" element={<CreateTripPage />} />
           <Route path="/club/events/:eventId/trip" element={<TripViewPage />} />
+          <Route path="/clubs" element={<ClubsPage />} />
           <Route path="/club/famille" element={<FamilyPage />} />
           <Route path="/club/famille/planning" element={<FamilyDashboardPage />} />
+          <Route path="/club/famille/:childId" element={<ChildDetailPage />} />
           <Route path="/club/notifications" element={<NotificationsPage />} />
           <Route path="/club/loyalty" element={<LoyaltyPage />} />
           <Route path="/club/professeurs" element={<TeachersPage />} />
@@ -180,7 +204,7 @@ const AppContent: React.FC<{
           <Route path="/club/:orgId" element={<ClubHomePage />} />
           <Route path="/club/:orgId/planning" element={<ClubPlanningPage />} />
           <Route path="/club/:orgId/events" element={<ClubOrgEventsPage />} />
-          <Route path="/club/:orgId/famille" element={<ComingSoon title="Ma famille" description="La gestion de votre famille sera disponible prochainement." />} />
+          <Route path="/club/:orgId/famille" element={<FamilyPage />} />
           <Route path="/club/:orgId/coaches" element={<ComingSoon title="Coachs" description="L'annuaire des coachs sera disponible prochainement." />} />
           <Route path="/club/:orgId/deplacements" element={<ComingSoon title="Déplacements" description="La gestion des déplacements sera disponible prochainement." />} />
           <Route path="/club/:orgId/notifications" element={<ComingSoon title="Notifications" description="Vos notifications seront disponibles prochainement." />} />
@@ -238,6 +262,7 @@ const AppContent: React.FC<{
           <Route path="/dashboard/:organisationId/attendance" element={<AttendancePage />} />
           <Route path="/dashboard/:organisationId/attendance/stats" element={<AttendanceStatsPage />} />
           <Route path="/dashboard/:organisationId/attendance/:eventId" element={<AttendanceDetailPage />} />
+          <Route path="/dashboard/:organisationId/settings" element={<SettingsPage />} />
         </Route>
 
         {/* ═══════════════════════════════════════

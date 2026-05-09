@@ -9,7 +9,8 @@ export const UpdateUserSchema = z.object({
     .optional(),
   phone: z.string().optional(),
   birthdate: z.string().optional(),
-  avatar_url: z.url("URL d'avatar invalide").optional(),
+  avatar_url: z.string().url("URL d'avatar invalide").optional(),
+  profile_mode: z.enum(['solo', 'duo', 'famille']).optional(),
 });
 
 export type UpdateUserDto = z.infer<typeof UpdateUserSchema>;

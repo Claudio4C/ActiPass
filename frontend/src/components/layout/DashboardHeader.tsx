@@ -11,8 +11,16 @@ interface DashboardHeaderProps {
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ organisationId }) => {
   const { user, logout, isLoading } = useAuth()
-  const [organisation, setOrganisation] = useState<Organisation | null>(null)
+  const [organisation, setOrganisation] = useState<(Organisation & { logo_url?: string | null }) | null>(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(
+    () => localStorage.getItem('user_avatar_url'),
+  )
+  useEffect(() => {
+    const handler = () => setAvatarUrl(localStorage.getItem('user_avatar_url'))
+    window.addEventListener('avatar:updated', handler)
+    return () => window.removeEventListener('avatar:updated', handler)
+  }, [])
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
 
@@ -35,12 +43,12 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ organisationId }) => 
   useEffect(() => {
     const load = async () => {
       try {
-        const org = await api.get<Organisation>(
+        const data = await api.get<{ organisation: Organisation & { logo_url?: string | null } }>(
           `/organisations/${organisationId}`,
           undefined,
           { useCache: true, cacheTTL: 300000 },
         )
-        setOrganisation(org)
+        setOrganisation(data.organisation)
       } catch {
         // silently fail — name stays null
       }
@@ -90,9 +98,18 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ organisationId }) => 
           </span>
         </Link>
         <ChevronRight className="w-4 h-4 text-muted-foreground hidden sm:block shrink-0" />
-        <h1 className="font-display text-base font-bold text-foreground truncate">
-          {organisation?.name ?? 'Organisation'}
-        </h1>
+        <div className="flex items-center gap-2 min-w-0">
+          {organisation?.logo_url ? (
+            <img
+              src={organisation.logo_url}
+              alt={organisation.name}
+              className="w-7 h-7 rounded-lg object-cover shrink-0 border border-border"
+            />
+          ) : null}
+          <h1 className="font-display text-base font-bold text-foreground truncate">
+            {organisation?.name ?? 'Organisation'}
+          </h1>
+        </div>
       </div>
 
       {/* Right: Actions */}
@@ -121,8 +138,11 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ organisationId }) => 
             onClick={() => setIsMenuOpen(p => !p)}
             className="flex items-center gap-2 rounded-full border border-border bg-card px-1.5 py-1 shadow-sm hover:border-primary/30 transition active:scale-95 transition-transform"
           >
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold shrink-0">
-              {initials}
+            <div className="w-8 h-8 rounded-full overflow-hidden shrink-0">
+              {avatarUrl
+                ? <img src={avatarUrl} alt={initials} className="w-full h-full object-cover" />
+                : <div className="w-full h-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">{initials}</div>
+              }
             </div>
             <Menu className="w-4 h-4 text-muted-foreground shrink-0" />
           </button>
@@ -132,11 +152,17 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ organisationId }) => 
               <div className="fixed inset-0 z-10" onClick={closeMenu} />
               <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-border bg-card shadow-xl overflow-hidden z-20">
                 {user && (
-                  <div className="px-4 py-3 border-b border-border bg-muted/50">
-                    <p className="text-sm font-semibold text-foreground">
-                      {user.firstName} {user.lastName}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  <div className="px-4 py-3 border-b border-border bg-muted/50 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full overflow-hidden shrink-0">
+                      {avatarUrl
+                        ? <img src={avatarUrl} alt={initials} className="w-full h-full object-cover" />
+                        : <div className="w-full h-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">{initials}</div>
+                      }
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">{user.firstName} {user.lastName}</p>
+                      <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                    </div>
                   </div>
                 )}
                 <nav className="py-1 text-sm">
