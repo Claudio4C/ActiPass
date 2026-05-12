@@ -35,16 +35,8 @@ const MemberLayout: React.FC = () => {
     const isActive = (path: string) =>
         location.pathname === path || location.pathname.startsWith(path + '/');
 
-    const sidebar = (
-        <aside
-            className={`
-                fixed lg:static inset-y-0 left-0 z-40
-                w-64 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800
-                transform transition-transform duration-300 ease-in-out
-                ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-                flex flex-col
-            `}
-        >
+    const sidebarContent = (
+        <>
             {/* Sidebar header */}
             <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-200 dark:border-slate-800">
                 <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -86,7 +78,7 @@ const MemberLayout: React.FC = () => {
                     );
                 })}
             </nav>
-        </aside>
+        </>
     );
 
     return (
@@ -104,7 +96,7 @@ const MemberLayout: React.FC = () => {
                 }
             />
 
-            <div className="flex flex-1" style={{ minHeight: 'calc(100vh - 3.5rem)' }}>
+            <div className="flex-1" style={{ minHeight: 'calc(100vh - 3.5rem)' }}>
                 {/* Mobile toggle */}
                 <button
                     onClick={() => setIsMobileOpen(!isMobileOpen)}
@@ -119,13 +111,34 @@ const MemberLayout: React.FC = () => {
                     <div className="lg:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setIsMobileOpen(false)} />
                 )}
 
-                {sidebar}
+                {/* Desktop/container layout (sidebar not glued to screen edge) */}
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+                    <div className="flex gap-6">
+                        {/* Desktop sidebar */}
+                        <aside className="hidden lg:flex w-64 shrink-0">
+                            <div className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 rounded-2xl overflow-hidden flex flex-col sticky top-[5.25rem] max-h-[calc(100vh-6.25rem)]">
+                                {sidebarContent}
+                            </div>
+                        </aside>
 
-                <main className="flex-1 overflow-y-auto">
-                    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-                        <Outlet />
+                        {/* Mobile sidebar drawer */}
+                        <aside
+                            className={`
+                                lg:hidden fixed inset-y-0 left-0 z-40
+                                w-64 bg-white dark:bg-slate-900 border-r border-gray-200 dark:border-slate-800
+                                transform transition-transform duration-300 ease-in-out
+                                ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
+                                flex flex-col
+                            `}
+                        >
+                            {sidebarContent}
+                        </aside>
+
+                        <main className="flex-1 min-w-0">
+                            <Outlet />
+                        </main>
                     </div>
-                </main>
+                </div>
             </div>
         </div>
     );
