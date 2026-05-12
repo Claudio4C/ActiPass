@@ -290,7 +290,11 @@ export class OrganisationsService {
   /**
    * Récupérer les membres d'une organisation
    */
-  async getOrganisationMembers(organisationId: string, userId: string) {
+  async getOrganisationMembers(
+    organisationId: string,
+    userId: string,
+    opts?: { tagId?: string }
+  ) {
     // Vérifier que l'utilisateur est membre de l'organisation
     const membership = await this.prisma.membership.findFirst({
       where: {
@@ -304,11 +308,20 @@ export class OrganisationsService {
       throw new ForbiddenException("Vous n'êtes pas membre de cette organisation");
     }
 
+    const tagId = opts?.tagId;
+
     const members = await this.prisma.membership.findMany({
       where: {
         organisation_id: organisationId,
         left_at: null, // Seulement les membres actifs (non retirés)
         deleted_at: null, // Exclure aussi les membres supprimés (soft delete)
+        ...(tagId
+          ? {
+              tagAssignments: {
+                some: { tag_id: tagId },
+              },
+            }
+          : {}),
       },
       include: {
         user: {
@@ -332,6 +345,11 @@ export class OrganisationsService {
             level: true,
           },
         },
+        tagAssignments: {
+          include: {
+            tag: { select: { id: true, name: true } },
+          },
+        },
       },
       orderBy: { joined_at: 'asc' },
     });
@@ -351,6 +369,7 @@ export class OrganisationsService {
       is_minor: member.user.is_minor,
       role: member.role,
       joined_at: member.joined_at,
+      tags: member.tagAssignments.map((a) => ({ id: a.tag.id, name: a.tag.name })),
     }));
   }
 
@@ -762,21 +781,43 @@ export class OrganisationsService {
   }
 
   /**
-   * Récupérer l'historique des anciens membres (left_at != null)
+   * Export CSV / historique membres : propriétaire, gestionnaire ou créateur du club (sans RBAC `members.read`).
    */
-  async getOrganisationMembersHistory(organisationId: string, userId: string) {
-    // Vérifier que l'utilisateur est membre de l'organisation
+  private async assertClubStaffOrOrgCreatorForMemberLists(organisationId: string, userId: string) {
     const membership = await this.prisma.membership.findFirst({
       where: {
         user_id: userId,
         organisation_id: organisationId,
         left_at: null,
+        deleted_at: null,
       },
+      include: { role: { select: { type: true } } },
     });
-
     if (!membership) {
       throw new ForbiddenException("Vous n'êtes pas membre de cette organisation");
     }
+    const org = await this.prisma.organisation.findFirst({
+      where: { id: organisationId },
+      select: { created_by_id: true },
+    });
+    if (!org) {
+      throw new ForbiddenException('Organisation introuvable');
+    }
+    const staffTypes = ['club_owner', 'club_manager'] as const;
+    const isStaff = staffTypes.includes(membership.role.type as (typeof staffTypes)[number]);
+    const isCreator = org.created_by_id === userId;
+    if (!isStaff && !isCreator) {
+      throw new ForbiddenException(
+        'Seuls le propriétaire, le gestionnaire ou le créateur du club peuvent utiliser cette fonctionnalité.'
+      );
+    }
+  }
+
+  /**
+   * Récupérer l'historique des anciens membres (left_at != null)
+   */
+  async getOrganisationMembersHistory(organisationId: string, userId: string) {
+    await this.assertClubStaffOrOrgCreatorForMemberLists(organisationId, userId);
 
     const members = await this.prisma.membership.findMany({
       where: {
@@ -819,25 +860,35 @@ export class OrganisationsService {
     }));
   }
 
+  /** Nom de fichier export CSV : `{nom-club}-membres.csv` (caractères invalides retirés). */
+  private buildMembersExportCsvFilename(organisationName: string): string {
+    const slug = organisationName
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .replace(/[\u0000-\u001f\\/:*?"<>|]+/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '') || 'organisation';
+    return `${slug.slice(0, 120)}-membres.csv`;
+  }
+
   /**
-   * Exporter les membres en CSV
+   * Exporter les membres en CSV (données étendues + tags)
    */
   async exportMembersToCSV(
     organisationId: string,
     userId: string,
     includeHistory: boolean = false
   ) {
-    // Vérifier que l'utilisateur est membre de l'organisation
-    const membership = await this.prisma.membership.findFirst({
-      where: {
-        user_id: userId,
-        organisation_id: organisationId,
-        left_at: null,
-      },
-    });
+    await this.assertClubStaffOrOrgCreatorForMemberLists(organisationId, userId);
 
-    if (!membership) {
-      throw new ForbiddenException("Vous n'êtes pas membre de cette organisation");
+    const orgMeta = await this.prisma.organisation.findUnique({
+      where: { id: organisationId },
+      select: { name: true },
+    });
+    if (!orgMeta) {
+      throw new NotFoundException('Organisation introuvable');
     }
 
     const whereClause: {
@@ -864,7 +915,24 @@ export class OrganisationsService {
             lastname: true,
             username: true,
             phone: true,
+            birthdate: true,
+            gender: true,
+            profile_mode: true,
+            is_minor: true,
             created_at: true,
+            healthInfo: {
+              select: {
+                blood_type: true,
+                allergies: true,
+                no_known_allergies: true,
+                treatments: true,
+                no_known_treatments: true,
+                medical_notes: true,
+                emergency_contact_name: true,
+                emergency_contact_phone: true,
+                emergency_contact_relation: true,
+              },
+            },
           },
         },
         role: {
@@ -873,40 +941,215 @@ export class OrganisationsService {
             type: true,
           },
         },
+        tagAssignments: {
+          include: { tag: { select: { name: true } } },
+        },
       },
       orderBy: { joined_at: 'asc' },
     });
 
-    // Générer le CSV
+    const csvCell = (v: unknown) => {
+      if (v === null || v === undefined) {
+        return '""';
+      }
+      const s = String(v).replace(/"/g, '""');
+      return `"${s}"`;
+    };
+
+    const fmtDate = (d: Date | null | undefined) =>
+      d ? d.toISOString().split('T')[0] : '';
+
     const headers = [
       'Email',
       'Prénom',
       'Nom',
       'Username',
       'Téléphone',
+      'Date de naissance',
+      'Genre',
+      'Mode profil',
+      'Mineur',
       'Rôle',
+      'Statut adhésion',
+      'Numéro licence',
+      'Année adhésion',
+      'Payé',
+      'Validé',
+      'Statut documents',
+      'Statut paiement',
+      'Commentaire',
+      'Tags',
+      'Groupe sanguin',
+      'Allergies',
+      'Traitements',
+      'Notes médicales',
+      "Contact urgence — nom",
+      "Contact urgence — téléphone",
+      "Contact urgence — lien",
       "Date d'adhésion",
       'Date de départ',
     ];
-    const rows = members.map((member) => [
-      member.user.email,
-      member.user.firstname,
-      member.user.lastname,
-      member.user.username || '',
-      member.user.phone || '',
-      member.role.name,
-      member.joined_at.toISOString().split('T')[0],
-      member.left_at ? member.left_at.toISOString().split('T')[0] : '',
-    ]);
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
-    ].join('\n');
+    const rows = members.map((member) => {
+      const u = member.user;
+      const h = u.healthInfo;
+      const tags = member.tagAssignments.map((a) => a.tag.name).join('; ');
+      return [
+        u.email,
+        u.firstname,
+        u.lastname,
+        u.username || '',
+        u.phone || '',
+        fmtDate(u.birthdate),
+        u.gender,
+        u.profile_mode,
+        u.is_minor ? 'oui' : 'non',
+        member.role.name,
+        member.status,
+        member.license_number || '',
+        member.adhesion_year ?? '',
+        member.is_paid ? 'oui' : 'non',
+        member.validated ? 'oui' : 'non',
+        member.docs_status,
+        member.payment_status,
+        member.comment || '',
+        tags,
+        h?.blood_type || '',
+        h?.allergies?.length ? h.allergies.join('; ') : h?.no_known_allergies ? 'aucune connue' : '',
+        h?.treatments?.length ? h.treatments.join('; ') : h?.no_known_treatments ? 'aucun connu' : '',
+        h?.medical_notes || '',
+        h?.emergency_contact_name || '',
+        h?.emergency_contact_phone || '',
+        h?.emergency_contact_relation || '',
+        fmtDate(member.joined_at),
+        member.left_at ? fmtDate(member.left_at) : '',
+      ];
+    });
+
+    const csvContent = [headers.map(csvCell).join(','), ...rows.map((row) => row.map(csvCell).join(','))].join(
+      '\n'
+    );
 
     return {
       csv: csvContent,
-      filename: `membres_${organisationId}_${new Date().toISOString().split('T')[0]}.csv`,
+      filename: this.buildMembersExportCsvFilename(orgMeta.name),
     };
+  }
+
+  /**
+   * Tags : propriétaire du club (rôle club_owner) ou créateur de l’organisation (fallback si données rôle incohérentes).
+   */
+  private async assertClubOwnerOrOrgCreatorForMemberTags(organisationId: string, userId: string) {
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        user_id: userId,
+        organisation_id: organisationId,
+        left_at: null,
+        deleted_at: null,
+      },
+      include: { role: { select: { type: true } } },
+    });
+    if (!membership) {
+      throw new ForbiddenException("Vous n'êtes pas membre de cette organisation");
+    }
+    const org = await this.prisma.organisation.findFirst({
+      where: { id: organisationId },
+      select: { created_by_id: true },
+    });
+    if (!org) {
+      throw new ForbiddenException('Organisation introuvable');
+    }
+    const isOwnerRole = membership.role.type === 'club_owner';
+    const isOrgCreator = org.created_by_id === userId;
+    if (!isOwnerRole && !isOrgCreator) {
+      throw new ForbiddenException('Seul le propriétaire du club peut gérer les tags membres.');
+    }
+  }
+
+  async listOrganisationMemberTags(organisationId: string, userId: string) {
+    await this.assertClubOwnerOrOrgCreatorForMemberTags(organisationId, userId);
+    return this.prisma.organisationMemberTag.findMany({
+      where: { organisation_id: organisationId },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, created_at: true },
+    });
+  }
+
+  async createOrganisationMemberTag(organisationId: string, userId: string, rawName: string) {
+    await this.assertClubOwnerOrOrgCreatorForMemberTags(organisationId, userId);
+    const name = rawName.trim();
+    if (!name) {
+      throw new BadRequestException('Le nom du tag est requis');
+    }
+    const existing = await this.prisma.organisationMemberTag.findFirst({
+      where: { organisation_id: organisationId, name },
+    });
+    if (existing) {
+      throw new ConflictException('Un tag avec ce nom existe déjà');
+    }
+    return this.prisma.organisationMemberTag.create({
+      data: { organisation_id: organisationId, name },
+      select: { id: true, name: true, created_at: true },
+    });
+  }
+
+  async deleteOrganisationMemberTag(organisationId: string, userId: string, tagId: string) {
+    await this.assertClubOwnerOrOrgCreatorForMemberTags(organisationId, userId);
+    const tag = await this.prisma.organisationMemberTag.findFirst({
+      where: { id: tagId, organisation_id: organisationId },
+    });
+    if (!tag) {
+      throw new NotFoundException('Tag introuvable');
+    }
+    await this.prisma.organisationMemberTag.delete({ where: { id: tagId } });
+    return { message: 'Tag supprimé' };
+  }
+
+  async setMemberTagsForUser(
+    organisationId: string,
+    targetUserId: string,
+    requesterId: string,
+    tagIds: string[]
+  ) {
+    await this.assertClubOwnerOrOrgCreatorForMemberTags(organisationId, requesterId);
+
+    const targetMembership = await this.prisma.membership.findFirst({
+      where: {
+        user_id: targetUserId,
+        organisation_id: organisationId,
+        left_at: null,
+        deleted_at: null,
+      },
+    });
+    if (!targetMembership) {
+      throw new NotFoundException('Membre introuvable dans cette organisation');
+    }
+
+    if (tagIds.length > 0) {
+      const tags = await this.prisma.organisationMemberTag.findMany({
+        where: { organisation_id: organisationId, id: { in: tagIds } },
+      });
+      if (tags.length !== tagIds.length) {
+        throw new BadRequestException('Un ou plusieurs tags ne sont pas valides pour ce club');
+      }
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.membershipTagAssignment.deleteMany({
+        where: { membership_id: targetMembership.id },
+      }),
+      ...(tagIds.length
+        ? [
+            this.prisma.membershipTagAssignment.createMany({
+              data: tagIds.map((tag_id) => ({
+                membership_id: targetMembership.id,
+                tag_id,
+              })),
+            }),
+          ]
+        : []),
+    ]);
+
+    return { message: 'Tags mis à jour' };
   }
 }

@@ -137,6 +137,7 @@ model Membership {
   role               Role                    @relation(fields: [role_id], references: [id])
   user               User                    @relation(fields: [user_id], references: [id])
   Reservation        Reservation[]
+  tagAssignments     MembershipTagAssignment[]
 
   @@index([user_id, organisation_id])
   @@index([user_id, status])
@@ -171,6 +172,7 @@ model Organisation {
   Invoice       Invoice[]
   listings      Listing[]
   memberships   Membership[]
+  memberTags    OrganisationMemberTag[]
   categories    OrganisationCategory[]
   created_by    User                   @relation(fields: [created_by_id], references: [id])
   Payment       Payment[]
@@ -178,6 +180,32 @@ model Organisation {
   subscriptions Subscription[]
 
   @@map("organisations")
+}
+
+model OrganisationMemberTag {
+  id              String   @id @default(uuid())
+  organisation_id String
+  name            String
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  organisation    Organisation @relation(fields: [organisation_id], references: [id], onDelete: Cascade)
+  assignments     MembershipTagAssignment[]
+
+  @@unique([organisation_id, name])
+  @@index([organisation_id])
+  @@map("organisation_member_tags")
+}
+
+model MembershipTagAssignment {
+  membership_id String
+  tag_id        String
+  assigned_at   DateTime @default(now())
+  membership    Membership @relation(fields: [membership_id], references: [id], onDelete: Cascade)
+  tag           OrganisationMemberTag @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@id([membership_id, tag_id])
+  @@index([tag_id])
+  @@map("membership_tag_assignments")
 }
 
 model Category {
