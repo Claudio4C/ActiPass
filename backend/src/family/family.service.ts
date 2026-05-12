@@ -6,7 +6,13 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateChildDto, UpdateChildDto, EnrollChildDto } from './dto';
+import { CreateChildDto, UpdateChildDto, EnrollChildDto, UpsertChildHealthDto } from './dto';
+
+const AUTHORIZATION_META: Record<string, { title: string; description: string }> = {
+  photo_rights: { title: 'Droit à l\'image', description: 'Autorisation d\'utiliser photos et vidéos de l\'enfant lors des activités du club.' },
+  excursion:    { title: 'Autorisation de sortie', description: 'Autorisation de participer aux sorties, déplacements et voyages organisés par le club.' },
+  medical_waiver: { title: 'Décharge médicale', description: 'Autorisation de prise en charge médicale d\'urgence en cas d\'accident ou d\'indisposition.' },
+};
 
 @Injectable()
 export class FamilyService {
@@ -75,6 +81,7 @@ export class FamilyService {
         ...(dto.birthdate && { birthdate: new Date(dto.birthdate + 'T00:00:00.000Z') }),
         ...(dto.gender && { gender: dto.gender }),
         phone: dto.phone ?? undefined,
+        ...(dto.avatar_url !== undefined && { avatar_url: dto.avatar_url }),
       },
     });
 
@@ -185,9 +192,12 @@ export class FamilyService {
       select: {
         id: true,
         title: true,
+        description: true,
         start_time: true,
         end_time: true,
         location: true,
+        registration_required: true,
+        capacity: true,
         organisation: { select: { id: true, name: true } },
       },
       orderBy: { start_time: 'asc' },
@@ -318,6 +328,88 @@ export class FamilyService {
     return { message: 'Inscription annulée' };
   }
 
+  // ─── Health info ──────────────────────────────────────────────────────────
+
+  async getChildHealth(parentId: string, childId: string) {
+    await this.assertParentOwnsChild(parentId, childId);
+    const health = await this.prisma.childHealthInfo.findUnique({ where: { child_id: childId } });
+    return health ?? { child_id: childId, blood_type: null, allergies: [], treatments: [], medical_notes: null, emergency_contact_name: null, emergency_contact_phone: null, emergency_contact_relation: null };
+  }
+
+  async upsertChildHealth(parentId: string, childId: string, dto: UpsertChildHealthDto) {
+    await this.assertParentOwnsChild(parentId, childId);
+    return this.prisma.childHealthInfo.upsert({
+      where: { child_id: childId },
+      update: {
+        ...(dto.blood_type !== undefined && { blood_type: dto.blood_type }),
+        ...(dto.allergies !== undefined && { allergies: dto.allergies }),
+        ...(dto.no_known_allergies !== undefined && { no_known_allergies: dto.no_known_allergies }),
+        ...(dto.treatments !== undefined && { treatments: dto.treatments }),
+        ...(dto.no_known_treatments !== undefined && { no_known_treatments: dto.no_known_treatments }),
+        ...(dto.medical_notes !== undefined && { medical_notes: dto.medical_notes }),
+        ...(dto.emergency_contact_name !== undefined && { emergency_contact_name: dto.emergency_contact_name }),
+        ...(dto.emergency_contact_phone !== undefined && { emergency_contact_phone: dto.emergency_contact_phone }),
+        ...(dto.emergency_contact_relation !== undefined && { emergency_contact_relation: dto.emergency_contact_relation }),
+      },
+      create: {
+        child_id: childId,
+        blood_type: dto.blood_type ?? null,
+        allergies: dto.allergies ?? [],
+        no_known_allergies: dto.no_known_allergies ?? false,
+        treatments: dto.treatments ?? [],
+        no_known_treatments: dto.no_known_treatments ?? false,
+        medical_notes: dto.medical_notes ?? null,
+        emergency_contact_name: dto.emergency_contact_name ?? null,
+        emergency_contact_phone: dto.emergency_contact_phone ?? null,
+        emergency_contact_relation: dto.emergency_contact_relation ?? null,
+      },
+    });
+  }
+
+  // ─── Authorizations ───────────────────────────────────────────────────────
+
+  async getChildAuthorizations(parentId: string, childId: string) {
+    await this.assertParentOwnsChild(parentId, childId);
+    const existing = await this.prisma.childAuthorization.findMany({ where: { child_id: childId } });
+    const existingMap = new Map(existing.map((a) => [a.type, a]));
+
+    return (['photo_rights', 'excursion', 'medical_waiver'] as const).map((type) => {
+      const record = existingMap.get(type);
+      const meta = AUTHORIZATION_META[type];
+      return {
+        type,
+        title: meta.title,
+        description: meta.description,
+        id: record?.id ?? null,
+        is_signed: record?.is_signed ?? false,
+        signed_at: record?.signed_at ?? null,
+      };
+    });
+  }
+
+  async signAuthorization(parentId: string, childId: string, type: string) {
+    await this.assertParentOwnsChild(parentId, childId);
+    const meta = AUTHORIZATION_META[type];
+    if (!meta) { throw new BadRequestException('Type d\'autorisation invalide'); }
+
+    return this.prisma.childAuthorization.upsert({
+      where: { child_id_type: { child_id: childId, type: type as any } },
+      update: { is_signed: true, signed_at: new Date() },
+      create: { child_id: childId, parent_id: parentId, type: type as any, title: meta.title, description: meta.description, is_signed: true, signed_at: new Date() },
+    });
+  }
+
+  async unsignAuthorization(parentId: string, childId: string, type: string) {
+    await this.assertParentOwnsChild(parentId, childId);
+    if (!AUTHORIZATION_META[type]) { throw new BadRequestException('Type d\'autorisation invalide'); }
+
+    return this.prisma.childAuthorization.upsert({
+      where: { child_id_type: { child_id: childId, type: type as any } },
+      update: { is_signed: false, signed_at: null },
+      create: { child_id: childId, parent_id: parentId, type: type as any, title: AUTHORIZATION_META[type].title, description: AUTHORIZATION_META[type].description, is_signed: false },
+    });
+  }
+
   private async assertParentOwnsChild(parentId: string, childId: string) {
     const link = await this.prisma.familyLink.findUnique({
       where: { parent_id_child_id: { parent_id: parentId, child_id: childId } },
@@ -336,6 +428,7 @@ export class FamilyService {
       birthdate: child.birthdate,
       gender: child.gender,
       phone: child.phone,
+      avatar_url: child.avatar_url ?? null,
       relationship,
       is_primary_contact,
       memberships: child.memberships ?? [],

@@ -15,6 +15,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { FamilyModule } from './family/family.module';
 import { UsersModule } from './users/users.module';
+import { UploadModule } from './upload/upload.module';
 
 @Module({
   imports: [
@@ -24,13 +25,13 @@ import { UsersModule } from './users/users.module';
     }),
     ThrottlerModule.forRoot([
       {
-        ttl: 60, // 60 secondes
-        limit: 50, // 50 requêtes par minute (augmenté de 10 pour permettre une navigation normale)
+        ttl: 60,
+        limit: 400, // 400 req/min — navigation SaaS fluide (multi-appels au chargement de page)
       },
       {
         name: 'auth',
         ttl: 60,
-        limit: 10, // 10 tentatives de connexion par minute (augmenté de 5)
+        limit: 15, // Auth reste stricte : 15 tentatives/min anti-bruteforce
       },
     ]),
     PrismaModule,
@@ -41,6 +42,7 @@ import { UsersModule } from './users/users.module';
     AttendanceModule,
     FamilyModule,
     EmailModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [

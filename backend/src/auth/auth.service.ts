@@ -327,10 +327,9 @@ export class AuthService {
       email: user.email,
     };
 
-    // Durée du token plus longue pour les Super Admins (2h au lieu de 15min)
     const expiresIn = user.is_super_admin
-      ? '2h'
-      : this.configService.get<string>('JWT_EXPIRES_IN', '15m');
+      ? '24h'
+      : this.configService.get<string>('JWT_EXPIRES_IN', '8h');
 
     const [accessToken, refreshToken] = await Promise.all([
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

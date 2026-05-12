@@ -1,17 +1,202 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import {
-  Users,
-  CalendarDays,
-  Zap,
-  MapPin,
-  Clock,
-  TrendingUp,
+  Users, CalendarDays, Zap, MapPin, Clock, TrendingUp,
+  CheckCircle, Circle, ChevronRight, Building2,
 } from 'lucide-react';
 import RoleBasedRoute from '../../components/shared/RoleBasedRoute';
 import { api } from '../../lib/api';
 import { cn } from '../../lib/utils';
 import type { Event, EventType } from '../../types';
+
+// ─── Confetti (CDN) ──────────────────────────────────────────────────────────
+
+type ConfettiFn = (opts?: Record<string, unknown>) => void
+const loadConfetti = (): Promise<ConfettiFn> =>
+  new Promise((resolve) => {
+    if ((window as unknown as { confetti?: ConfettiFn }).confetti) {
+      resolve((window as unknown as { confetti: ConfettiFn }).confetti); return
+    }
+    const s = document.createElement('script')
+    s.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js'
+    s.onload = () => resolve((window as unknown as { confetti: ConfettiFn }).confetti)
+    document.head.appendChild(s)
+  })
+
+// ─── ManagerGettingStartedCard ────────────────────────────────────────────────
+
+interface OrgResponse {
+  organisation: OrgFull;
+  myRole: { name: string; type: string };
+}
+
+interface OrgFull {
+  id: string; name: string; description: string | null;
+  city: string | null; status: string; logo_url: string | null;
+}
+
+const ManagerGettingStartedCard: React.FC<{
+  organisationId: string;
+  hasEvents: boolean;
+}> = ({ organisationId, hasEvents }) => {
+  const [org, setOrg] = useState<OrgFull | null>(null)
+  const [hidden, setHidden] = useState(() =>
+    localStorage.getItem('ikivio_welcome_seen') === 'done',
+  )
+  const celebrationFired = useRef(false)
+
+  const fetchOrg = useCallback(async () => {
+    try {
+      const data = await api.get<OrgResponse>(
+        `/organisations/${organisationId}`, undefined, { useCache: false },
+      )
+      setOrg(data.organisation)
+    } catch {}
+  }, [organisationId])
+
+  // Chargement initial + polling 60s + refresh au focus
+  useEffect(() => { fetchOrg() }, [fetchOrg])
+  useEffect(() => {
+    const id = setInterval(fetchOrg, 60000)
+    window.addEventListener('focus', fetchOrg)
+    return () => { clearInterval(id); window.removeEventListener('focus', fetchOrg) }
+  }, [fetchOrg])
+
+  // Confetti quand le statut passe à 'active'
+  useEffect(() => {
+    if (!org || celebrationFired.current || org.status !== 'active') { return }
+    celebrationFired.current = true
+    loadConfetti().then((confetti) => {
+      const fire = (opts: Record<string, unknown>) =>
+        confetti({ colors: ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EC4899'], ...opts })
+      fire({ particleCount: 60, spread: 60, origin: { y: 0.65 } })
+      setTimeout(() => fire({ particleCount: 40, spread: 90, origin: { y: 0.4 } }), 350)
+      setTimeout(() => {
+        localStorage.setItem('ikivio_welcome_seen', 'done')
+        localStorage.removeItem('ikivio_onboarding_type')
+        setHidden(true)
+      }, 2500)
+    })
+  }, [org])
+
+  if (hidden) { return null }
+
+  const isApproved = org?.status === 'active'
+
+  const steps = [
+    { id: 'account',     label: 'Créer votre compte',       done: true,              cta: '',           href: '' },
+    { id: 'club',        label: 'Créer votre club',         done: true,              cta: '',           href: '' },
+    { id: 'description', label: 'Compléter la description', done: !!org?.description, cta: 'Compléter →', href: `/dashboard/${organisationId}/settings` },
+    { id: 'logo',        label: 'Uploader un logo',         done: !!org?.logo_url,   cta: 'Ajouter →',  href: `/dashboard/${organisationId}/settings` },
+    { id: 'events',      label: 'Ajouter vos créneaux',     done: hasEvents,         cta: 'Créer →',    href: `/dashboard/${organisationId}/events/create` },
+    { id: 'validation',  label: 'Validation Ikivio',        done: !!isApproved,      cta: '',           href: '' },
+  ]
+
+  const completedCount = steps.filter((s) => s.done).length
+  const totalCount = steps.length
+  const pct = Math.round((completedCount / totalCount) * 100)
+  // L'étape "validation" ne devient jamais l'étape "active" affichée avec ChevronRight
+  const activeIndex = steps.findIndex((s) => !s.done && s.id !== 'validation')
+
+  return (
+    <div className={`bg-card border border-border rounded-2xl overflow-hidden transition-all ${isApproved ? 'border-[hsl(160,84%,39%)]/40' : ''}`}>
+
+      {/* Header */}
+      <div className="px-5 pt-5 pb-4 space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <Building2 className="w-5 h-5 text-primary shrink-0" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold mb-0.5">
+              Guide de démarrage
+            </p>
+            <h2 className="font-display text-base font-bold text-foreground">
+              Finalisez votre club · {completedCount}/{totalCount}
+            </h2>
+          </div>
+        </div>
+        <div className="w-full bg-border rounded-full h-1.5 overflow-hidden">
+          <div
+            className={`h-1.5 rounded-full transition-all duration-700 ${isApproved ? 'bg-[hsl(160,84%,39%)]' : 'bg-primary'}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Steps */}
+      <div className="divide-y divide-border">
+        {steps.map((step, index) => {
+          const isActive = index === activeIndex
+
+          return (
+            <div
+              key={step.id}
+              className={`flex items-center gap-4 px-5 py-3.5 transition-colors ${isActive ? 'bg-primary/5' : ''}`}
+            >
+              {/* Icône ou pill "En attente" */}
+              <div className="shrink-0">
+                {step.id === 'validation' && !step.done ? (
+                  <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 animate-pulse whitespace-nowrap">
+                    En attente · 24-48h
+                  </span>
+                ) : step.done ? (
+                  <CheckCircle className="w-5 h-5 text-[hsl(160,84%,39%)] shrink-0" />
+                ) : isActive ? (
+                  <ChevronRight className="w-5 h-5 text-primary shrink-0" />
+                ) : (
+                  <Circle className="w-5 h-5 text-border shrink-0" />
+                )}
+              </div>
+
+              {/* Label */}
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-semibold leading-tight ${
+                  step.done
+                    ? 'line-through text-muted-foreground'
+                    : isActive
+                    ? 'text-primary'
+                    : 'text-muted-foreground'
+                }`}>
+                  {step.label}
+                </p>
+              </div>
+
+              {/* CTA pill */}
+              {isActive && step.cta && step.href && (
+                <Link
+                  to={step.href}
+                  className="shrink-0 inline-flex items-center px-3 py-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-full hover:opacity-90 active:scale-95 transition-all shadow-sm shadow-primary/20 whitespace-nowrap"
+                >
+                  {step.cta}
+                </Link>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Footer */}
+      <div className="px-5 py-3 border-t border-border">
+        {org && !isApproved ? (
+          <p className="text-[11px] text-muted-foreground text-center">
+            Notre équipe vérifie votre dossier. Vous recevrez un email de confirmation.
+          </p>
+        ) : (
+          <button
+            onClick={() => {
+              localStorage.setItem('ikivio_welcome_seen', 'done')
+              setHidden(true)
+            }}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Masquer pour l'instant
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -165,6 +350,14 @@ const OverviewPage: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
+
+      {/* ── Checklist de démarrage gérant ────────────────────────────────────── */}
+      {organisationId && (
+        <ManagerGettingStartedCard
+          organisationId={organisationId}
+          hasEvents={events.length > 0}
+        />
+      )}
 
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div>

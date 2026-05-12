@@ -28,7 +28,7 @@ import { SuperAdminService } from './super-admin.service';
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        signOptions: { expiresIn: configService.get<string>('JWT_EXPIRES_IN', '15m') as any },
+        signOptions: { expiresIn: configService.get<string>('JWT_EXPIRES_IN', '8h') as any },
       }),
       inject: [ConfigService],
     }),

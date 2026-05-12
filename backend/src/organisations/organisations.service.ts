@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, ForbiddenException, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 
 import { EmailService } from '../email/email.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,11 +19,15 @@ export class OrganisationsService {
   async createOrganisation(createOrganisationDto: CreateOrganisationDto, userId: string) {
     const { name, type, description, address, phone, email, website } = createOrganisationDto;
 
-    // Créer l'organisation
+    // Slug unique : nom + suffixe aléatoire pour éviter les doublons
+    const baseSlug = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const slug = `${baseSlug}-${Date.now().toString(36)}`;
+
+    // Créer l'organisation en statut pending_validation (validée par un super-admin)
     const organisation = await this.prisma.organisation.create({
       data: {
         name,
-        slug: name.toLowerCase().replace(/\s+/g, '-'),
+        slug,
         type: type,
         description,
         address,
@@ -31,6 +35,7 @@ export class OrganisationsService {
         email,
         website_url: website,
         created_by_id: userId,
+        status: 'pending_validation',
       },
     });
 
@@ -72,6 +77,7 @@ export class OrganisationsService {
         id: organisation.id,
         name: organisation.name,
         type: organisation.type,
+        status: organisation.status,
         created_at: organisation.created_at,
       },
       role: {
@@ -80,6 +86,38 @@ export class OrganisationsService {
         type: ownerRole.type,
       },
     };
+  }
+
+  /**
+   * Lister tous les clubs/associations publics avec filtres (annuaire)
+   */
+  async listPublicOrganisations(filters: {
+    search?: string; type?: string; city?: string; limit: number;
+  }) {
+    const orgs = await this.prisma.organisation.findMany({
+      where: {
+        is_public: true,
+        status: 'active',
+        deleted_at: null,
+        ...(filters.type && { type: filters.type as any }),
+        ...(filters.city && { city: { contains: filters.city, mode: 'insensitive' } }),
+        ...(filters.search && {
+          OR: [
+            { name: { contains: filters.search, mode: 'insensitive' } },
+            { description: { contains: filters.search, mode: 'insensitive' } },
+            { city: { contains: filters.search, mode: 'insensitive' } },
+          ],
+        }),
+      },
+      select: {
+        id: true, name: true, type: true, description: true,
+        city: true, address: true, phone: true, email: true, website_url: true,
+        _count: { select: { memberships: { where: { left_at: null, deleted_at: null, status: 'active' } } } },
+      },
+      orderBy: { created_at: 'desc' },
+      take: filters.limit,
+    });
+    return orgs.map((o) => ({ ...o, member_count: o._count.memberships }));
   }
 
   /**
@@ -98,6 +136,8 @@ export class OrganisationsService {
             name: true,
             type: true,
             description: true,
+            logo_url: true,
+            status: true,
             created_at: true,
           },
         },

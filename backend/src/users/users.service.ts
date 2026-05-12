@@ -104,9 +104,18 @@ export class UsersService {
       throw new NotFoundException('Utilisateur non trouvé');
     }
 
+    const updateData: Record<string, unknown> = {}
+    if (updateUserDto.firstname)    { updateData.firstname    = updateUserDto.firstname }
+    if (updateUserDto.lastname)     { updateData.lastname     = updateUserDto.lastname }
+    if (updateUserDto.username)     { updateData.username     = updateUserDto.username }
+    if (updateUserDto.phone !== undefined)     { updateData.phone     = updateUserDto.phone }
+    if (updateUserDto.birthdate)    { updateData.birthdate    = new Date(updateUserDto.birthdate) }
+    if (updateUserDto.avatar_url !== undefined) { updateData.avatar_url = updateUserDto.avatar_url }
+    if (updateUserDto.profile_mode) { updateData.profile_mode = updateUserDto.profile_mode }
+
     const updatedUser = await this.prisma.user.update({
       where: { id: userId },
-      data: updateUserDto,
+      data: updateData,
     });
 
     return {

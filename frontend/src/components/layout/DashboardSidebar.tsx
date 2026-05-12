@@ -26,7 +26,16 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
   const location = useLocation()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [membership, setMembership] = useState<Membership | null>(null)
+  const [orgInfo, setOrgInfo] = useState<{ name: string; logo_url: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(
+    () => localStorage.getItem('user_avatar_url'),
+  )
+  useEffect(() => {
+    const handler = () => setAvatarUrl(localStorage.getItem('user_avatar_url'))
+    window.addEventListener('avatar:updated', handler)
+    return () => window.removeEventListener('avatar:updated', handler)
+  }, [])
 
   useEffect(() => {
     if (!user?.id || !organisationId) {return}
@@ -34,7 +43,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
       try {
         setLoading(true)
         const data = await api.get<{
-          organisation: { id: string; name: string };
+          organisation: { id: string; name: string; logo_url?: string | null };
           myRole: { id: string; name: string; type: RoleType; level: number };
         }>(`/organisations/${organisationId}`, undefined, { useCache: true, cacheTTL: 60000 })
         setMembership({
@@ -43,6 +52,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
           role: data.myRole,
           joined_at: new Date().toISOString(),
         })
+        setOrgInfo({ name: data.organisation.name, logo_url: data.organisation.logo_url ?? null })
       } catch {
         // silently fail
       } finally {
@@ -103,11 +113,25 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
           to="/home"
           className="flex items-center gap-3 px-5 py-4 border-b border-border hover:bg-muted transition-colors"
         >
-          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shadow-sm shrink-0">
-            <span className="text-primary-foreground font-display font-bold text-sm">I</span>
+          <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0">
+            {orgInfo?.logo_url ? (
+              <img
+                src={orgInfo.logo_url}
+                alt={orgInfo.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-primary flex items-center justify-center shadow-sm">
+                <span className="text-primary-foreground font-display font-bold text-sm">
+                  {orgInfo?.name?.[0]?.toUpperCase() ?? 'I'}
+                </span>
+              </div>
+            )}
           </div>
-          <div>
-            <p className="font-display font-bold text-foreground text-sm leading-none">Actipass</p>
+          <div className="min-w-0">
+            <p className="font-display font-bold text-foreground text-sm leading-none truncate">
+              {orgInfo?.name ?? 'Actipass'}
+            </p>
             <p className="text-[11px] text-muted-foreground mt-0.5">Dashboard</p>
           </div>
         </Link>
@@ -143,8 +167,13 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
         {/* User footer */}
         <div className="px-4 py-4 border-t border-border">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold shrink-0">
-              {user?.firstName?.[0] ?? 'U'}
+            <div className="w-9 h-9 rounded-full overflow-hidden shrink-0">
+              {avatarUrl
+                ? <img src={avatarUrl} alt={user?.firstName ?? 'U'} className="w-full h-full object-cover" />
+                : <div className="w-full h-full bg-primary flex items-center justify-center text-primary-foreground text-sm font-bold">
+                    {`${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`.toUpperCase() || 'U'}
+                  </div>
+              }
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-foreground truncate">

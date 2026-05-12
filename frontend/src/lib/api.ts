@@ -201,6 +201,16 @@ class ApiClient {
     return response.data
   }
 
+  // Upload d'un fichier image — retourne l'URL publique
+  async upload(file: File): Promise<string> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await this.client.post<{ url: string }>('/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data.url
+  }
+
   // Méthode pour obtenir l'instance axios (si besoin)
   getInstance(): AxiosInstance {
     return this.client

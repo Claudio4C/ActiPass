@@ -1,14 +1,17 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
-import { Baby, Calendar, MapPin, CheckCircle, Clock, ArrowLeft, AlertCircle } from 'lucide-react';
-import { api } from '../../lib/api';
+import React, { useEffect, useState, useCallback } from 'react'
+import { Link } from 'react-router-dom'
+import { Baby, Calendar, MapPin, CheckCircle, ArrowLeft, AlertCircle, ChevronLeft, ChevronRight, Building2 } from 'lucide-react'
+import { api } from '../../lib/api'
 
 interface EventItem {
   id: string;
   title: string;
+  description?: string | null;
   start_time: string;
   end_time: string | null;
   location: string | null;
+  registration_required: boolean;
+  capacity?: number | null;
   organisation: { id: string; name: string };
   is_registered: boolean;
   membership_id: string;
@@ -24,242 +27,403 @@ interface ChildSummary {
   events: EventItem[];
 }
 
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'long' });
+const AVATAR_COLORS = [
+  'hsl(217,91%,60%)', 'hsl(280,70%,60%)', 'hsl(25,95%,53%)',
+  'hsl(160,84%,39%)', 'hsl(340,75%,55%)',
+]
+const avatarColor = (name: string) => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length]
 
-const formatTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+const fmtDay = (date: Date) =>
+  date.toLocaleDateString('fr-FR', { weekday: 'short' }).slice(0, 3)
+
+const fmtTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+
+const fmtMonthYear = (date: Date) =>
+  date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+
+function getWeekDays(refDate: Date): Date[] {
+  const monday = new Date(refDate)
+  monday.setDate(refDate.getDate() - ((refDate.getDay() + 6) % 7))
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday)
+    d.setDate(monday.getDate() + i)
+    return d
+  })
+}
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
 
 const FamilyDashboardPage: React.FC = () => {
-  const [children, setChildren] = useState<ChildSummary[]>([]);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [children, setChildren] = useState<ChildSummary[]>([])
+  const [selected, setSelected] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+
+  const [weekRef, setWeekRef] = useState(new Date())
+  const [activeDay, setActiveDay] = useState<Date>(new Date())
+
+  const weekDays = getWeekDays(weekRef)
+
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3500)
+  }
 
   const load = useCallback(async () => {
     try {
-      setError(null);
-      api.clearCache('/family/dashboard');
-      const data = await api.get<{ children: ChildSummary[] }>('/family/dashboard');
-      setChildren(data.children);
+      setError(null)
+      api.clearCache('/family/dashboard')
+      const data = await api.get<{ children: ChildSummary[] }>('/family/dashboard')
+      setChildren(data.children)
       if (data.children.length > 0 && !selected) {
-        setSelected(data.children[0].id);
+        setSelected(data.children[0].id)
       }
-    } catch (e) {
-      setError('Impossible de charger le planning. Vérifiez votre connexion.');
-      console.error(e);
+    } catch {
+      setError('Impossible de charger le planning.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [selected]);
+  }, [selected])
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load() }, [])
 
   const handleRegister = async (child: ChildSummary, event: EventItem) => {
-    setActionLoading(event.id);
+    setActionLoading(event.id)
+    // Mise à jour optimiste
+    setChildren((prev) =>
+      prev.map((c) =>
+        c.id !== child.id ? c : {
+          ...c,
+          events: c.events.map((e) =>
+            e.id !== event.id ? e : { ...e, is_registered: !e.is_registered },
+          ),
+        },
+      ),
+    )
     try {
       if (event.is_registered) {
-        await api.delete(`/family/children/${child.id}/events/${event.id}/register`);
+        await api.delete(`/family/children/${child.id}/events/${event.id}/register`)
+        showToast(`Inscription de ${child.firstname} annulée.`, 'success')
       } else {
-        await api.post(`/family/children/${child.id}/events/${event.id}/register`);
+        await api.post(`/family/children/${child.id}/events/${event.id}/register`, {})
+        showToast(`${child.firstname} est inscrit(e) à "${event.title}" !`, 'success')
       }
-      await load();
+      // Sync silencieuse en arrière-plan
+      api.clearCache('/family/dashboard')
+      const data = await api.get<{ children: ChildSummary[] }>('/family/dashboard', undefined, { useCache: false })
+      setChildren(data.children)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erreur lors de l\'inscription.');
+      // Rollback optimiste
+      setChildren((prev) =>
+        prev.map((c) =>
+          c.id !== child.id ? c : {
+            ...c,
+            events: c.events.map((ev) =>
+              ev.id !== event.id ? ev : { ...ev, is_registered: event.is_registered },
+            ),
+          },
+        ),
+      )
+      showToast(e instanceof Error ? e.message : 'Erreur lors de l\'inscription.', 'error')
     } finally {
-      setActionLoading(null);
+      setActionLoading(null)
     }
-  };
+  }
 
-  const current = selected ? children.find((c) => c.id === selected) ?? null : null;
+  const prevWeek = () => {
+    const d = new Date(weekRef)
+    d.setDate(d.getDate() - 7)
+    setWeekRef(d)
+  }
+  const nextWeek = () => {
+    const d = new Date(weekRef)
+    d.setDate(d.getDate() + 7)
+    setWeekRef(d)
+  }
 
-  const displayedEvents: (EventItem & { childName: string })[] = current
-    ? current.events.map((e) => ({ ...e, childName: current.firstname }))
-    : children
-        .flatMap((c) => c.events.map((e) => ({ ...e, childName: c.firstname })))
-        .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  const current = selected ? children.find((c) => c.id === selected) ?? null : null
+
+  const allEvents: (EventItem & { childId: string; childName: string })[] = current
+    ? current.events.map((e) => ({ ...e, childId: current.id, childName: current.firstname }))
+    : children.flatMap((c) => c.events.map((e) => ({ ...e, childId: c.id, childName: c.firstname })))
+        .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
+
+  const dayEvents = allEvents.filter((e) => isSameDay(new Date(e.start_time), activeDay))
+
+  const eventCountByDay = weekDays.map((day) => ({
+    date: day,
+    count: allEvents.filter((e) => isSameDay(new Date(e.start_time), day)).length,
+  }))
 
   return (
-    <>
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="space-y-6">
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Calendar className="h-7 w-7 text-indigo-500" />
-            <div>
-              <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Planning famille</h1>
-              <p className="text-sm text-slate-500">Inscrivez vos enfants aux événements de leur club</p>
-            </div>
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-xl text-sm font-semibold flex items-center gap-2 transition-all animate-in fade-in slide-in-from-bottom-2 ${
+          toast.type === 'success'
+            ? 'bg-[hsl(160,84%,39%)] text-white'
+            : 'bg-destructive text-white'
+        }`}>
+          {toast.type === 'success'
+            ? <CheckCircle className="w-4 h-4 shrink-0" />
+            : <AlertCircle className="w-4 h-4 shrink-0" />}
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Link
+          to="/club/famille"
+          className="w-9 h-9 rounded-xl flex items-center justify-center border border-border bg-card text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors active:scale-95"
+        >
+          <ArrowLeft className="w-4 h-4 shrink-0" />
+        </Link>
+        <div>
+          <h1 className="font-display text-2xl font-bold text-foreground">Planning famille</h1>
+          <p className="text-sm text-muted-foreground mt-1">Inscrivez vos enfants aux événements de leur club</p>
+        </div>
+      </div>
+
+      {/* Erreur */}
+      {error && (
+        <div className="flex items-start gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+          <AlertCircle className="w-4 h-4 shrink-0 text-destructive mt-0.5" />
+          <p className="text-sm text-destructive">{error}</p>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex items-center justify-center h-48">
+          <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        </div>
+      ) : children.length === 0 ? (
+        <div className="bg-card border border-border rounded-3xl p-12 text-center space-y-4">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center">
+            <Baby className="w-7 h-7 text-primary" />
           </div>
+          <h2 className="font-display text-lg font-bold text-foreground">Aucun enfant enregistré</h2>
+          <p className="text-sm text-muted-foreground">Créez les profils de vos enfants pour gérer leur planning.</p>
           <Link
             to="/club/famille"
-            className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:opacity-90 active:scale-95 transition-all"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Gérer les enfants
+            Gérer ma famille →
           </Link>
         </div>
-
-        {/* Erreur */}
-        {error && (
-          <div className="rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 flex items-center gap-3 text-sm text-red-600 dark:text-red-300">
-            <AlertCircle className="h-4 w-4 flex-shrink-0" />
-            {error}
+      ) : children.every((c) => c.organisations.length === 0) ? (
+        <div className="bg-card border border-border rounded-3xl p-12 text-center space-y-4">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/10 flex items-center justify-center">
+            <Building2 className="w-7 h-7 text-amber-600" />
           </div>
-        )}
-
-        {loading ? (
-          <div className="text-center py-20 text-slate-400">Chargement…</div>
-        ) : children.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-12 text-center space-y-3">
-            <Baby className="mx-auto h-12 w-12 text-slate-300" />
-            <p className="text-slate-500 dark:text-slate-400 font-medium">Aucun enfant enregistré</p>
-            <Link to="/club/famille" className="inline-block text-sm text-pink-500 hover:underline">
-              Ajouter un enfant →
+          <h2 className="font-display text-lg font-bold text-foreground">
+            {children.length === 1 ? `${children[0].firstname} n'est inscrit dans aucun club` : 'Vos enfants ne sont inscrits dans aucun club'}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Inscrivez-les dans un club pour voir leurs événements et gérer leurs présences.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              to="/clubs"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:opacity-90 active:scale-95 transition-all"
+            >
+              <Building2 className="w-4 h-4 shrink-0" />
+              Trouver un club
+            </Link>
+            <Link
+              to="/club/famille"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-border rounded-xl text-sm font-semibold text-foreground hover:bg-muted active:scale-95 transition-all"
+            >
+              Gérer ma famille
             </Link>
           </div>
-        ) : (
-          <>
-            {/* Onglets enfants */}
-            <div className="flex flex-wrap gap-2">
+        </div>
+      ) : (
+        <>
+          {/* Filtres enfants */}
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setSelected(null)}
+              className={`inline-flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold border transition-colors ${
+                selected === null ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-foreground border-border hover:border-primary/40'
+              }`}
+            >
+              Tous
+            </button>
+            {children.map((c) => (
               <button
-                onClick={() => setSelected(null)}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition cursor-pointer ${
-                  selected === null
-                    ? 'bg-indigo-500 text-white'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                key={c.id}
+                onClick={() => setSelected(c.id)}
+                className={`inline-flex items-center gap-1.5 px-3 h-8 rounded-full text-xs font-semibold border transition-colors ${
+                  selected === c.id ? 'border-transparent text-white' : 'bg-card text-foreground border-border hover:border-primary/40'
                 }`}
+                style={selected === c.id ? { backgroundColor: avatarColor(c.firstname), borderColor: avatarColor(c.firstname) } : {}}
               >
-                Tous
-              </button>
-              {children.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => setSelected(c.id)}
-                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition cursor-pointer ${
-                    selected === c.id
-                      ? 'bg-pink-500 text-white'
-                      : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
-                  }`}
+                <span
+                  className="w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white shrink-0"
+                  style={{ backgroundColor: selected === c.id ? 'rgba(255,255,255,0.3)' : avatarColor(c.firstname) }}
                 >
-                  {c.firstname}
-                </button>
-              ))}
+                  {c.firstname.charAt(0)}
+                </span>
+                {c.firstname}
+              </button>
+            ))}
+          </div>
+
+          {/* Navigateur de semaine */}
+          <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <button onClick={prevWeek} className="w-8 h-8 rounded-xl border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors active:scale-95">
+                <ChevronLeft className="w-4 h-4 shrink-0" />
+              </button>
+              <span className="text-sm font-semibold text-foreground capitalize">{fmtMonthYear(weekRef)}</span>
+              <button onClick={nextWeek} className="w-8 h-8 rounded-xl border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors active:scale-95">
+                <ChevronRight className="w-4 h-4 shrink-0" />
+              </button>
             </div>
 
-            {/* Infos enfant sélectionné */}
-            {current && (
-              <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-5 py-4 flex items-center gap-4">
-                <div className="h-10 w-10 rounded-full bg-pink-100 dark:bg-pink-900/30 flex items-center justify-center text-pink-600 font-bold text-sm flex-shrink-0">
-                  {current.firstname.charAt(0)}
-                </div>
-                <div>
-                  <p className="font-semibold text-slate-800 dark:text-white">{current.firstname} {current.lastname}</p>
-                  <div className="flex flex-wrap gap-2 mt-1">
-                    {current.organisations.length === 0 ? (
-                      <span className="text-xs text-slate-400">Non inscrit dans un club</span>
-                    ) : current.organisations.map((o) => (
-                      <span key={o.id} className="text-xs rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 px-2 py-0.5">
-                        {o.name}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Day picker */}
+            <div className="grid grid-cols-7 gap-1">
+              {eventCountByDay.map(({ date, count }) => {
+                const isToday = isSameDay(date, new Date())
+                const isActive = isSameDay(date, activeDay)
+                return (
+                  <button
+                    key={date.toISOString()}
+                    onClick={() => setActiveDay(date)}
+                    className={`flex flex-col items-center gap-1 py-2 rounded-xl transition-all active:scale-95 ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
+                        : isToday
+                        ? 'bg-primary/10 text-primary border border-primary/30'
+                        : 'text-foreground hover:bg-muted'
+                    }`}
+                  >
+                    <span className={`text-[10px] font-bold uppercase ${isActive ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                      {fmtDay(date)}
+                    </span>
+                    <span className="font-display text-base font-bold">{date.getDate()}</span>
+                    {count > 0 && (
+                      <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-primary-foreground' : 'bg-primary'}`} />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
-            {/* Liste événements */}
-            {displayedEvents.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 p-8 text-center text-slate-400 text-sm">
-                {current?.organisations.length === 0
-                  ? 'Inscrivez d\'abord votre enfant dans un club pour voir les événements.'
-                  : 'Aucun événement à venir dans ce club.'}
+          {/* Événements du jour */}
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold mb-3">
+              {activeDay.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </p>
+
+            {dayEvents.length === 0 ? (
+              <div className="bg-card border border-border rounded-2xl p-8 text-center space-y-2">
+                <Calendar className="w-8 h-8 mx-auto text-muted-foreground/40" />
+                <p className="text-sm text-muted-foreground">Aucun événement ce jour</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {displayedEvents.map((event) => {
-                  const child = children.find((c) => c.firstname === event.childName)!;
-                  const isLoading = actionLoading === event.id;
+                {dayEvents.map((event) => {
+                  const child = children.find((c) => c.id === event.childId)!
+                  const isLoading = actionLoading === event.id
 
                   return (
                     <div
-                      key={`${event.id}-${event.childName}`}
-                      className={`rounded-2xl border bg-white dark:bg-slate-800 p-4 shadow-sm flex gap-4 transition ${
-                        event.is_registered
-                          ? 'border-green-200 dark:border-green-800'
-                          : 'border-slate-200 dark:border-slate-700'
+                      key={`${event.id}-${event.childId}`}
+                      className={`bg-card border rounded-2xl p-4 transition-colors ${
+                        event.is_registered ? 'border-[hsl(160,84%,39%)]/40' : 'border-border'
                       }`}
                     >
-                      {/* Date */}
-                      <div className="flex-shrink-0 w-12 text-center">
-                        <p className="text-xs text-slate-400 uppercase tracking-wide">
-                          {new Date(event.start_time).toLocaleDateString('fr-FR', { month: 'short' })}
-                        </p>
-                        <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                          {new Date(event.start_time).getDate()}
-                        </p>
-                      </div>
+                      <div className="flex gap-4">
+                        {/* Date */}
+                        <div className="shrink-0 text-center w-10">
+                          <p className="text-[10px] text-muted-foreground uppercase font-bold">
+                            {new Date(event.start_time).toLocaleDateString('fr-FR', { month: 'short' })}
+                          </p>
+                          <p className="font-display text-2xl font-bold text-primary leading-tight">
+                            {new Date(event.start_time).getDate()}
+                          </p>
+                        </div>
 
-                      {/* Infos */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-3 flex-wrap">
-                          <div>
-                            <p className="font-semibold text-slate-800 dark:text-white">{event.title}</p>
-                            <p className="text-sm text-slate-500 mt-0.5">
-                              {formatDate(event.start_time)} · {formatTime(event.start_time)}
-                              {event.end_time ? ` – ${formatTime(event.end_time)}` : ''}
-                            </p>
-                            <div className="flex flex-wrap gap-3 mt-1">
-                              {event.location && (
-                                <span className="flex items-center gap-1 text-xs text-slate-400">
-                                  <MapPin className="h-3 w-3" />{event.location}
-                                </span>
-                              )}
-                              {selected === null && (
-                                <span className="text-xs text-pink-500 font-medium">{event.childName}</span>
-                              )}
-                              <span className="text-xs text-slate-400">{event.organisation.name}</span>
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-display font-bold text-foreground leading-tight">{event.title}</p>
+                                {!event.registration_required && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                                    Libre
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {fmtTime(event.start_time)}
+                                {event.end_time ? ` – ${fmtTime(event.end_time)}` : ''}
+                              </p>
+                              <div className="flex flex-wrap gap-2 mt-1.5">
+                                {event.location && (
+                                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                    <MapPin className="w-3 h-3 shrink-0" />{event.location}
+                                  </span>
+                                )}
+                                <span className="text-xs text-muted-foreground">{event.organisation.name}</span>
+                                {selected === null && (
+                                  <span
+                                    className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
+                                    style={{ backgroundColor: avatarColor(event.childName) }}
+                                  >
+                                    {event.childName}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                          </div>
 
-                          {/* Bouton inscription */}
-                          <button
-                            onClick={() => handleRegister(child, event)}
-                            disabled={isLoading}
-                            className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer disabled:opacity-50 ${
-                              event.is_registered
-                                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 hover:border-red-200 group'
-                                : 'bg-indigo-500 text-white hover:bg-indigo-600'
-                            }`}
-                          >
-                            {isLoading ? (
-                              <Clock className="h-3.5 w-3.5 animate-spin" />
-                            ) : event.is_registered ? (
-                              <>
-                                <CheckCircle className="h-3.5 w-3.5" />
-                                <span>Inscrit · Annuler</span>
-                              </>
+                            {/* Bouton inscription — seulement si required */}
+                            {event.registration_required ? (
+                              <button
+                                onClick={() => handleRegister(child, event)}
+                                disabled={isLoading}
+                                className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 ${
+                                  event.is_registered
+                                    ? 'bg-[hsl(160,84%,39%)]/10 text-[hsl(160,84%,39%)] border border-[hsl(160,84%,39%)]/30 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30'
+                                    : 'bg-primary text-primary-foreground hover:opacity-90 shadow-md shadow-primary/20'
+                                }`}
+                              >
+                                {isLoading ? (
+                                  <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin shrink-0" />
+                                ) : event.is_registered ? (
+                                  <><CheckCircle className="w-3.5 h-3.5 shrink-0" /><span>Inscrit ✓</span></>
+                                ) : (
+                                  <><Calendar className="w-3.5 h-3.5 shrink-0" /><span>S'inscrire</span></>
+                                )}
+                              </button>
                             ) : (
-                              <>
-                                <Calendar className="h-3.5 w-3.5" />
-                                <span>S'inscrire</span>
-                              </>
+                              <span className="shrink-0 text-[10px] font-bold text-muted-foreground px-2.5 py-1 rounded-full border border-border">
+                                Accès libre
+                              </span>
                             )}
-                          </button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  );
+                  )
                 })}
               </div>
             )}
-          </>
-        )}
-      </div>
-    </>
-  );
-};
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
-export default FamilyDashboardPage;
+export default FamilyDashboardPage
