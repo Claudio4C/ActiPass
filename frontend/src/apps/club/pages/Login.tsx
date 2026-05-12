@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../../../contexts/AuthContext'
 import { useFormValidation } from '../../../hooks/useFormValidation'
@@ -7,7 +7,15 @@ import { loginSchema, type LoginFormData } from '../../../shared/schemas/auth'
 
 const Login: React.FC = () => {
   const { login, isLoading, error, clearError } = useAuth()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [showPassword, setShowPassword] = React.useState(false)
+
+  const consumeSafeRedirect = (): string | null => {
+    const r = searchParams.get('redirect')
+    if (!r || !r.startsWith('/') || r.startsWith('//')) return null
+    return r
+  }
 
   const { values: formData, setValue, validate, handleBlur, handleFocus, getFieldError } =
     useFormValidation<LoginFormData>({
@@ -26,7 +34,11 @@ const Login: React.FC = () => {
     if (!validate()) { return }
     try {
       await login(formData.email, formData.password)
-      // Le router (App.tsx) gère le redirect vers /onboarding ou /home
+      const red = consumeSafeRedirect()
+      if (red) {
+        navigate(red, { replace: true })
+        return
+      }
     } catch {
       // handled by AuthContext
     }

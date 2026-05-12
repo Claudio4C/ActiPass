@@ -70,6 +70,7 @@ import EventEditPage from '../pages/dashboard/EventEditPage'
 import EventDetailPage from '../pages/dashboard/EventDetailPage'
 import AttendancePage from '../pages/dashboard/AttendancePage'
 import AttendanceDetailPage from '../pages/dashboard/AttendanceDetailPage'
+import AttendanceCheckInPage from '../pages/dashboard/AttendanceCheckInPage'
 import AttendanceStatsPage from '../pages/dashboard/AttendanceStatsPage'
 import SettingsPage from '../pages/dashboard/SettingsPage'
 
@@ -261,6 +262,10 @@ const AppContent: React.FC<{
           <Route path="/dashboard/:organisationId/events/:eventId/edit" element={<EventEditPage />} />
           <Route path="/dashboard/:organisationId/attendance" element={<AttendancePage />} />
           <Route path="/dashboard/:organisationId/attendance/stats" element={<AttendanceStatsPage />} />
+          <Route
+            path="/dashboard/:organisationId/attendance/:eventId/check-in"
+            element={<AttendanceCheckInPage />}
+          />
           <Route path="/dashboard/:organisationId/attendance/:eventId" element={<AttendanceDetailPage />} />
           <Route path="/dashboard/:organisationId/settings" element={<SettingsPage />} />
         </Route>

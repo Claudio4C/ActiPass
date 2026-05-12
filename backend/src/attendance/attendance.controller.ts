@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   Param,
   Query,
@@ -26,6 +27,7 @@ import {
   CorrectAttendanceDto,
   BulkUpdateAttendanceDto,
   QrCodeAttendanceDto,
+  GenerateEventQrDto,
 } from './dto';
 
 @Controller('organisations/:organisationId/events/:eventId/attendance')
@@ -131,11 +133,14 @@ export class AttendanceController {
   async generateEventQrCode(
     @Param('organisationId') organisationId: string,
     @Param('eventId') eventId: string,
+    @Body() body: GenerateEventQrDto,
     @Req() req: Request
   ) {
     const userId = req.user?.['sub'] as string;
     if (!userId) throw new Error('Utilisateur non authentifié');
-    return this.attendanceService.generateEventQrCode(organisationId, eventId, userId);
+    return this.attendanceService.generateEventQrCode(organisationId, eventId, userId, {
+      rotate: body?.rotate === true,
+    });
   }
 
   @Post('qr-code/validate')
@@ -156,6 +161,22 @@ export class AttendanceController {
       userId,
       qrCodeDto
     );
+  }
+
+  @Delete(':attendanceId')
+  @RequireManage('attendance', 'organisation')
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(AuditInterceptor)
+  @Audit({ action: 'delete', resourceType: 'attendance', logOnSuccess: true })
+  async deleteEventAttendance(
+    @Param('organisationId') organisationId: string,
+    @Param('eventId') eventId: string,
+    @Param('attendanceId') attendanceId: string,
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) throw new Error('Utilisateur non authentifié');
+    return this.attendanceService.deleteEventAttendance(organisationId, eventId, attendanceId, userId);
   }
 }
 
