@@ -233,6 +233,7 @@ export class FamilyService {
           firstname: link.child.firstname,
           lastname: link.child.lastname,
           birthdate: link.child.birthdate,
+          avatar_url: link.child.avatar_url ?? null,
           relationship: link.relationship,
           organisations: link.child.memberships.map((m) => m.organisation),
           events,

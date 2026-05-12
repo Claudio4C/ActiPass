@@ -116,6 +116,7 @@ export interface Event {
   };
   current_registrations?: number;
   available_spots?: number | null;
+  myReservation?: { id: string; status: string } | null;
 }
 
 export interface Reservation {

@@ -773,80 +773,71 @@ export class EventsService {
       throw new ForbiddenException("Vous n'êtes pas membre de cette organisation");
     }
 
-    // Vérifier que l'utilisateur n'est pas déjà inscrit
-    const existingReservation = await this.prisma.reservation.findFirst({
+    // Vérifier toute réservation existante, y compris annulées (contrainte unique DB)
+    const anyReservation = await this.prisma.reservation.findFirst({
+      where: { event_id: eventId, membership_id: membership.id },
+    });
+
+    if (anyReservation && (anyReservation.status === 'confirmed' || anyReservation.status === 'pending')) {
+      throw new BadRequestException('Vous êtes déjà inscrit à cet événement');
+    }
+
+    // Calcul du statut selon la capacité
+    const confirmedCount = event.Reservation.filter((r) => r.status === 'confirmed').length;
+    const reservationStatus: 'confirmed' | 'pending' =
+      event.capacity && event.capacity > 0 && confirmedCount >= event.capacity
+        ? 'pending'
+        : 'confirmed';
+
+    const include = {
+      membership: { include: { user: { select: { id: true, firstname: true, lastname: true, email: true } } } },
+      event: { select: { id: true, title: true, start_time: true, end_time: true, capacity: true } },
+    };
+
+    // Réactiver une réservation annulée ou en créer une nouvelle
+    const reservation = anyReservation
+      ? await this.prisma.reservation.update({
+          where: { id: anyReservation.id },
+          data: { status: reservationStatus, deleted_at: null },
+          include,
+        })
+      : await this.prisma.reservation.create({
+          data: { event_id: eventId, membership_id: membership.id, status: reservationStatus },
+          include,
+        });
+
+    return {
+      message: reservationStatus === 'confirmed' ? 'Inscription confirmée' : "Vous êtes sur la liste d'attente",
+      reservation: { id: reservation.id, status: reservation.status, event: reservation.event, user: reservation.membership.user },
+    };
+  }
+
+  async unregisterFromEvent(eventId: string, organisationId: string, userId: string) {
+    const membership = await this.prisma.membership.findFirst({
+      where: { user_id: userId, organisation_id: organisationId, left_at: null, deleted_at: null },
+    });
+    if (!membership) {
+      throw new ForbiddenException("Vous n'êtes pas membre de cette organisation");
+    }
+
+    const reservation = await this.prisma.reservation.findFirst({
       where: {
         event_id: eventId,
         membership_id: membership.id,
         deleted_at: null,
-        status: {
-          in: ['confirmed', 'pending'],
-        },
+        status: { in: ['confirmed', 'pending'] },
       },
     });
-
-    if (existingReservation) {
-      throw new BadRequestException('Vous êtes déjà inscrit à cet événement');
+    if (!reservation) {
+      throw new NotFoundException("Aucune inscription active trouvée pour cet événement");
     }
 
-    // Compter les réservations confirmées
-    const confirmedCount = event.Reservation.filter((r) => r.status === 'confirmed').length;
-
-    // Déterminer le statut de la réservation
-    let reservationStatus: 'confirmed' | 'pending' = 'confirmed';
-
-    // Si l'événement a une capacité limitée
-    if (event.capacity && event.capacity > 0) {
-      if (confirmedCount >= event.capacity) {
-        // Capacité atteinte, mettre en liste d'attente
-        reservationStatus = 'pending';
-      }
-    }
-
-    // Créer la réservation
-    const reservation = await this.prisma.reservation.create({
-      data: {
-        event_id: eventId,
-        membership_id: membership.id,
-        status: reservationStatus,
-      },
-      include: {
-        membership: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                firstname: true,
-                lastname: true,
-                email: true,
-              },
-            },
-          },
-        },
-        event: {
-          select: {
-            id: true,
-            title: true,
-            start_time: true,
-            end_time: true,
-            capacity: true,
-          },
-        },
-      },
+    await this.prisma.reservation.update({
+      where: { id: reservation.id },
+      data: { status: 'cancelled', deleted_at: new Date() },
     });
 
-    return {
-      message:
-        reservationStatus === 'confirmed'
-          ? 'Inscription confirmée'
-          : "Vous êtes sur la liste d'attente",
-      reservation: {
-        id: reservation.id,
-        status: reservation.status,
-        event: reservation.event,
-        user: reservation.membership.user,
-      },
-    };
+    return { message: 'Désinscription effectuée' };
   }
 
   /**

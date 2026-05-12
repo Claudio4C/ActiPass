@@ -213,9 +213,20 @@ export class EventsController {
     @Req() req: Request
   ) {
     const userId = req.user?.['sub'] as string;
-    if (!userId) {
-      throw new Error('Utilisateur non authentifié');
-    }
+    if (!userId) { throw new Error('Utilisateur non authentifié'); }
     return this.eventsService.registerToEvent(eventId, organisationId, userId);
+  }
+
+  @Delete(':eventId/register')
+  @HttpCode(HttpStatus.OK)
+  @RequireEventRead('organisation')
+  async unregisterFromEvent(
+    @Param('organisationId') organisationId: string,
+    @Param('eventId') eventId: string,
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) { throw new Error('Utilisateur non authentifié'); }
+    return this.eventsService.unregisterFromEvent(eventId, organisationId, userId);
   }
 }

@@ -62,9 +62,10 @@ const ManagerGettingStartedCard: React.FC<{
     return () => { clearInterval(id); window.removeEventListener('focus', fetchOrg) }
   }, [fetchOrg])
 
-  // Confetti quand le statut passe à 'active'
+  // Confetti quand le statut passe à 'active' — une seule fois (persisté en localStorage)
   useEffect(() => {
     if (!org || celebrationFired.current || org.status !== 'active') { return }
+    if (localStorage.getItem('ikivio_welcome_seen') === 'done') { return }
     celebrationFired.current = true
     loadConfetti().then((confetti) => {
       const fire = (opts: Record<string, unknown>) =>

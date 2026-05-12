@@ -55,6 +55,7 @@ interface Child {
   birthdate: string | null;
   gender: string | null;
   phone: string | null;
+  avatar_url: string | null;
   relationship: string;
   is_primary_contact: boolean;
   memberships: ChildMembership[];
@@ -276,12 +277,20 @@ const FamilyPage: React.FC = () => {
         <div>
           <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold mb-3">Vous</p>
           <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-4">
-            <div
-              className="shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center font-display font-bold text-lg text-white"
-              style={{ backgroundColor: avatarColor((user as any).firstname || user.email) }}
-            >
-              {((user as any).firstname || user.email).charAt(0).toUpperCase()}
-            </div>
+            {localStorage.getItem('user_avatar_url') ? (
+              <img
+                src={localStorage.getItem('user_avatar_url')!}
+                alt={(user as any).firstname || user.email}
+                className="shrink-0 w-12 h-12 rounded-2xl object-cover"
+              />
+            ) : (
+              <div
+                className="shrink-0 w-12 h-12 rounded-2xl flex items-center justify-center font-display font-bold text-lg text-white"
+                style={{ backgroundColor: avatarColor((user as any).firstname || user.email) }}
+              >
+                {((user as any).firstname || user.email).charAt(0).toUpperCase()}
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className="font-display font-bold text-foreground">
                 {(user as any).firstname} {(user as any).lastname}
@@ -336,12 +345,20 @@ const FamilyPage: React.FC = () => {
               >
                 <div className="p-4">
                   <div className="flex items-start gap-3">
-                    <div
-                      className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center font-display font-bold text-base text-white"
-                      style={{ backgroundColor: avatarColor(child.firstname) }}
-                    >
-                      {child.firstname.charAt(0)}{child.lastname.charAt(0)}
-                    </div>
+                    {child.avatar_url ? (
+                      <img
+                        src={child.avatar_url}
+                        alt={child.firstname}
+                        className="shrink-0 w-11 h-11 rounded-xl object-cover"
+                      />
+                    ) : (
+                      <div
+                        className="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center font-display font-bold text-base text-white"
+                        style={{ backgroundColor: avatarColor(child.firstname) }}
+                      >
+                        {child.firstname.charAt(0)}{child.lastname.charAt(0)}
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <p className="font-display font-bold text-foreground truncate">

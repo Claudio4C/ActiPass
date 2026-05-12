@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, Save, Globe, Phone, Mail, MapPin, Image, Eye, Loader2, CheckCircle, Construction } from 'lucide-react'
 import { api } from '../../lib/api'
@@ -73,6 +73,7 @@ const SettingsPage: React.FC = () => {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const feedbackRef = useRef<HTMLDivElement>(null)
 
   const [form, setForm] = useState({
     name: '', description: '', type: 'sport',
@@ -128,6 +129,7 @@ const SettingsPage: React.FC = () => {
       api.clearCache(`/organisations/${organisationId}`)
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
+      setTimeout(() => feedbackRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erreur lors de la sauvegarde.')
     } finally {
@@ -161,17 +163,19 @@ const SettingsPage: React.FC = () => {
       </div>
 
       {/* Feedback */}
-      {error && (
-        <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3">
-          <p className="text-sm text-destructive">{error}</p>
-        </div>
-      )}
-      {saved && (
-        <div className="rounded-2xl border border-[hsl(160,84%,39%)]/30 bg-[hsl(160,84%,39%)]/5 px-4 py-3 flex items-center gap-2">
-          <CheckCircle className="w-4 h-4 text-[hsl(160,84%,39%)] shrink-0" />
-          <p className="text-sm font-semibold text-[hsl(160,84%,39%)]">Modifications enregistrées !</p>
-        </div>
-      )}
+      <div ref={feedbackRef}>
+        {error && (
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
+        {saved && (
+          <div className="rounded-2xl border border-[hsl(160,84%,39%)]/30 bg-[hsl(160,84%,39%)]/5 px-4 py-3 flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-[hsl(160,84%,39%)] shrink-0" />
+            <p className="text-sm font-semibold text-[hsl(160,84%,39%)]">Modifications enregistrées !</p>
+          </div>
+        )}
+      </div>
 
       {/* Identité */}
       <Section title="Identité" icon={<span className="text-base leading-none">🏷️</span>}>

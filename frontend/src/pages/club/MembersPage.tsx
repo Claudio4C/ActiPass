@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   Clock, MapPin, User, Dumbbell, Music, Trophy, Users, Bookmark,
   Calendar, Building2, CheckCircle2, AlertCircle, Navigation, Info,
-  ShieldCheck, ArrowRight, ChevronRight,
+  ShieldCheck, ArrowRight, ChevronRight, Bell, X,
 } from 'lucide-react'
 import type { RoleType } from '../../types'
 import { useAuth } from '../../contexts/AuthContext'
@@ -11,6 +11,8 @@ import { useCurrentOrganisation } from '../../hooks/useCurrentOrganisation'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/utils'
 import type { Event, EventType } from '../../types'
+import { EventDetailSheet } from '../../components/EventDetailSheet'
+import type { SheetEvent } from '../../components/EventDetailSheet'
 
 // ─── constants ────────────────────────────────────────────────────────────────
 
@@ -43,6 +45,7 @@ interface FamilyChildEvent {
 }
 interface FamilyChild {
   id: string; firstname: string; lastname: string; birthdate: string | null;
+  avatar_url: string | null;
   organisations: { id: string; name: string }[]; events: FamilyChildEvent[];
 }
 
@@ -50,8 +53,15 @@ interface DisplayEvent {
   id: string; title: string; start_time: string; end_time: string;
   location: string | null; event_type: EventType;
   created_by?: { firstname: string; lastname: string } | null;
-  memberId: string; memberName: string; memberColor: string;
-  extraMembers?: { id: string; name: string; color: string }[];
+  memberId: string; memberName: string; memberColor: string; memberAvatarUrl?: string | null;
+  extraMembers?: { id: string; name: string; color: string; avatarUrl?: string | null }[];
+  orgId?: string;
+  isRegistered?: boolean;
+  description?: string;
+  registrationRequired?: boolean;
+  myReservation?: { id: string; status: string } | null;
+  capacity?: number;
+  price?: number;
 }
 
 type OrgItem = { id: string; name: string; type: 'club' | 'association' | 'independant'; roleType: RoleType; roleName: string }
@@ -85,6 +95,26 @@ const getAge = (birthdate: string | null) => {
   return Math.floor((Date.now() - new Date(birthdate).getTime()) / (1000 * 60 * 60 * 24 * 365))
 }
 
+type UrgencyTone = 'urgent' | 'soon'
+
+const getUrgency = (startIso: string): { label: string; tone: UrgencyTone } | null => {
+  const diff = new Date(startIso).getTime() - Date.now()
+  if (diff < 0 && diff > -90 * 60 * 1000) { return { label: 'En cours', tone: 'urgent' } }
+  if (diff <= 0) { return null }
+  if (diff < 30 * 60 * 1000) { return { label: `Dans ${Math.ceil(diff / 60000)} min`, tone: 'urgent' } }
+  if (diff < 2 * 60 * 60 * 1000) {
+    const h = Math.floor(diff / 3600000)
+    const m = Math.floor((diff % 3600000) / 60000)
+    return { label: `Dans ${h}h${m > 0 ? String(m).padStart(2, '0') : ''}`, tone: 'soon' }
+  }
+  return null
+}
+
+const URGENCY_CLS: Record<UrgencyTone, string> = {
+  urgent: 'bg-destructive text-destructive-foreground animate-pulse',
+  soon: 'bg-amber-500 text-white',
+}
+
 const overlaps = (a: Event, b: Event) =>
   new Date(a.start_time) < new Date(b.end_time) &&
   new Date(b.start_time) < new Date(a.end_time)
@@ -101,23 +131,55 @@ const CategoryBubble: React.FC<{ type: EventType }> = ({ type }) => {
   )
 }
 
+// ─── MemberBadge ──────────────────────────────────────────────────────────────
+
+const MemberBadge: React.FC<{ name: string; color: string; avatarUrl?: string | null; size: 'sm' | 'md' }> = ({ name, color, avatarUrl, size }) => {
+  const cls = size === 'sm'
+    ? 'w-5 h-5 text-[9px] ring-1'
+    : 'w-7 h-7 text-[10px] ring-2'
+  return avatarUrl ? (
+    <img
+      src={avatarUrl}
+      alt={name}
+      title={name}
+      className={`${cls} rounded-full object-cover shrink-0 ring-card`}
+    />
+  ) : (
+    <div
+      title={name}
+      className={`${cls} rounded-full flex items-center justify-center text-white font-bold shrink-0 ring-card`}
+      style={{ backgroundColor: color }}
+    >
+      {name.charAt(0)}
+    </div>
+  )
+}
+
 // ─── WeeklyCard ───────────────────────────────────────────────────────────────
 
-const WeeklyCard: React.FC<{ event: DisplayEvent; isToday: boolean; showMember: boolean }> = ({
-  event, isToday, showMember,
+const WeeklyCard: React.FC<{ event: DisplayEvent; isToday: boolean; showMember: boolean; onClick: () => void }> = ({
+  event, isToday, showMember, onClick,
 }) => {
   const meta = EVENT_META[event.event_type] ?? EVENT_META.other
   const Icon = meta.Icon
   return (
-    <div className={cn(
-      'bg-card border rounded-2xl p-3 space-y-2 cursor-pointer active:scale-[0.99] transition-all hover:shadow-sm',
-      isToday ? 'border-primary/25' : 'border-border',
-    )}>
-      <div className="flex items-center justify-between">
+    <div
+      onClick={onClick}
+      className={cn(
+        'bg-card border rounded-2xl p-3 space-y-2 cursor-pointer active:scale-[0.99] transition-all hover:shadow-sm',
+        isToday ? 'border-primary/25' : 'border-border',
+      )}
+    >
+      <div className="flex items-center justify-between gap-1">
         <div className={cn('w-8 h-8 rounded-full flex items-center justify-center shrink-0', meta.bg, meta.text)}>
           <Icon className="w-4 h-4 shrink-0" />
         </div>
-        <span className="text-xs font-bold text-foreground tabular-nums">{fmtTime(event.start_time)}</span>
+        {(() => {
+          const urg = getUrgency(event.start_time)
+          return urg
+            ? <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0', URGENCY_CLS[urg.tone])}>{urg.label}</span>
+            : <span className="text-xs font-bold text-foreground tabular-nums">{fmtTime(event.start_time)}</span>
+        })()}
       </div>
       <p className="font-display font-bold text-sm text-foreground leading-snug">{event.title}</p>
       <div className="space-y-1">
@@ -140,13 +202,8 @@ const WeeklyCard: React.FC<{ event: DisplayEvent; isToday: boolean; showMember: 
       </div>
       {showMember && (
         <div className="flex items-center gap-1 pt-0.5">
-          {[{ id: event.memberId, name: event.memberName, color: event.memberColor }, ...(event.extraMembers ?? [])].map((m) => (
-            <div key={m.id} title={m.name}
-              className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[9px] font-bold shrink-0 ring-1 ring-card"
-              style={{ backgroundColor: m.color }}
-            >
-              {m.name.charAt(0)}
-            </div>
+          {[{ id: event.memberId, name: event.memberName, color: event.memberColor, avatarUrl: event.memberAvatarUrl }, ...(event.extraMembers ?? [])].map((m) => (
+            <MemberBadge key={m.id} name={m.name} color={m.color} avatarUrl={m.avatarUrl} size="sm" />
           ))}
         </div>
       )}
@@ -156,8 +213,8 @@ const WeeklyCard: React.FC<{ event: DisplayEvent; isToday: boolean; showMember: 
 
 // ─── TodayRow ─────────────────────────────────────────────────────────────────
 
-const TodayRow: React.FC<{ event: DisplayEvent; showMember: boolean }> = ({ event, showMember }) => (
-  <div className="flex items-center gap-4 py-3 border-b border-border last:border-0">
+const TodayRow: React.FC<{ event: DisplayEvent; showMember: boolean; onClick: () => void }> = ({ event, showMember, onClick }) => (
+  <div onClick={onClick} className="flex items-center gap-4 py-3 border-b border-border last:border-0 cursor-pointer active:opacity-70 transition-opacity">
     <div className="text-right shrink-0 w-12">
       <p className="text-sm font-bold text-foreground tabular-nums">{fmtTime(event.start_time)}</p>
       <p className="text-[10px] text-muted-foreground tabular-nums">{fmtTime(event.end_time)}</p>
@@ -171,13 +228,8 @@ const TodayRow: React.FC<{ event: DisplayEvent; showMember: boolean }> = ({ even
     </div>
     {showMember && (
       <div className="flex -space-x-1 shrink-0">
-        {[{ id: event.memberId, name: event.memberName, color: event.memberColor }, ...(event.extraMembers ?? [])].map((m) => (
-          <div key={m.id} title={m.name}
-            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-card shrink-0"
-            style={{ backgroundColor: m.color }}
-          >
-            {m.name.charAt(0)}
-          </div>
+        {[{ id: event.memberId, name: event.memberName, color: event.memberColor, avatarUrl: event.memberAvatarUrl }, ...(event.extraMembers ?? [])].map((m) => (
+          <MemberBadge key={m.id} name={m.name} color={m.color} avatarUrl={m.avatarUrl} size="md" />
         ))}
       </div>
     )}
@@ -188,8 +240,8 @@ const TodayRow: React.FC<{ event: DisplayEvent; showMember: boolean }> = ({ even
 
 const FamilyMemberCard: React.FC<{
   name: string; subtitle: string; color: string; coursesPerWeek: number;
-  active: boolean; onClick: () => void;
-}> = ({ name, subtitle, color, coursesPerWeek, active, onClick }) => (
+  avatarUrl?: string | null; active: boolean; onClick: () => void;
+}> = ({ name, subtitle, color, coursesPerWeek, avatarUrl, active, onClick }) => (
   <button
     onClick={onClick}
     className={cn(
@@ -197,12 +249,20 @@ const FamilyMemberCard: React.FC<{
       active ? 'border-primary bg-primary/5' : 'border-border bg-background/40 hover:border-primary/40',
     )}
   >
-    <div
-      className="w-12 h-12 rounded-full flex items-center justify-center font-display font-bold text-base text-white ring-2 ring-card"
-      style={{ backgroundColor: color }}
-    >
-      {name.charAt(0)}
-    </div>
+    {avatarUrl ? (
+      <img
+        src={avatarUrl}
+        alt={name}
+        className="w-12 h-12 rounded-full object-cover ring-2 ring-card"
+      />
+    ) : (
+      <div
+        className="w-12 h-12 rounded-full flex items-center justify-center font-display font-bold text-base text-white ring-2 ring-card"
+        style={{ backgroundColor: color }}
+      >
+        {name.charAt(0)}
+      </div>
+    )}
     <p className={cn('text-xs font-bold', active ? 'text-primary' : 'text-foreground')}>{name}</p>
     <p className="text-[10px] text-muted-foreground">{subtitle}</p>
     <p className="text-[10px] font-semibold text-muted-foreground">{coursesPerWeek} cours/sem</p>
@@ -217,12 +277,19 @@ const ClubMembersPage: React.FC = () => {
   const orgId = organisation?.id
   const isManager = role === 'manager'
 
-  const [myEvents,     setMyEvents]     = useState<Event[]>([])
-  const [children,     setChildren]     = useState<FamilyChild[]>([])
-  const [memberCount,  setMemberCount]  = useState(0)
-  const [myOrgs,       setMyOrgs]       = useState<OrgItem[]>([])
-  const [loading,      setLoading]      = useState(true)
-  const [activeFilter, setActiveFilter] = useState<string>('all') // 'all' | 'me' | childId
+  const [myEvents,       setMyEvents]       = useState<Event[]>([])
+  const [children,       setChildren]       = useState<FamilyChild[]>([])
+  const [memberCount,    setMemberCount]    = useState(0)
+  const [myOrgs,         setMyOrgs]         = useState<OrgItem[]>([])
+  const [loading,        setLoading]        = useState(true)
+  const [activeFilter,   setActiveFilter]   = useState<string>('all')
+  const [selectedEvent,   setSelectedEvent]   = useState<SheetEvent | null>(null)
+  const [notifPerm,       setNotifPerm]       = useState<NotificationPermission | null>(() =>
+    'Notification' in window ? Notification.permission : null,
+  )
+  const [notifDismissed,  setNotifDismissed]  = useState(false)
+  const [urgentDismissed, setUrgentDismissed] = useState(false)
+  const [, setTick] = useState(0)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -283,6 +350,13 @@ const ClubMembersPage: React.FC = () => {
       location: e.location ?? null, event_type: e.event_type,
       created_by: e.created_by ?? null,
       memberId: 'me', memberName: firstName, memberColor: MEMBER_COLORS[0],
+      memberAvatarUrl: localStorage.getItem('user_avatar_url') ?? null,
+      orgId: orgId ?? undefined,
+      description: e.description,
+      registrationRequired: e.registration_required,
+      myReservation: e.myReservation,
+      capacity: e.capacity,
+      price: e.price,
     }))
     // Index parent events by id for deduplication
     const mineById = new Map(mine.map((e) => [e.id, e]))
@@ -298,14 +372,15 @@ const ClubMembersPage: React.FC = () => {
             // Même événement : on ajoute l'enfant comme membre supplémentaire
             if (!existing.extraMembers) { existing.extraMembers = [] }
             if (!existing.extraMembers.find((m) => m.id === child.id)) {
-              existing.extraMembers.push({ id: child.id, name: child.firstname, color })
+              existing.extraMembers.push({ id: child.id, name: child.firstname, color, avatarUrl: child.avatar_url })
             }
           } else {
             const ev: DisplayEvent = {
               id: e.id, title: e.title,
               start_time: e.start_time, end_time: e.end_time ?? e.start_time,
               location: e.location, event_type: 'training' as EventType,
-              memberId: child.id, memberName: child.firstname, memberColor: color,
+              memberId: child.id, memberName: child.firstname, memberColor: color, memberAvatarUrl: child.avatar_url,
+            orgId: e.organisation.id, isRegistered: e.is_registered,
             }
             mineById.set(e.id, ev)
             result.push(ev)
@@ -313,7 +388,7 @@ const ClubMembersPage: React.FC = () => {
         })
     })
     return result
-  }, [myEvents, children, firstName])
+  }, [myEvents, children, firstName, orgId])
 
   const filteredEvents = useMemo(() => {
     if (activeFilter === 'all') { return allDisplayEvents }
@@ -379,9 +454,74 @@ const ClubMembersPage: React.FC = () => {
   const disciplines = useMemo(() => [...new Set(myEvents.map((e) => e.event_type))], [myEvents])
 
   const dayName   = today.toLocaleDateString('fr-FR', { weekday: 'long' }).toUpperCase()
-  const todayLabel = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 
   const showMemberBadge = activeFilter === 'all' && children.length > 0
+
+  // ── Tick (rafraîchit les urgences chaque minute) ─────────────────────────
+
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60000)
+    return () => clearInterval(id)
+  }, [])
+
+  // ── Événement le plus urgent (< 2h) ──────────────────────────────────────
+
+  const urgentEvent = useMemo(() => {
+    const now = Date.now()
+    return allDisplayEvents
+      .filter((e) => {
+        const diff = new Date(e.start_time).getTime() - now
+        return diff > -5 * 60 * 1000 && diff < 2 * 60 * 60 * 1000
+      })
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())[0] ?? null
+  }, [allDisplayEvents])
+
+  // ── Notifications ────────────────────────────────────────────────────────
+
+  const enableNotifications = async () => {
+    const result = await Notification.requestPermission()
+    setNotifPerm(result)
+  }
+
+  useEffect(() => {
+    if (!('Notification' in window) || Notification.permission !== 'granted') { return }
+    const notified = new Set<string>(JSON.parse(localStorage.getItem('ikivio_notified_events') ?? '[]'))
+    const now = Date.now()
+    const timers: ReturnType<typeof setTimeout>[] = []
+
+    allDisplayEvents.forEach((event) => {
+      const startMs = new Date(event.start_time).getTime()
+      const checks = [
+        { key: `${event.id}:2h`,  delay: startMs - 2 * 60 * 60 * 1000, label: 'dans 2h' },
+        { key: `${event.id}:30m`, delay: startMs - 30 * 60 * 1000,      label: 'dans 30 min' },
+      ]
+      checks.forEach(({ key, delay, label }) => {
+        if (notified.has(key)) { return }
+        const wait = delay - now
+        if (wait <= 0 && startMs > now) {
+          new Notification(event.title, {
+            body: `${label}${event.location ? ` · ${event.location}` : ''}`,
+            icon: '/favicon.ico',
+            tag: key,
+          })
+          notified.add(key)
+          localStorage.setItem('ikivio_notified_events', JSON.stringify([...notified]))
+        } else if (wait > 0 && wait < 24 * 60 * 60 * 1000) {
+          timers.push(setTimeout(() => {
+            new Notification(event.title, {
+              body: `${label}${event.location ? ` · ${event.location}` : ''}`,
+              icon: '/favicon.ico',
+              tag: key,
+            })
+            notified.add(key)
+            localStorage.setItem('ikivio_notified_events', JSON.stringify([...notified]))
+          }, wait))
+        }
+      })
+    })
+
+    return () => timers.forEach(clearTimeout)
+  }, [allDisplayEvents])
 
   const ORG_CARD_META = {
     club:       { Icon: Dumbbell, bg: 'bg-cat-sport/15', text: 'text-cat-sport' },
@@ -420,6 +560,65 @@ const ClubMembersPage: React.FC = () => {
           >
             Portail admin <ArrowRight className="w-3.5 h-3.5 shrink-0" />
           </Link>
+        </div>
+      )}
+
+      {/* Bannière événement urgent */}
+      {urgentEvent && !urgentDismissed && (() => {
+        const urg = getUrgency(urgentEvent.start_time)
+        if (!urg) { return null }
+        return (
+          <div className={`flex items-start gap-3 border rounded-2xl px-4 py-3 ${urg.tone === 'urgent' ? 'bg-destructive/5 border-destructive/20' : 'bg-amber-500/5 border-amber-500/20'}`}>
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${urg.tone === 'urgent' ? 'bg-destructive/15 text-destructive' : 'bg-amber-500/15 text-amber-600'}`}>
+              <Clock className="w-4 h-4 shrink-0" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${urg.tone === 'urgent' ? 'bg-destructive text-white' : 'bg-amber-500 text-white'}`}>
+                  {urg.tone === 'urgent' ? 'URGENT' : 'BIENTÔT'}
+                </span>
+                <span className="font-bold text-sm text-foreground truncate">{urgentEvent.title} · {urg.label}</span>
+              </div>
+              <p className="text-xs text-muted-foreground truncate">
+                {urgentEvent.memberName}{urgentEvent.location ? ` • ${urgentEvent.location}` : ''} · Pensez à partir bientôt.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {urgentEvent.location && (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(urgentEvent.location)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`text-xs font-bold ${urg.tone === 'urgent' ? 'text-destructive' : 'text-amber-600'}`}
+                >
+                  Itinéraire →
+                </a>
+              )}
+              <button onClick={() => setUrgentDismissed(true)} className="text-muted-foreground hover:text-foreground transition-colors">
+                <X className="w-4 h-4 shrink-0" />
+              </button>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Banner notification */}
+      {notifPerm === 'default' && !notifDismissed && (
+        <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3">
+          <Bell className="w-4 h-4 text-primary shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-foreground">Rappels d'activité</p>
+            <p className="text-xs text-muted-foreground">Notification 2h avant chaque séance</p>
+          </div>
+          <button
+            onClick={enableNotifications}
+            className="shrink-0 text-xs font-bold px-3 py-1.5 rounded-full bg-primary text-primary-foreground active:scale-95 transition-transform"
+          >
+            Activer
+          </button>
+          <button onClick={() => setNotifDismissed(true)} className="text-muted-foreground hover:text-foreground transition-colors shrink-0">
+            <X className="w-4 h-4 shrink-0" />
+          </button>
         </div>
       )}
 
@@ -485,13 +684,8 @@ const ClubMembersPage: React.FC = () => {
                   <div className="flex items-center gap-2">
                     {nextEvent.extraMembers && nextEvent.extraMembers.length > 0 && (
                       <div className="flex -space-x-1">
-                        {[{ id: nextEvent.memberId, name: nextEvent.memberName, color: nextEvent.memberColor }, ...nextEvent.extraMembers].map((m) => (
-                          <div key={m.id}
-                            className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold border-2 border-primary-foreground/30"
-                            style={{ backgroundColor: m.color }}
-                          >
-                            {m.name.charAt(0)}
-                          </div>
+                        {[{ id: nextEvent.memberId, name: nextEvent.memberName, color: nextEvent.memberColor, avatarUrl: nextEvent.memberAvatarUrl }, ...nextEvent.extraMembers].map((m) => (
+                          <MemberBadge key={m.id} name={m.name} color={m.color} avatarUrl={m.avatarUrl} size="sm" />
                         ))}
                       </div>
                     )}
@@ -525,11 +719,19 @@ const ClubMembersPage: React.FC = () => {
                   )}
                   <div className="flex gap-2">
                     {nextEvent.location && (
-                      <button className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-primary-foreground/20 text-primary-foreground active:scale-95 transition-transform">
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nextEvent.location)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-primary-foreground/20 text-primary-foreground active:scale-95 transition-transform"
+                      >
                         <Navigation className="w-3.5 h-3.5 shrink-0" /> Itinéraire
-                      </button>
+                      </a>
                     )}
-                    <button className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-primary-foreground text-primary active:scale-95 transition-transform">
+                    <button
+                      onClick={() => setSelectedEvent(nextEvent)}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-primary-foreground text-primary active:scale-95 transition-transform"
+                    >
                       <Info className="w-3.5 h-3.5 shrink-0" /> Détails
                     </button>
                   </div>
@@ -542,7 +744,7 @@ const ClubMembersPage: React.FC = () => {
           {nextTwo.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
               {nextTwo.map((ev) => (
-                <div key={ev.id} className="bg-card border border-border rounded-2xl p-3 flex items-center gap-3 active:scale-[0.99] transition-all hover:border-primary/20">
+                <div key={ev.id} onClick={() => setSelectedEvent(ev)} className="bg-card border border-border rounded-2xl p-3 flex items-center gap-3 active:scale-[0.99] transition-all hover:border-primary/20 cursor-pointer">
                   <CategoryBubble type={ev.event_type} />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm text-foreground truncate">{ev.title}</p>
@@ -552,13 +754,8 @@ const ClubMembersPage: React.FC = () => {
                   </div>
                   {showMemberBadge && (
                     <div className="flex -space-x-1 shrink-0">
-                      {[{ id: ev.memberId, name: ev.memberName, color: ev.memberColor }, ...(ev.extraMembers ?? [])].map((m) => (
-                        <div key={m.id} title={m.name}
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[9px] font-bold ring-2 ring-card"
-                          style={{ backgroundColor: m.color }}
-                        >
-                          {m.name.charAt(0)}
-                        </div>
+                      {[{ id: ev.memberId, name: ev.memberName, color: ev.memberColor, avatarUrl: ev.memberAvatarUrl }, ...(ev.extraMembers ?? [])].map((m) => (
+                        <MemberBadge key={m.id} name={m.name} color={m.color} avatarUrl={m.avatarUrl} size="sm" />
                       ))}
                     </div>
                   )}
@@ -584,7 +781,7 @@ const ClubMembersPage: React.FC = () => {
               {todayEvents.length === 0 ? (
                 <p className="py-5 text-sm text-muted-foreground text-center">Pas de cours prévu aujourd'hui.</p>
               ) : (
-                todayEvents.map((ev) => <TodayRow key={ev.id} event={ev} showMember={showMemberBadge} />)
+                todayEvents.map((ev) => <TodayRow key={ev.id} event={ev} showMember={showMemberBadge} onClick={() => setSelectedEvent(ev)} />)
               )}
             </div>
           </div>
@@ -615,6 +812,7 @@ const ClubMembersPage: React.FC = () => {
                   name={firstName}
                   subtitle="Adulte"
                   color={MEMBER_COLORS[0]}
+                  avatarUrl={localStorage.getItem('user_avatar_url')}
                   coursesPerWeek={eventsPerWeekByMember['me'] ?? 0}
                   active={activeFilter === 'me'}
                   onClick={() => setActiveFilter(activeFilter === 'me' ? 'all' : 'me')}
@@ -628,6 +826,7 @@ const ClubMembersPage: React.FC = () => {
                       name={child.firstname}
                       subtitle={age !== null ? `${age} ans` : 'Enfant'}
                       color={MEMBER_COLORS[idx + 1] ?? MEMBER_COLORS[1]}
+                      avatarUrl={child.avatar_url}
                       coursesPerWeek={eventsPerWeekByMember[child.id] ?? 0}
                       active={activeFilter === child.id}
                       onClick={() => setActiveFilter(activeFilter === child.id ? 'all' : child.id)}
@@ -726,7 +925,7 @@ const ClubMembersPage: React.FC = () => {
         </div>
         <div className="overflow-x-auto pb-2">
           <div className="grid grid-cols-7 gap-3 min-w-[700px]">
-            {weekDays.map((day, i) => {
+            {weekDays.map((_day, i) => {
               const dayEvts = weekEventsByDay[i]
               const isToday = i === todayIdx
               return (
@@ -739,7 +938,7 @@ const ClubMembersPage: React.FC = () => {
                   ) : (
                     <div className="space-y-3">
                       {dayEvts.map((ev) => (
-                        <WeeklyCard key={ev.id} event={ev} isToday={isToday} showMember={showMemberBadge} />
+                        <WeeklyCard key={ev.id} event={ev} isToday={isToday} showMember={showMemberBadge} onClick={() => setSelectedEvent(ev)} />
                       ))}
                     </div>
                   )}
@@ -750,6 +949,7 @@ const ClubMembersPage: React.FC = () => {
         </div>
       </section>
 
+      <EventDetailSheet event={selectedEvent} onClose={() => setSelectedEvent(null)} />
     </div>
   )
 }

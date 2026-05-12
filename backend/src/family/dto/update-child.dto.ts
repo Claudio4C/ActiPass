@@ -1,4 +1,4 @@
-import { IsString, IsDateString, IsEnum, IsOptional, IsUrl } from 'class-validator';
+import { IsString, IsDateString, IsEnum, IsOptional } from 'class-validator';
 import { Gender } from '../../generated/prisma/client';
 
 export class UpdateChildDto {
@@ -22,7 +22,7 @@ export class UpdateChildDto {
   @IsOptional()
   phone?: string;
 
-  @IsUrl()
+  @IsString()
   @IsOptional()
   avatar_url?: string;
 }
