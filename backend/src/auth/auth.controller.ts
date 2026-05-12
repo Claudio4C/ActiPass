@@ -13,23 +13,22 @@ import {
   Param,
   Query,
 } from '@nestjs/common';
-import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 
 import { AuthService } from './auth.service';
 import { Public } from './decorators/public.decorator';
 import { LoginDto, RegisterDto, ForgotPasswordDto, ResetPasswordDto } from './dto';
+import { AuthThrottlerGuard } from './guards/auth-throttler.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 
 @Controller('auth')
-@UseGuards(ThrottlerGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
   @Public()
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @UseGuards(AuthThrottlerGuard)
   async register(@Body() registerDto: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.register(registerDto);
 
@@ -40,8 +39,7 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @Public()
-  @UseGuards(LocalAuthGuard)
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @UseGuards(LocalAuthGuard, AuthThrottlerGuard)
   async login(
     @Body() loginDto: LoginDto,
     @Req() req: Request,
@@ -49,7 +47,6 @@ export class AuthController {
   ) {
     const result = await this.authService.login(loginDto);
 
-    // Set HttpOnly cookies
     this.setAuthCookies(res, result.accessToken, result.refreshToken);
 
     return result;
@@ -65,7 +62,6 @@ export class AuthController {
     const tokens = await this.authService.refreshToken(refreshTokenDto);
 
     if (tokens.accessToken && tokens.refreshToken) {
-      // Update cookies
       this.setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
     }
 
@@ -86,7 +82,6 @@ export class AuthController {
 
     await this.authService.logout(userId);
 
-    // Clear cookies
     this.clearAuthCookies(res);
 
     return { message: 'Logged out successfully' };
@@ -131,21 +126,19 @@ export class AuthController {
   private setAuthCookies(res: Response, accessToken: string, refreshToken: string) {
     const isProduction = process.env.NODE_ENV === 'production';
 
-    // Access token cookie (short-lived)
     res.cookie('access_token', accessToken, {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? 'strict' : 'lax',
-      maxAge: 15 * 60 * 1000, // 15 minutes
+      maxAge: 15 * 60 * 1000,
       path: '/',
     });
 
-    // Refresh token cookie (long-lived)
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? 'strict' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/',
     });
   }

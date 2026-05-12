@@ -7,7 +7,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
-import { SuperAdminThrottlerGuard } from './auth/guards/super-admin-throttler.guard';
 import { EmailModule } from './email/email.module';
 import { EventsModule } from './events/events.module';
 import { OrganisationsModule } from './organisations/organisations.module';
@@ -23,12 +22,7 @@ import { UploadModule } from './upload/upload.module';
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
     }),
-    ThrottlerModule.forRoot([
-      {
-        ttl: 60,
-        limit: 500,
-      },
-    ]),
+    ThrottlerModule.forRoot([{ ttl: 60, limit: 10 }]),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -45,10 +39,6 @@ import { UploadModule } from './upload/upload.module';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: SuperAdminThrottlerGuard,
     },
   ],
 })
