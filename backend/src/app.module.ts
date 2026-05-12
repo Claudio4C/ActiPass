@@ -26,12 +26,7 @@ import { UploadModule } from './upload/upload.module';
     ThrottlerModule.forRoot([
       {
         ttl: 60,
-        limit: 400, // 400 req/min — navigation SaaS fluide (multi-appels au chargement de page)
-      },
-      {
-        name: 'auth',
-        ttl: 60,
-        limit: 15, // Auth reste stricte : 15 tentatives/min anti-bruteforce
+        limit: 500,
       },
     ]),
     PrismaModule,
