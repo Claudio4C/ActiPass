@@ -73,7 +73,8 @@ export const ERROR_MESSAGES = {
 
 // Fonction pour créer une erreur à partir d'une réponse HTTP
 export function createErrorFromResponse(statusCode: number, data: any): ApiError {
-  const message = data?.message || data?.error || ERROR_MESSAGES[ERROR_CODES.UNKNOWN_ERROR]
+  const raw = data?.message ?? data?.error ?? ERROR_MESSAGES[ERROR_CODES.UNKNOWN_ERROR]
+  const message = Array.isArray(raw) ? raw.join(' ') : String(raw)
 
   switch (statusCode) {
     case 400:
@@ -84,6 +85,8 @@ export function createErrorFromResponse(statusCode: number, data: any): ApiError
       return new ApiError(message, 403, ERROR_CODES.FORBIDDEN, data)
     case 404:
       return new ApiError('Ressource non trouvée', 404, 'NOT_FOUND', data)
+    case 409:
+      return new ApiError(message, 409, 'CONFLICT', data)
     case 422:
       return new ApiError(message, 422, ERROR_CODES.VALIDATION_ERROR, data)
     case 429:
@@ -111,7 +114,11 @@ export function createNetworkError(error: any): NetworkError {
 // Fonction pour obtenir un message d'erreur user-friendly
 export function getErrorMessage(error: Error): string {
   if (error instanceof ApiError) {
-    return ERROR_MESSAGES[error.code as keyof typeof ERROR_MESSAGES] || error.message
+    return (
+      error.message ||
+      ERROR_MESSAGES[error.code as keyof typeof ERROR_MESSAGES] ||
+      ERROR_MESSAGES[ERROR_CODES.UNKNOWN_ERROR]
+    )
   }
   if (error instanceof NetworkError) {
     return error.message

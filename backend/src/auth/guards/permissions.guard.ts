@@ -94,6 +94,7 @@ export class PermissionsGuard implements CanActivate {
 
     return (
       params?.organisationId ||
+      params?.id ||
       (typeof body?.organisation_id === 'string' ? body.organisation_id : undefined) ||
       query?.organisationId ||
       (request.headers['x-organisation-id'] as string)

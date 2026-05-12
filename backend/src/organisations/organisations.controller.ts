@@ -18,7 +18,13 @@ import { RequireManage, RequirePermissions } from '../auth/decorators/permission
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 
-import { CreateOrganisationDto, UpdateOrganisationDto, InviteMemberDto } from './dto';
+import {
+  CreateOrganisationDto,
+  UpdateOrganisationDto,
+  InviteMemberDto,
+  CreateMemberTagDto,
+  SetMemberTagsDto,
+} from './dto';
 import { OrganisationsService } from './organisations.service';
 
 @Controller('organisations')
@@ -133,15 +139,106 @@ export class OrganisationsController {
   }
 
   /**
-   * Lister les membres d'une organisation
+   * Lister les membres d'une organisation (?tagId= pour filtrer par tag)
    */
   @Get(':id/members')
-  async getOrganisationMembers(@Param('id') id: string, @Req() req: Request) {
+  async getOrganisationMembers(
+    @Param('id') id: string,
+    @Query('tagId') tagId: string | undefined,
+    @Req() req: Request
+  ) {
     const userId = req.user?.['sub'] as string;
     if (!userId) {
       throw new Error('Utilisateur non authentifié');
     }
-    return this.organisationsService.getOrganisationMembers(id, userId);
+    return this.organisationsService.getOrganisationMembers(id, userId, tagId ? { tagId } : undefined);
+  }
+
+  /**
+   * Récupérer l'historique des anciens membres (route statique avant :memberId)
+   */
+  @Get(':id/members/history')
+  async getOrganisationMembersHistory(@Param('id') organisationId: string, @Req() req: Request) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) {
+      throw new Error('Utilisateur non authentifié');
+    }
+    return this.organisationsService.getOrganisationMembersHistory(organisationId, userId);
+  }
+
+  /**
+   * Exporter les membres en CSV
+   */
+  @Get(':id/members/export')
+  async exportMembersToCSV(
+    @Param('id') organisationId: string,
+    @Query('includeHistory') includeHistory: string | undefined,
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) {
+      throw new Error('Utilisateur non authentifié');
+    }
+    return this.organisationsService.exportMembersToCSV(
+      organisationId,
+      userId,
+      includeHistory === 'true'
+    );
+  }
+
+  /**
+   * Inviter un membre par email
+   */
+  @Post(':id/members/invite')
+  @RequirePermissions({ resource: 'role', action: 'assign', scope: 'organisation' })
+  async inviteMember(
+    @Param('id') organisationId: string,
+    @Body() inviteMemberDto: InviteMemberDto,
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) {
+      throw new Error('Utilisateur non authentifié');
+    }
+    return this.organisationsService.inviteMember(organisationId, userId, inviteMemberDto);
+  }
+
+  /**
+   * Tags membres du club (libellés — contrôle d’accès dans le service, sans RBAC « members.read »)
+   */
+  @Get(':id/member-tags')
+  async listOrganisationMemberTags(@Param('id') organisationId: string, @Req() req: Request) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) {
+      throw new Error('Utilisateur non authentifié');
+    }
+    return this.organisationsService.listOrganisationMemberTags(organisationId, userId);
+  }
+
+  @Post(':id/member-tags')
+  async createOrganisationMemberTag(
+    @Param('id') organisationId: string,
+    @Body() dto: CreateMemberTagDto,
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) {
+      throw new Error('Utilisateur non authentifié');
+    }
+    return this.organisationsService.createOrganisationMemberTag(organisationId, userId, dto.name);
+  }
+
+  @Delete(':id/member-tags/:tagId')
+  async deleteOrganisationMemberTag(
+    @Param('id') organisationId: string,
+    @Param('tagId') tagId: string,
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) {
+      throw new Error('Utilisateur non authentifié');
+    }
+    return this.organisationsService.deleteOrganisationMemberTag(organisationId, userId, tagId);
   }
 
   /**
@@ -155,6 +252,28 @@ export class OrganisationsController {
   ) {
     const userId = req.user?.['sub'] as string;
     return this.organisationsService.getMemberById(organisationId, memberId, userId);
+  }
+
+  /**
+   * Attribuer des tags à un membre (remplace l'ensemble des tags)
+   */
+  @Put(':id/members/:memberId/tags')
+  async setMemberTags(
+    @Param('id') organisationId: string,
+    @Param('memberId') memberId: string,
+    @Body() dto: SetMemberTagsDto,
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) {
+      throw new Error('Utilisateur non authentifié');
+    }
+    return this.organisationsService.setMemberTagsForUser(
+      organisationId,
+      memberId,
+      userId,
+      dto.tagIds
+    );
   }
 
   /**
@@ -195,56 +314,5 @@ export class OrganisationsController {
       throw new Error('Utilisateur non authentifié');
     }
     return this.organisationsService.removeMember(organisationId, memberId, userId);
-  }
-
-  /**
-   * Inviter un membre par email
-   */
-  @Post(':id/members/invite')
-  @RequirePermissions({ resource: 'role', action: 'assign', scope: 'organisation' })
-  async inviteMember(
-    @Param('id') organisationId: string,
-    @Body() inviteMemberDto: InviteMemberDto,
-    @Req() req: Request
-  ) {
-    const userId = req.user?.['sub'] as string;
-    if (!userId) {
-      throw new Error('Utilisateur non authentifié');
-    }
-    return this.organisationsService.inviteMember(organisationId, userId, inviteMemberDto);
-  }
-
-  /**
-   * Récupérer l'historique des anciens membres
-   */
-  @Get(':id/members/history')
-  async getOrganisationMembersHistory(@Param('id') organisationId: string, @Req() req: Request) {
-    const userId = req.user?.['sub'] as string;
-    if (!userId) {
-      throw new Error('Utilisateur non authentifié');
-    }
-    return this.organisationsService.getOrganisationMembersHistory(organisationId, userId);
-  }
-
-  /**
-   * Exporter les membres en CSV
-   */
-  @Get(':id/members/export')
-  async exportMembersToCSV(
-    @Param('id') organisationId: string,
-    @Query('includeHistory') includeHistory?: string,
-    @Req() req?: Request
-  ) {
-    const userId = req?.user?.['sub'] as string;
-    if (!userId) {
-      throw new Error('Utilisateur non authentifié');
-    }
-    const result = await this.organisationsService.exportMembersToCSV(
-      organisationId,
-      userId,
-      includeHistory === 'true'
-    );
-    // Retourner le CSV avec les headers appropriés
-    return result;
   }
 }

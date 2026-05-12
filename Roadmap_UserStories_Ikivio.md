@@ -180,7 +180,7 @@
 - [x] Dashboard admin : membres, événements, présences — vraies données
 - [x] Fiche membre detail avec tuteur pour les mineurs
 - [ ] Upload et validation des documents administratifs (**Epic 1.2**)
-- [ ] Export CSV membres + tags membres (**Epic 1.3**)
+- [x] Export CSV membres + tags membres (**Epic 1.3**)
 - [ ] Création d'événements + réservation par les membres (paiements)
 - [ ] Paiement de cotisation en ligne (Stripe)
 - [ ] Génération de facture PDF

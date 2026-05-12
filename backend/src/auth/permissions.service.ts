@@ -18,6 +18,19 @@ export class PermissionsService {
   ) {}
 
   /**
+   * L'action « manage » couvre create / read / update / delete sur la même ressource.
+   */
+  private actionMatches(roleAction: string, requiredAction: string): boolean {
+    if (roleAction === requiredAction) {
+      return true;
+    }
+    if (roleAction === 'manage' && ['create', 'read', 'update', 'delete'].includes(requiredAction)) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Vérifie si un utilisateur a une permission spécifique
    */
   async hasPermission(
@@ -48,7 +61,7 @@ export class PermissionsService {
       const hasPermission = membership.role.permissions.some(
         (rolePerm) =>
           rolePerm.permission.resource === permission.resource &&
-          rolePerm.permission.action === permission.action &&
+          this.actionMatches(rolePerm.permission.action, permission.action) &&
           this.checkScope(rolePerm.permission.scope, permission.scope)
       );
 
@@ -95,7 +108,7 @@ export class PermissionsService {
       const hasPermission = membership.role.permissions.some(
         (rolePerm) =>
           rolePerm.permission.resource === permission.resource &&
-          rolePerm.permission.action === permission.action &&
+          this.actionMatches(rolePerm.permission.action, permission.action) &&
           this.checkScope(rolePerm.permission.scope, permission.scope)
       );
 
