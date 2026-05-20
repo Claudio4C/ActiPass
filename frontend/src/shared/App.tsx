@@ -26,6 +26,7 @@ import OnboardingPage from '../pages/OnboardingPage'
 import ClubsPage from '../pages/club/ClubsPage'
 import ClubHomePage from '../pages/club/ClubHomePage'
 import ClubPlanningPage from '../pages/club/ClubPlanningPage'
+import ClubDocumentsPage from '../pages/club/ClubDocumentsPage'
 import ClubOrgEventsPage from '../pages/club/ClubOrgEventsPage'
 import ComingSoon from '../components/shared/ComingSoon'
 
@@ -72,6 +73,7 @@ import AttendancePage from '../pages/dashboard/AttendancePage'
 import AttendanceDetailPage from '../pages/dashboard/AttendanceDetailPage'
 import AttendanceStatsPage from '../pages/dashboard/AttendanceStatsPage'
 import SettingsPage from '../pages/dashboard/SettingsPage'
+import AdminRequests from '../pages/dashboard/AdminRequests'
 
 interface AppProps {
     mode: AppMode;
@@ -210,7 +212,7 @@ const AppContent: React.FC<{
           <Route path="/club/:orgId/notifications" element={<ComingSoon title="Notifications" description="Vos notifications seront disponibles prochainement." />} />
           <Route path="/club/:orgId/abonnements" element={<ComingSoon title="Abonnements & paiements" description="La gestion des abonnements sera disponible prochainement." />} />
           <Route path="/club/:orgId/fidelite" element={<ComingSoon title="Fidélité" description="Votre programme de fidélité sera disponible prochainement." />} />
-          <Route path="/club/:orgId/documents" element={<ComingSoon title="Documents" description="Vos documents seront disponibles prochainement." />} />
+          <Route path="/club/:orgId/documents" element={<ClubDocumentsPage />} />
           <Route path="/club/:orgId/inviter" element={<ComingSoon title="Inviter" description="La fonctionnalité d'invitation sera disponible prochainement." />} />
         </Route>
 
@@ -263,6 +265,7 @@ const AppContent: React.FC<{
           <Route path="/dashboard/:organisationId/attendance/stats" element={<AttendanceStatsPage />} />
           <Route path="/dashboard/:organisationId/attendance/:eventId" element={<AttendanceDetailPage />} />
           <Route path="/dashboard/:organisationId/settings" element={<SettingsPage />} />
+          <Route path="/dashboard/:organisationId/requests" element={<AdminRequests />} />
         </Route>
 
         {/* ═══════════════════════════════════════

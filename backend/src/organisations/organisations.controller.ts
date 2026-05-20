@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -297,6 +298,48 @@ export class OrganisationsController {
       body.roleType,
       userId
     );
+  }
+
+  // ─── Adhésions (demandes & décisions) ───────────────────────────────────────
+
+  @Get(':id/memberships')
+  async getMemberships(
+    @Param('id') organisationId: string,
+    @Query('status') status: string | undefined,
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    return this.organisationsService.getMemberships(organisationId, status, userId);
+  }
+
+  /** bulk-approve DOIT être avant :membershipId pour éviter le conflit de route */
+  @Patch(':id/memberships/bulk-approve')
+  @HttpCode(HttpStatus.OK)
+  async bulkApproveMemberships(
+    @Param('id') organisationId: string,
+    @Body() body: { ids: string[] },
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    return this.organisationsService.bulkApproveMemberships(organisationId, body.ids, userId);
+  }
+
+  @Patch(':id/memberships/:membershipId')
+  @HttpCode(HttpStatus.OK)
+  async decideMembership(
+    @Param('id') organisationId: string,
+    @Param('membershipId') membershipId: string,
+    @Body() body: { action: 'approve' | 'reject'; reason?: string },
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    return this.organisationsService.decideMembership(organisationId, membershipId, body.action, body.reason, userId);
+  }
+
+  @Get(':id/my-membership')
+  async getMyMembership(@Param('id') organisationId: string, @Req() req: Request) {
+    const userId = req.user?.['sub'] as string;
+    return this.organisationsService.getMyMembership(organisationId, userId);
   }
 
   /**

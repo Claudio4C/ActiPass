@@ -157,6 +157,8 @@ export class OrganisationsService {
       role: membership.role,
       joined_at: membership.joined_at,
       status: membership.status,
+      membership_id: membership.id,
+      comment: membership.comment,
     }));
   }
 
@@ -295,17 +297,18 @@ export class OrganisationsService {
     userId: string,
     opts?: { tagId?: string }
   ) {
-    // Vérifier que l'utilisateur est membre de l'organisation
+    // Vérifier que l'utilisateur est membre ACTIF de l'organisation
     const membership = await this.prisma.membership.findFirst({
       where: {
         user_id: userId,
         organisation_id: organisationId,
         left_at: null,
+        status: 'active',
       },
     });
 
     if (!membership) {
-      throw new ForbiddenException("Vous n'êtes pas membre de cette organisation");
+      throw new ForbiddenException("Vous n'êtes pas membre actif de cette organisation");
     }
 
     const tagId = opts?.tagId;
@@ -313,8 +316,9 @@ export class OrganisationsService {
     const members = await this.prisma.membership.findMany({
       where: {
         organisation_id: organisationId,
-        left_at: null, // Seulement les membres actifs (non retirés)
-        deleted_at: null, // Exclure aussi les membres supprimés (soft delete)
+        left_at: null,
+        deleted_at: null,
+        status: 'active', // Exclure les adhésions pending et banned
         ...(tagId
           ? {
               tagAssignments: {
@@ -665,6 +669,99 @@ export class OrganisationsService {
     return {
       message: "Demande d'adhésion envoyée avec succès",
       membership,
+    };
+  }
+
+  // ─── Gestion des adhésions ───────────────────────────────────────────────────
+
+  private async assertCanManageMemberships(organisationId: string, userId: string) {
+    const m = await this.prisma.membership.findFirst({
+      where: { user_id: userId, organisation_id: organisationId, left_at: null, deleted_at: null },
+      include: { role: true },
+    });
+    if (!m || !['club_owner', 'club_manager'].includes(m.role.type)) {
+      throw new ForbiddenException("Accès refusé — seuls les gestionnaires peuvent administrer les adhésions");
+    }
+  }
+
+  async getMemberships(organisationId: string, status: string | undefined, userId: string) {
+    await this.assertCanManageMemberships(organisationId, userId);
+    const isPending = status === 'pending';
+    const memberships = await this.prisma.membership.findMany({
+      where: {
+        organisation_id: organisationId,
+        deleted_at: null,
+        ...(isPending ? { status: 'pending', left_at: null } : { status: { not: 'pending' } }),
+      },
+      include: {
+        user: { select: { id: true, firstname: true, lastname: true, email: true, phone: true, birthdate: true, avatar_url: true } },
+        role: { select: { id: true, name: true, type: true } },
+      },
+      orderBy: { created_at: 'desc' },
+      take: isPending ? undefined : 8,
+    });
+    return memberships;
+  }
+
+  async decideMembership(
+    organisationId: string,
+    membershipId: string,
+    action: 'approve' | 'reject',
+    reason: string | undefined,
+    userId: string,
+  ) {
+    await this.assertCanManageMemberships(organisationId, userId);
+    const target = await this.prisma.membership.findFirst({
+      where: { id: membershipId, organisation_id: organisationId, deleted_at: null },
+    });
+    if (!target) { throw new NotFoundException('Adhésion non trouvée'); }
+    if (target.status !== 'pending') { throw new BadRequestException('Cette adhésion a déjà été traitée'); }
+
+    const updated = await this.prisma.membership.update({
+      where: { id: membershipId },
+      data: action === 'approve'
+        ? { status: 'active', validated: true, comment: reason ?? null }
+        : { status: 'banned', comment: reason ?? null, left_at: new Date() },
+    });
+    return {
+      message: action === 'approve' ? 'Adhésion approuvée' : 'Adhésion refusée',
+      membership: updated,
+    };
+  }
+
+  async bulkApproveMemberships(organisationId: string, ids: string[], userId: string) {
+    await this.assertCanManageMemberships(organisationId, userId);
+    const result = await this.prisma.membership.updateMany({
+      where: { id: { in: ids }, organisation_id: organisationId, status: 'pending' },
+      data: { status: 'active', validated: true },
+    });
+    return {
+      message: `${result.count} adhésion${result.count > 1 ? 's' : ''} approuvée${result.count > 1 ? 's' : ''}`,
+      count: result.count,
+    };
+  }
+
+  async getMyMembership(organisationId: string, userId: string) {
+    const membership = await this.prisma.membership.findFirst({
+      where: { user_id: userId, organisation_id: organisationId, deleted_at: null },
+      include: {
+        role: { select: { id: true, name: true, type: true } },
+        organisation: { select: { id: true, name: true, logo_url: true } },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+    if (!membership) { throw new NotFoundException('Adhésion non trouvée'); }
+    return {
+      id: membership.id,
+      status: membership.status,
+      docs_status: membership.docs_status,
+      payment_status: membership.payment_status,
+      is_paid: membership.is_paid,
+      validated: membership.validated,
+      joined_at: membership.joined_at,
+      comment: membership.comment,
+      role: membership.role,
+      organisation: membership.organisation,
     };
   }
 

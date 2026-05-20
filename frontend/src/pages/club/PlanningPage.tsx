@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Clock, MapPin, User, Dumbbell, Music, Trophy, Users, Bookmark, ChevronLeft, ChevronRight, CalendarPlus, Building2, Bell, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Clock, MapPin, User, Dumbbell, Music, Trophy, Users, Bookmark, ChevronLeft, ChevronRight, CalendarPlus, Bell, X, Search } from 'lucide-react'
 import { useCurrentOrganisation } from '../../hooks/useCurrentOrganisation'
 import { useAuth } from '../../contexts/AuthContext'
 import { api } from '../../lib/api'
@@ -228,7 +228,6 @@ const FamilyMemberCard: React.FC<{
 const PlanningPage: React.FC = () => {
   const { organisation } = useCurrentOrganisation()
   const { user } = useAuth()
-  const navigate = useNavigate()
   const orgId = organisation?.id
 
   const [myEvents,       setMyEvents]       = useState<Event[]>([])
@@ -236,6 +235,7 @@ const PlanningPage: React.FC = () => {
   const [loading,        setLoading]        = useState(true)
   const [weekRef,        setWeekRef]        = useState(new Date())
   const [activeId,       setActiveId]       = useState<string>('all')
+  const [selectedOrgStatus, setSelectedOrgStatus] = useState<string | null>(null)
   const [selectedEvent,    setSelectedEvent]    = useState<SheetEvent | null>(null)
   const [notifPerm,        setNotifPerm]        = useState<NotificationPermission | null>(() =>
     'Notification' in window ? Notification.permission : null,
@@ -251,13 +251,21 @@ const PlanningPage: React.FC = () => {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [evtsData, famData] = await Promise.all([
-        orgId
-          ? api.get<Event[]>(`/organisations/${orgId}/events`, { status: 'published' }, { useCache: true, cacheTTL: 60000 })
-          : Promise.resolve([] as Event[]),
+      const [myOrgsData, famData] = await Promise.all([
+        api.get<{ organisation: { id: string }; status: string }[]>('/organisations/my', {}, { useCache: false }).catch(() => [] as { organisation: { id: string }; status: string }[]),
         api.get<{ children: FamilyChild[] }>('/family/dashboard').catch(() => ({ children: [] })),
       ])
-      setMyEvents(Array.isArray(evtsData) ? evtsData : [])
+
+      const selectedOrgMs = orgId ? myOrgsData.find((m) => m.organisation.id === orgId) : null
+      const status = selectedOrgMs?.status ?? null
+      setSelectedOrgStatus(status)
+
+      const isActive = !orgId || status === 'active'
+      const evtsData = isActive && orgId
+        ? await api.get<Event[]>(`/organisations/${orgId}/events`, { status: 'published' }, { useCache: true, cacheTTL: 60000 }).catch(() => [] as Event[])
+        : [] as Event[]
+
+      setMyEvents(evtsData)
       setChildren(famData.children ?? [])
     } catch {
       setMyEvents([])
@@ -494,25 +502,52 @@ const PlanningPage: React.FC = () => {
         </div>
       )}
 
-      {/* Empty state global — aucun club */}
-      {hasNoClubs && (
-        <div className="bg-card border border-border rounded-3xl p-8 text-center space-y-4">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center">
-            <CalendarPlus className="w-7 h-7 text-primary shrink-0" />
+      {/* Notice pending pour l'org sélectionnée */}
+      {orgId && selectedOrgStatus === 'pending' && (
+        <div className="flex items-start gap-3 bg-amber-500/5 border border-amber-500/20 rounded-2xl px-4 py-3.5">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0 mt-0.5">
+            <Clock className="w-4 h-4 text-amber-600 shrink-0" />
           </div>
-          <div>
-            <h2 className="font-display font-bold text-lg text-foreground">Aucune activité prévue</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Inscrivez vos enfants dans un club pour voir leur planning ici.
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-amber-800 dark:text-amber-400">Adhésion en attente</p>
+            <p className="text-xs text-amber-700/80 dark:text-amber-400/70 mt-0.5">
+              Votre demande est en cours de validation. Le planning sera disponible dès qu'elle sera approuvée.
             </p>
           </div>
-          <button
-            onClick={() => navigate('/clubs')}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-full text-sm font-bold hover:opacity-90 active:scale-95 transition-transform shadow-lg shadow-primary/25"
-          >
-            <Building2 className="w-4 h-4 shrink-0" />
-            Découvrir des clubs
-          </button>
+          <Link to="/clubs" className="text-xs font-bold text-amber-700 hover:underline shrink-0 mt-0.5">
+            Gérer →
+          </Link>
+        </div>
+      )}
+
+      {/* Empty state — aucun club actif */}
+      {hasNoClubs && !selectedOrgStatus && (
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="max-w-sm w-full text-center space-y-5 px-4">
+            <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shadow-lg shadow-primary/10">
+              <CalendarPlus className="w-10 h-10 text-primary shrink-0" />
+            </div>
+            <div>
+              <h2 className="font-display text-2xl font-bold text-foreground">Aucune activité planifiée</h2>
+              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                Rejoignez un club ou inscrivez vos enfants pour voir les créneaux et les événements ici.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2.5">
+              <Link
+                to="/clubs"
+                className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-bold px-6 py-3 rounded-full active:scale-95 transition-transform shadow-lg shadow-primary/25"
+              >
+                <Search className="w-4 h-4 shrink-0" /> Découvrir des clubs
+              </Link>
+              <Link
+                to="/club/famille"
+                className="inline-flex items-center justify-center gap-2 border border-border text-foreground text-sm font-semibold px-6 py-2.5 rounded-full active:scale-95 transition-transform hover:border-primary/40"
+              >
+                Inscrire ma famille
+              </Link>
+            </div>
+          </div>
         </div>
       )}
 
