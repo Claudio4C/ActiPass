@@ -27,7 +27,7 @@ interface FamilyChild {
   memberships: { id: string; organisation: { id: string } }[];
 }
 
-type MembershipStatus = 'pending' | 'active' | 'banned' | 'suspended'
+type MembershipStatus = 'pending' | 'active' | 'banned' | 'suspended' | 'expired' | 'resigned'
 
 interface MyMembership {
   id: string;
@@ -39,11 +39,11 @@ interface MyMembership {
 // ─── Meta catégories ──────────────────────────────────────────────────────────
 
 const CAT_META: Record<string, { emoji: string; label: string; color: string }> = {
-  sport:   { emoji: '⚽', label: 'Sport',   color: 'text-[hsl(160,84%,39%)] bg-[hsl(160,84%,39%)]/10' },
+  sport: { emoji: '⚽', label: 'Sport', color: 'text-[hsl(160,84%,39%)] bg-[hsl(160,84%,39%)]/10' },
   culture: { emoji: '🎭', label: 'Culture', color: 'text-[hsl(340,75%,55%)] bg-[hsl(340,75%,55%)]/10' },
-  loisir:  { emoji: '🎨', label: 'Loisir',  color: 'text-amber-600 bg-amber-500/10' },
-  social:  { emoji: '🤝', label: 'Social',  color: 'text-primary bg-primary/10' },
-  other:   { emoji: '🏢', label: 'Autre',   color: 'text-muted-foreground bg-muted' },
+  loisir: { emoji: '🎨', label: 'Loisir', color: 'text-amber-600 bg-amber-500/10' },
+  social: { emoji: '🤝', label: 'Social', color: 'text-primary bg-primary/10' },
+  other: { emoji: '🏢', label: 'Autre', color: 'text-muted-foreground bg-muted' },
 }
 
 const FILTER_CATS = [
@@ -73,7 +73,7 @@ const EnrollModal: React.FC<EnrollModalProps> = ({ org, myMemberships, children,
 
   // Bloquer si déjà membre ou en attente
   const myMs = myMemberships.find((m) => m.organisation.id === org.id)
-  const alreadyMeEnrolled = !!myMs
+  const alreadyMeEnrolled = myMs?.status === 'active' || myMs?.status === 'pending'
 
   const getChildEnrolled = (child: FamilyChild) =>
     child.memberships.some((m) => m.organisation.id === org.id)
@@ -230,6 +230,20 @@ const MembershipBadge: React.FC<{ status: MembershipStatus; comment?: string | n
       </div>
     )
   }
+  if (status === 'expired') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-muted text-muted-foreground shrink-0">
+        <AlertTriangle className="w-3 h-3 shrink-0" /> Expiré
+      </span>
+    )
+  }
+  if (status === 'resigned') {
+    return (
+      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-muted text-muted-foreground shrink-0">
+        <AlertTriangle className="w-3 h-3 shrink-0" /> Démissionnaire
+      </span>
+    )
+  }
   return null
 }
 
@@ -243,9 +257,10 @@ const ClubCard: React.FC<{
   onEnroll: (org: PublicOrg) => void;
 }> = ({ org, membershipStatus, membershipComment, hasChildEnrolled, onEnroll }) => {
   const meta = CAT_META[org.type] ?? CAT_META.other
-  const isActive  = membershipStatus === 'active'
-  const isPending = membershipStatus === 'pending'
-  const canEnroll = !membershipStatus && !isPending
+  const isActive    = membershipStatus === 'active'
+  const isPending   = membershipStatus === 'pending'
+  const isSuspended = membershipStatus === 'suspended' || membershipStatus === 'banned'
+  const canEnroll   = !membershipStatus || membershipStatus === 'resigned' || membershipStatus === 'expired'
 
   return (
     <div className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-3 hover:shadow-md hover:border-primary/20 transition-all">
@@ -318,12 +333,16 @@ const ClubCard: React.FC<{
         {isPending && (
           <span className="text-xs text-muted-foreground italic ml-auto">Demande envoyée</span>
         )}
+        {isSuspended && (
+          <span className="text-xs text-muted-foreground italic ml-auto">Accès restreint</span>
+        )}
         {canEnroll && (
           <button
             onClick={() => onEnroll(org)}
             className="inline-flex items-center gap-1.5 bg-primary text-primary-foreground text-xs font-bold px-3.5 py-2 rounded-full active:scale-95 transition-transform hover:opacity-90"
           >
-            <Plus className="w-3.5 h-3.5 shrink-0" /> Inscrire
+            <Plus className="w-3.5 h-3.5 shrink-0" />
+            {membershipStatus === 'resigned' || membershipStatus === 'expired' ? 'Rejoindre' : 'Inscrire'}
           </button>
         )}
       </div>
@@ -399,7 +418,7 @@ const ClubsPage: React.FC = () => {
     })
   }, [orgs, search, activeType])
 
-  const hasNoClub = myMemberships.filter((m) => m.status === 'active').length === 0
+  const hasNoClub = !myMemberships.some((m) => ['active', 'pending', 'suspended'].includes(m.status))
 
   const getMembershipStatus = (orgId: string): MembershipStatus | null => {
     const m = myMemberships.find((ms) => ms.organisation.id === orgId)
@@ -440,8 +459,10 @@ const ClubsPage: React.FC = () => {
 
       {/* Header */}
       <div className="flex items-start gap-4">
-        <Link to="/home"
-          className="w-9 h-9 rounded-xl flex items-center justify-center border border-border bg-card text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors active:scale-95 shrink-0 mt-1">
+        <Link
+          to="/home"
+          className="w-9 h-9 rounded-xl flex items-center justify-center border border-border bg-card text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors active:scale-95 shrink-0 mt-1"
+        >
           <ChevronRight className="w-4 h-4 rotate-180 shrink-0" />
         </Link>
         <div>

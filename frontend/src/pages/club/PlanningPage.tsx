@@ -235,7 +235,8 @@ const PlanningPage: React.FC = () => {
   const [loading,        setLoading]        = useState(true)
   const [weekRef,        setWeekRef]        = useState(new Date())
   const [activeId,       setActiveId]       = useState<string>('all')
-  const [selectedOrgStatus, setSelectedOrgStatus] = useState<string | null>(null)
+  const [selectedOrgStatus,    setSelectedOrgStatus]    = useState<string | null>(null)
+  const [hasPendingMembership, setHasPendingMembership] = useState(false)
   const [selectedEvent,    setSelectedEvent]    = useState<SheetEvent | null>(null)
   const [notifPerm,        setNotifPerm]        = useState<NotificationPermission | null>(() =>
     'Notification' in window ? Notification.permission : null,
@@ -259,6 +260,7 @@ const PlanningPage: React.FC = () => {
       const selectedOrgMs = orgId ? myOrgsData.find((m) => m.organisation.id === orgId) : null
       const status = selectedOrgMs?.status ?? null
       setSelectedOrgStatus(status)
+      setHasPendingMembership(myOrgsData.some((m) => m.status === 'pending'))
 
       const isActive = !orgId || status === 'active'
       const evtsData = isActive && orgId
@@ -427,7 +429,8 @@ const PlanningPage: React.FC = () => {
   // Vrai quand aucun enfant n'est inscrit dans un club ET pas d'événements personnels
   const hasNoClubs = !loading &&
     children.every((c) => c.organisations.length === 0) &&
-    myEvents.length === 0
+    myEvents.length === 0 &&
+    !hasPendingMembership
 
   return (
     <div className="space-y-6">
@@ -503,7 +506,7 @@ const PlanningPage: React.FC = () => {
       )}
 
       {/* Notice pending pour l'org sélectionnée */}
-      {orgId && selectedOrgStatus === 'pending' && (
+      {(orgId ? selectedOrgStatus === 'pending' : hasPendingMembership) && (
         <div className="flex items-start gap-3 bg-amber-500/5 border border-amber-500/20 rounded-2xl px-4 py-3.5">
           <div className="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0 mt-0.5">
             <Clock className="w-4 h-4 text-amber-600 shrink-0" />

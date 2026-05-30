@@ -127,7 +127,7 @@ export class OrganisationsService {
     const memberships = await this.prisma.membership.findMany({
       where: {
         user_id: userId,
-        left_at: null, // Seulement les adhésions actives
+        deleted_at: null,
       },
       include: {
         organisation: {
@@ -150,9 +150,33 @@ export class OrganisationsService {
           },
         },
       },
+      orderBy: { created_at: 'desc' },
     });
 
-    return memberships.map((membership) => ({
+    // Déduplique par org : pour chaque org, garde l'adhésion la plus pertinente.
+    // Règle : un statut "courant" (active/pending/suspended, priority < 3) écrase toujours
+    // un statut "passé" (resigned/expired/banned). Entre deux statuts passés, on garde
+    // le plus récent (memberships déjà triés par created_at desc).
+    const STATUS_PRIORITY: Record<string, number> = {
+      active: 0, pending: 1, suspended: 2, resigned: 3, expired: 4, banned: 5,
+    };
+    const CURRENT_THRESHOLD = 3;
+    const best = new Map<string, typeof memberships[number]>();
+    for (const m of memberships) {
+      const orgId = m.organisation.id;
+      const existing = best.get(orgId);
+      if (!existing) {
+        best.set(orgId, m);
+        continue;
+      }
+      const pNew = STATUS_PRIORITY[m.status] ?? 99;
+      const pOld = STATUS_PRIORITY[existing.status] ?? 99;
+      if (pNew < CURRENT_THRESHOLD && pNew < pOld) {
+        best.set(orgId, m);
+      }
+    }
+
+    return [...best.values()].map((membership) => ({
       organisation: membership.organisation,
       role: membership.role,
       joined_at: membership.joined_at,
@@ -318,7 +342,7 @@ export class OrganisationsService {
         organisation_id: organisationId,
         left_at: null,
         deleted_at: null,
-        status: 'active', // Exclure les adhésions pending et banned
+        status: { in: ['active', 'suspended', 'pending'] },
         ...(tagId
           ? {
               tagAssignments: {
@@ -355,15 +379,15 @@ export class OrganisationsService {
           },
         },
       },
-      orderBy: { joined_at: 'asc' },
+      orderBy: [
+        { status: 'asc' },   // pending en premier (alphabétique : active < pending < suspended)
+        { joined_at: 'asc' },
+      ],
     });
-
-    console.log(
-      `[getOrganisationMembers] Retourné ${members.length} membres actifs pour l'organisation ${organisationId}`
-    );
 
     return members.map((member) => ({
       id: member.user.id,
+      membership_id: member.id,
       email: member.user.email,
       firstname: member.user.firstname,
       lastname: member.user.lastname,
@@ -372,6 +396,7 @@ export class OrganisationsService {
       birthdate: member.user.birthdate,
       is_minor: member.user.is_minor,
       role: member.role,
+      status: member.status,
       joined_at: member.joined_at,
       tags: member.tagAssignments.map((a) => ({ id: a.tag.id, name: a.tag.name })),
     }));
@@ -420,6 +445,7 @@ export class OrganisationsService {
 
     return {
       id: membership.user.id,
+      membership_id: membership.id,
       email: membership.user.email,
       firstname: membership.user.firstname,
       lastname: membership.user.lastname,
@@ -706,7 +732,7 @@ export class OrganisationsService {
   async decideMembership(
     organisationId: string,
     membershipId: string,
-    action: 'approve' | 'reject',
+    action: 'approve' | 'reject' | 'suspend' | 'archive' | 'reactivate',
     reason: string | undefined,
     userId: string,
   ) {
@@ -715,18 +741,58 @@ export class OrganisationsService {
       where: { id: membershipId, organisation_id: organisationId, deleted_at: null },
     });
     if (!target) { throw new NotFoundException('Adhésion non trouvée'); }
-    if (target.status !== 'pending') { throw new BadRequestException('Cette adhésion a déjà été traitée'); }
+
+    if ((action === 'approve' || action === 'reject') && target.status !== 'pending') {
+      throw new BadRequestException('Cette adhésion a déjà été traitée');
+    }
+    if ((action === 'suspend' || action === 'archive') && target.status !== 'active') {
+      throw new BadRequestException('Seuls les membres actifs peuvent être suspendus ou archivés');
+    }
+    if (action === 'reactivate' && target.status !== 'suspended') {
+      throw new BadRequestException('Seuls les membres suspendus peuvent être réactivés');
+    }
+
+    const dataMap: Record<string, object> = {
+      approve:    { status: 'active',    validated: true,  comment: reason ?? null },
+      reject:     { status: 'banned',                      comment: reason ?? null, left_at: new Date() },
+      suspend:    { status: 'suspended',                   comment: reason ?? null },
+      archive:    { status: 'expired',                     left_at: new Date() },
+      reactivate: { status: 'active',    comment: null },
+    };
 
     const updated = await this.prisma.membership.update({
       where: { id: membershipId },
-      data: action === 'approve'
-        ? { status: 'active', validated: true, comment: reason ?? null }
-        : { status: 'banned', comment: reason ?? null, left_at: new Date() },
+      data: dataMap[action],
     });
-    return {
-      message: action === 'approve' ? 'Adhésion approuvée' : 'Adhésion refusée',
-      membership: updated,
+    const messages: Record<string, string> = {
+      approve: 'Adhésion approuvée', reject: 'Adhésion refusée',
+      suspend: 'Membre suspendu',    archive: 'Membre archivé',
+      reactivate: 'Membre réactivé',
     };
+    return { message: messages[action], membership: updated };
+  }
+
+  async leaveOrganisation(organisationId: string, userId: string) {
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        user_id: userId,
+        organisation_id: organisationId,
+        status: { in: ['active', 'pending'] },
+        deleted_at: null,
+      },
+    });
+    if (!membership) { throw new NotFoundException('Adhésion introuvable'); }
+
+    if (membership.status === 'pending') {
+      await this.prisma.membership.delete({ where: { id: membership.id } });
+      return { message: 'Demande d\'adhésion annulée' };
+    }
+
+    await this.prisma.membership.update({
+      where: { id: membership.id },
+      data: { status: 'resigned', left_at: new Date() },
+    });
+    return { message: 'Vous avez quitté le club avec succès' };
   }
 
   async bulkApproveMemberships(organisationId: string, ids: string[], userId: string) {

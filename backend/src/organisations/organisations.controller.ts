@@ -329,7 +329,7 @@ export class OrganisationsController {
   async decideMembership(
     @Param('id') organisationId: string,
     @Param('membershipId') membershipId: string,
-    @Body() body: { action: 'approve' | 'reject'; reason?: string },
+    @Body() body: { action: 'approve' | 'reject' | 'suspend' | 'archive' | 'reactivate'; reason?: string },
     @Req() req: Request
   ) {
     const userId = req.user?.['sub'] as string;
@@ -340,6 +340,13 @@ export class OrganisationsController {
   async getMyMembership(@Param('id') organisationId: string, @Req() req: Request) {
     const userId = req.user?.['sub'] as string;
     return this.organisationsService.getMyMembership(organisationId, userId);
+  }
+
+  @Post(':id/leave')
+  @HttpCode(HttpStatus.OK)
+  async leaveOrganisation(@Param('id') organisationId: string, @Req() req: Request) {
+    const userId = req.user?.['sub'] as string;
+    return this.organisationsService.leaveOrganisation(organisationId, userId);
   }
 
   /**

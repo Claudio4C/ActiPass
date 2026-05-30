@@ -283,7 +283,8 @@ const ClubMembersPage: React.FC = () => {
   const [myOrgs,         setMyOrgs]         = useState<OrgItem[]>([])
   const [loading,        setLoading]        = useState(true)
   const [activeFilter,   setActiveFilter]   = useState<string>('all')
-  const [selectedOrgStatus, setSelectedOrgStatus] = useState<string | null>(null)
+  const [selectedOrgStatus,    setSelectedOrgStatus]    = useState<string | null>(null)
+  const [hasPendingMembership, setHasPendingMembership] = useState(false)
   const [selectedEvent,   setSelectedEvent]   = useState<SheetEvent | null>(null)
   const [notifPerm,       setNotifPerm]       = useState<NotificationPermission | null>(() =>
     'Notification' in window ? Notification.permission : null,
@@ -316,6 +317,7 @@ const ClubMembersPage: React.FC = () => {
         ? orgsData.find((m) => m.organisation.id === orgId)
         : null
       setSelectedOrgStatus(selectedOrgMembership?.status ?? null)
+      setHasPendingMembership(Array.isArray(orgsData) && orgsData.some((m) => m.status === 'pending'))
 
       // Org events only si le membre est actif dans cette org
       const isActiveMember = !orgId || selectedOrgMembership?.status === 'active'
@@ -551,7 +553,7 @@ const ClubMembersPage: React.FC = () => {
   }
 
   // Aucun club actif → état vide complet
-  if (myOrgs.length === 0 && children.length === 0) {
+  if (myOrgs.length === 0 && children.length === 0 && !hasPendingMembership) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
         <div className="max-w-sm w-full text-center space-y-5 px-4">
@@ -589,7 +591,7 @@ const ClubMembersPage: React.FC = () => {
     <div className="space-y-5">
 
       {/* Notice adhésion en attente pour l'org sélectionnée */}
-      {orgId && selectedOrgStatus === 'pending' && (
+      {(orgId ? selectedOrgStatus === 'pending' : hasPendingMembership) && (
         <div className="flex items-start gap-3 bg-amber-500/5 border border-amber-500/20 rounded-2xl px-4 py-3.5">
           <div className="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0 mt-0.5">
             <Clock className="w-4 h-4 text-amber-600 shrink-0" />

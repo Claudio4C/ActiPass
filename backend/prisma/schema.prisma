@@ -628,6 +628,9 @@ enum MembershipStatus {
   pending
   active
   banned
+  suspended
+  expired
+  resigned
 }
 
 enum MembershipDocsStatus {

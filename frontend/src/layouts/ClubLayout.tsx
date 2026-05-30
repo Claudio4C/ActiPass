@@ -5,7 +5,7 @@ import {
   Bell, CreditCard, Sparkles, FileText, UserPlus,
   ArrowLeft, Dumbbell, User, Music,
   Moon, Sun, LogOut, MapPin, Phone, Mail, Globe,
-  Clock, AlertTriangle, XCircle,
+  Clock, AlertTriangle, XCircle, ShieldOff, Archive, LogIn,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
@@ -60,7 +60,7 @@ const ClubLayout: React.FC = () => {
 
   const [org,              setOrg]              = useState<OrgDetails | null>(null)
   const [weekCount,        setWeekCount]        = useState(0)
-  const [membershipStatus, setMembershipStatus] = useState<'pending' | 'active' | 'banned' | null>(null)
+  const [membershipStatus, setMembershipStatus] = useState<'pending' | 'active' | 'banned' | 'suspended' | 'expired' | 'resigned' | null>(null)
   const [membershipComment, setMembershipComment] = useState<string | null>(null)
   const [membershipReady,  setMembershipReady]  = useState(false)
   const [isDark,           setIsDark]           = useState(() =>
@@ -69,7 +69,7 @@ const ClubLayout: React.FC = () => {
 
   useEffect(() => {
     const root = document.documentElement
-    isDark ? root.classList.add('dark') : root.classList.remove('dark')
+    if (isDark) { root.classList.add('dark') } else { root.classList.remove('dark') }
     localStorage.setItem('theme', isDark ? 'dark' : 'light')
   }, [isDark])
 
@@ -91,7 +91,7 @@ const ClubLayout: React.FC = () => {
           setOrg({ ...orgResp.organisation, myRole: orgResp.myRole })
         }
 
-        const status = (membershipResp?.status ?? null) as 'pending' | 'active' | 'banned' | null
+        const status = (membershipResp?.status ?? null) as 'pending' | 'active' | 'banned' | 'suspended' | 'expired' | 'resigned' | null
         setMembershipStatus(status)
         setMembershipComment(membershipResp?.comment ?? null)
         setMembershipReady(true)
@@ -181,6 +181,69 @@ const ClubLayout: React.FC = () => {
               to="/home"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
+              Retour à l'accueil
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (membershipReady && membershipStatus === 'suspended') {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="max-w-sm w-full bg-card border border-amber-500/20 rounded-3xl p-8 text-center space-y-4 shadow-xl">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/15 flex items-center justify-center">
+            <ShieldOff className="w-7 h-7 text-amber-600 shrink-0" />
+          </div>
+          <div>
+            <h2 className="font-display text-xl font-bold text-foreground">Compte suspendu</h2>
+            <p className="text-sm text-muted-foreground mt-2">
+              Votre accès à <strong>{org?.name}</strong> a été suspendu par un gestionnaire.
+            </p>
+            {membershipComment && (
+              <p className="text-sm text-amber-700 mt-2 bg-amber-500/5 rounded-xl px-3 py-2">
+                Motif : {membershipComment}
+              </p>
+            )}
+          </div>
+          <Link
+            to="/clubs"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"
+          >
+            <ArrowLeft className="w-4 h-4 shrink-0" /> Retour aux clubs
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (membershipReady && (membershipStatus === 'expired' || membershipStatus === 'resigned')) {
+    const isResigned = membershipStatus === 'resigned'
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+        <div className="max-w-sm w-full bg-card border border-border rounded-3xl p-8 text-center space-y-4 shadow-xl">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-muted flex items-center justify-center">
+            {isResigned ? <LogIn className="w-7 h-7 text-muted-foreground shrink-0" /> : <Archive className="w-7 h-7 text-muted-foreground shrink-0" />}
+          </div>
+          <div>
+            <h2 className="font-display text-xl font-bold text-foreground">
+              {isResigned ? 'Vous avez quitté ce club' : 'Adhésion expirée'}
+            </h2>
+            <p className="text-sm text-muted-foreground mt-2">
+              {isResigned
+                ? `Vous avez quitté ${org?.name ?? 'ce club'}. Pour rejoindre à nouveau, envoyez une nouvelle demande d'adhésion.`
+                : `Votre adhésion à ${org?.name ?? 'ce club'} a expiré. Contactez le club pour la renouveler.`}
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Link
+              to="/clubs"
+              className="inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-2.5 bg-primary text-primary-foreground rounded-full active:scale-95 transition-transform"
+            >
+              Rejoindre un club
+            </Link>
+            <Link to="/home" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Retour à l'accueil
             </Link>
           </div>
