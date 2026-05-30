@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Mail, Calendar, Shield, Trash2, User, Phone, Baby, X } from 'lucide-react'
+import { ArrowLeft, Mail, Calendar, Shield, Trash2, User, Phone, Baby, X, ShieldOff, Archive, ShieldCheck } from 'lucide-react'
 import RoleBasedRoute from '../../components/shared/RoleBasedRoute'
 import { api } from '../../lib/api'
 import { useAuth } from '../../contexts/AuthContext'
@@ -15,6 +15,7 @@ interface Guardian {
 
 interface MemberDetail {
   id: string;
+  membership_id: string;
   email: string;
   firstname: string;
   lastname: string;
@@ -63,13 +64,18 @@ const MemberDetailPage: React.FC = () => {
 
   const [member,          setMember]          = useState<MemberDetail | null>(null)
   const [loading,         setLoading]         = useState(true)
-  const [showRoleModal,   setShowRoleModal]   = useState(false)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [actionLoading,   setActionLoading]   = useState(false)
-  const [selectedRole,    setSelectedRole]    = useState('')
+  const [showRoleModal,    setShowRoleModal]    = useState(false)
+  const [showDeleteModal,  setShowDeleteModal]  = useState(false)
+  const [showSuspendModal, setShowSuspendModal] = useState(false)
+  const [showArchiveModal, setShowArchiveModal] = useState(false)
+  const [actionLoading,    setActionLoading]    = useState(false)
+  const [selectedRole,     setSelectedRole]     = useState('')
+  const [suspendReason,    setSuspendReason]    = useState('')
+  const [toast,            setToast]            = useState('')
 
   useEffect(() => {
     if (organisationId && memberId) { loadMember() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organisationId, memberId])
 
   const loadMember = async () => {
@@ -105,9 +111,68 @@ const MemberDetailPage: React.FC = () => {
     try {
       setActionLoading(true)
       await api.delete(`/organisations/${organisationId}/members/${memberId}`)
+      api.clearCache(`/organisations/${organisationId}`)
       navigate(`/dashboard/${organisationId}/members`)
     } catch {
       alert('Erreur lors de la suppression du membre')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleSuspend = async () => {
+    if (!organisationId || !member) { return }
+    try {
+      setActionLoading(true)
+      await api.patch(`/organisations/${organisationId}/memberships/${member.membership_id}`, {
+        action: 'suspend',
+        reason: suspendReason || undefined,
+      })
+      api.clearCache(`/organisations/${organisationId}`)
+      setShowSuspendModal(false)
+      setSuspendReason('')
+      setToast('Membre suspendu')
+      await loadMember()
+      setTimeout(() => setToast(''), 3000)
+    } catch {
+      alert('Erreur lors de la suspension')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleArchive = async () => {
+    if (!organisationId || !member) { return }
+    try {
+      setActionLoading(true)
+      await api.patch(`/organisations/${organisationId}/memberships/${member.membership_id}`, {
+        action: 'archive',
+      })
+      api.clearCache(`/organisations/${organisationId}`)
+      setShowArchiveModal(false)
+      setToast('Membre archivé')
+      await loadMember()
+      setTimeout(() => setToast(''), 3000)
+    } catch {
+      alert('Erreur lors de l\'archivage')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleReactivate = async () => {
+    if (!organisationId || !member) { return }
+    try {
+      setActionLoading(true)
+      await api.patch(`/organisations/${organisationId}/memberships/${member.membership_id}`, {
+        action: 'reactivate',
+      })
+      api.clearCache(`/organisations/${organisationId}`)
+      setToast('Membre réactivé')
+      await loadMember()
+      setTimeout(() => setToast(''), 3000)
+    } catch {
+      alert('Erreur lors de la réactivation')
     } finally {
       setActionLoading(false)
     }
@@ -137,8 +202,18 @@ const MemberDetailPage: React.FC = () => {
 
   const canManage = member.id !== user?.id && member.role.type !== 'club_owner'
 
+  const isActiveMember    = member.membership_status === 'active'
+  const isSuspendedMember = member.membership_status === 'suspended'
+
   return (
     <div className="space-y-6">
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-foreground text-background text-sm font-semibold rounded-full shadow-lg">
+          {toast}
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-start gap-4 flex-wrap">
@@ -166,14 +241,42 @@ const MemberDetailPage: React.FC = () => {
 
         {/* Actions */}
         {canManage ? (
-          <div className="flex gap-2 shrink-0">
+          <div className="flex flex-wrap gap-2 shrink-0">
             <button
               onClick={() => setShowRoleModal(true)}
               className="inline-flex items-center gap-2 px-3 py-2 border border-border rounded-xl text-sm font-semibold text-foreground hover:bg-muted transition-colors active:scale-95"
             >
               <Shield className="h-4 w-4 shrink-0" />
-              Changer le rôle
+              Rôle
             </button>
+            {isActiveMember && (
+              <button
+                onClick={() => setShowSuspendModal(true)}
+                className="inline-flex items-center gap-2 px-3 py-2 border border-amber-500/30 text-amber-700 rounded-xl text-sm font-semibold hover:bg-amber-500/5 transition-colors active:scale-95"
+              >
+                <ShieldOff className="h-4 w-4 shrink-0" />
+                Suspendre
+              </button>
+            )}
+            {isActiveMember && (
+              <button
+                onClick={() => setShowArchiveModal(true)}
+                className="inline-flex items-center gap-2 px-3 py-2 border border-border rounded-xl text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors active:scale-95"
+              >
+                <Archive className="h-4 w-4 shrink-0" />
+                Archiver
+              </button>
+            )}
+            {isSuspendedMember && (
+              <button
+                onClick={handleReactivate}
+                disabled={actionLoading}
+                className="inline-flex items-center gap-2 px-3 py-2 border border-[hsl(160,84%,39%)]/30 text-[hsl(160,84%,32%)] rounded-xl text-sm font-semibold hover:bg-[hsl(160,84%,39%)]/5 transition-colors active:scale-95 disabled:opacity-50"
+              >
+                <ShieldCheck className="h-4 w-4 shrink-0" />
+                Réactiver
+              </button>
+            )}
             <button
               onClick={() => setShowDeleteModal(true)}
               className="inline-flex items-center gap-2 px-3 py-2 bg-destructive text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-all active:scale-95"
@@ -371,6 +474,106 @@ const MemberDetailPage: React.FC = () => {
                 className="flex-1 px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
               >
                 {actionLoading ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal — Suspendre */}
+      {showSuspendModal && (
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-2xl shadow-xl max-w-md w-full p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                  <ShieldOff className="h-4 w-4 text-amber-700 shrink-0" />
+                </div>
+                <div>
+                  <h3 className="font-display text-base font-bold text-foreground">Suspendre le membre</h3>
+                  <p className="text-xs text-muted-foreground">{member.firstname} {member.lastname}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowSuspendModal(false); setSuspendReason('') }}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4 shrink-0" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Le membre perdra temporairement l'accès au club. Vous pourrez réactiver son adhésion ultérieurement.
+            </p>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">Motif (optionnel)</label>
+              <textarea
+                value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+                placeholder="Ex : comportement inapproprié, impayé…"
+                rows={3}
+                className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowSuspendModal(false); setSuspendReason('') }}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2.5 border border-border rounded-xl text-sm font-semibold text-foreground hover:bg-muted transition-colors active:scale-95"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleSuspend}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2.5 bg-amber-500 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-all active:scale-95 disabled:opacity-50"
+              >
+                {actionLoading ? 'En cours…' : 'Suspendre'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal — Archiver */}
+      {showArchiveModal && (
+        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-2xl shadow-xl max-w-md w-full p-6 space-y-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                  <Archive className="h-4 w-4 text-muted-foreground shrink-0" />
+                </div>
+                <div>
+                  <h3 className="font-display text-base font-bold text-foreground">Archiver le membre</h3>
+                  <p className="text-xs text-muted-foreground">{member.firstname} {member.lastname}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowArchiveModal(false)}
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
+              >
+                <X className="h-4 w-4 shrink-0" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              L'adhésion de{' '}
+              <span className="font-semibold text-foreground">{member.firstname} {member.lastname}</span>{' '}
+              passera au statut <span className="font-semibold text-foreground">Expiré</span>. Le membre n'aura plus accès au club.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowArchiveModal(false)}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2.5 border border-border rounded-xl text-sm font-semibold text-foreground hover:bg-muted transition-colors active:scale-95"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleArchive}
+                disabled={actionLoading}
+                className="flex-1 px-4 py-2.5 bg-foreground text-background rounded-xl text-sm font-semibold hover:opacity-80 transition-all active:scale-95 disabled:opacity-50"
+              >
+                {actionLoading ? 'En cours…' : 'Archiver'}
               </button>
             </div>
           </div>

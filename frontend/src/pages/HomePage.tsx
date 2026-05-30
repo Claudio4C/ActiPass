@@ -52,18 +52,21 @@ const HomePage: React.FC = () => {
           Array<{
             organisation: { id: string; name: string; type: 'club' | 'association' | null; logo_url?: string | null };
             role: { name: string; type: RoleType };
+            status: string;
           }>
         >('/organisations/my', {}, { useCache: false })
 
         setOrganisations(
-          data.map(item => ({
-            id: item.organisation.id,
-            name: item.organisation.name,
-            type: item.organisation.type || 'club',
-            roleType: item.role.type,
-            roleName: ROLE_LABELS[item.role.type] ?? item.role.name,
-            logo_url: item.organisation.logo_url ?? null,
-          })),
+          data
+            .filter((item) => ['active', 'pending', 'suspended'].includes(item.status))
+            .map(item => ({
+              id: item.organisation.id,
+              name: item.organisation.name,
+              type: item.organisation.type || 'club',
+              roleType: item.role.type,
+              roleName: ROLE_LABELS[item.role.type] ?? item.role.name,
+              logo_url: item.organisation.logo_url ?? null,
+            })),
         )
       } catch {
         setOrganisations([])
@@ -235,7 +238,7 @@ const HomePage: React.FC = () => {
                 Créer un espace
               </Link>
               <Link
-                to="/accounts?intent=join-organisation"
+                to="/clubs"
                 className="inline-flex items-center gap-2 bg-muted text-foreground text-sm font-semibold px-4 py-2.5 rounded-full active:scale-95 transition-transform border border-border"
               >
                 <UserPlus className="w-4 h-4 shrink-0" />

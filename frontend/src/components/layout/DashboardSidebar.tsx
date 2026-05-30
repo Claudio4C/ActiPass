@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Calendar, ClipboardCheck, Euro,
-  FileText, Settings, Menu, X, MessageSquare, UserCog,
+  FileText, Settings, Menu, X, MessageSquare, UserCog, ClipboardList,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { api } from '../../lib/api'
@@ -28,6 +28,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
   const [membership, setMembership] = useState<Membership | null>(null)
   const [orgInfo, setOrgInfo] = useState<{ name: string; logo_url: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [pendingCount, setPendingCount] = useState(0)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(
     () => localStorage.getItem('user_avatar_url'),
   )
@@ -53,6 +54,17 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
           joined_at: new Date().toISOString(),
         })
         setOrgInfo({ name: data.organisation.name, logo_url: data.organisation.logo_url ?? null })
+
+        // Fetch pending memberships count (only for managers)
+        if (['club_owner', 'club_manager'].includes(data.myRole.type)) {
+          api.get<{ length: number } | unknown[]>(
+            `/organisations/${organisationId}/memberships`,
+            { status: 'pending' },
+            { useCache: false },
+          ).then((res) => {
+            setPendingCount(Array.isArray(res) ? res.length : 0)
+          }).catch(() => {})
+        }
       } catch {
         // silently fail
       } finally {
@@ -67,6 +79,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
   const menuItems: MenuItem[] = [
     { icon: LayoutDashboard, label: "Vue d'ensemble", path: `/dashboard/${organisationId}/overview`,       roles: ['club_owner', 'club_manager', 'treasurer'] },
     { icon: Users,           label: 'Membres',         path: `/dashboard/${organisationId}/members`,        roles: ['club_owner', 'club_manager'] },
+    { icon: ClipboardList,   label: 'Adhésions',       path: `/dashboard/${organisationId}/requests`,       roles: ['club_owner', 'club_manager'], badge: pendingCount > 0 ? pendingCount : null },
     { icon: Calendar,        label: 'Événements',      path: `/dashboard/${organisationId}/events`,         roles: ['club_owner', 'club_manager'] },
     { icon: ClipboardCheck,  label: 'Présences',       path: `/dashboard/${organisationId}/attendance`,     roles: ['club_owner', 'club_manager'] },
     { icon: Euro,            label: 'Finances',        path: `/dashboard/${organisationId}/payments`,       roles: ['club_owner', 'club_manager', 'treasurer'] },

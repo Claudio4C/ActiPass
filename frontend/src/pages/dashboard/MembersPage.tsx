@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { Users, Search, Edit, Trash2, Shield, Mail, Download, Tag, X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Users, Search, Edit, Trash2, Shield, Mail, Download, Tag, X, Loader2, CheckCircle2, AlertCircle, Clock, ShieldOff } from 'lucide-react'
 import RoleBasedRoute from '../../components/shared/RoleBasedRoute'
 import { api } from '../../lib/api'
 import { getErrorMessage } from '../../lib/errors'
@@ -14,6 +14,7 @@ interface MemberTag {
 
 interface Member {
   id: string;
+  membership_id: string;
   email: string;
   firstname: string;
   lastname: string;
@@ -24,6 +25,7 @@ interface Member {
     type: string;
     level: number;
   };
+  status: 'active' | 'pending' | 'suspended';
   joined_at: string;
   tags?: MemberTag[];
 }
@@ -202,6 +204,34 @@ const MembersPage: React.FC = () => {
       alert('Erreur lors de la suppression du membre')
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  const handleApproveMember = async (membershipId: string) => {
+    if (!organisationId) { return }
+    const prev = members
+    setMembers((ms) => ms.map((m) => m.membership_id === membershipId ? { ...m, status: 'active' as const } : m))
+    try {
+      await api.patch(`/organisations/${organisationId}/memberships/${membershipId}`, { action: 'approve' })
+      api.clearCache(`/organisations/${organisationId}`)
+      setPageToast({ variant: 'success', message: 'Membre approuvé.' })
+    } catch {
+      setMembers(prev)
+      setPageToast({ variant: 'error', message: 'Erreur lors de l\'approbation.' })
+    }
+  }
+
+  const handleRejectMember = async (membershipId: string) => {
+    if (!organisationId) { return }
+    const prev = members
+    setMembers((ms) => ms.filter((m) => m.membership_id !== membershipId))
+    try {
+      await api.patch(`/organisations/${organisationId}/memberships/${membershipId}`, { action: 'reject' })
+      api.clearCache(`/organisations/${organisationId}`)
+      setPageToast({ variant: 'success', message: 'Demande refusée.' })
+    } catch {
+      setMembers(prev)
+      setPageToast({ variant: 'error', message: 'Erreur lors du refus.' })
     }
   }
 
@@ -456,10 +486,10 @@ const MembersPage: React.FC = () => {
             <table className="w-full">
               <thead className="bg-muted border-b border-border">
                 <tr>
-                  {['Membre', 'Rôle', 'Tags', "Date d'adhésion", 'Actions'].map((col, i) => (
+                  {['Membre', 'Statut', 'Rôle', 'Tags', "Date d'adhésion", 'Actions'].map((col, i) => (
                     <th
                       key={col}
-                      className={`px-5 py-3 text-[11px] uppercase tracking-wider text-muted-foreground font-bold ${i === 4 ? 'text-right' : 'text-left'}`}
+                      className={`px-5 py-3 text-[11px] uppercase tracking-wider text-muted-foreground font-bold ${i === 5 ? 'text-right' : 'text-left'}`}
                     >
                       {col}
                     </th>
@@ -487,6 +517,46 @@ const MembersPage: React.FC = () => {
                           </p>
                         </div>
                       </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      {member.status === 'pending' ? (
+                        <div className="flex flex-col gap-1.5">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 w-fit">
+                            <Clock className="w-3 h-3 shrink-0" />
+                            En attente
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => void handleApproveMember(member.membership_id)}
+                              className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                              title="Approuver"
+                            >
+                              <CheckCircle2 className="w-3 h-3 shrink-0" />
+                              Approuver
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleRejectMember(member.membership_id)}
+                              className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+                              title="Refuser"
+                            >
+                              <X className="w-3 h-3 shrink-0" />
+                              Refuser
+                            </button>
+                          </div>
+                        </div>
+                      ) : member.status === 'suspended' ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400">
+                          <ShieldOff className="w-3 h-3 shrink-0" />
+                          Suspendu
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+                          <CheckCircle2 className="w-3 h-3 shrink-0" />
+                          Actif
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-4">
                       <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${roleBadgeClass(member.role.type)}`}>
@@ -534,7 +604,7 @@ const MembersPage: React.FC = () => {
                         >
                           <Edit className="w-4 h-4 shrink-0" />
                         </Link>
-                        {member.id !== user?.id && member.role.type !== 'club_owner' && (
+                        {member.id !== user?.id && member.role.type !== 'club_owner' && member.status !== 'pending' && (
                           <>
                             <button
                               onClick={() => { setSelectedMember(member); setSelectedRoleType(member.role.type); setShowRoleModal(true) }}

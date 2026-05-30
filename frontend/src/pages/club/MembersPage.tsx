@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   Clock, MapPin, User, Dumbbell, Music, Trophy, Users, Bookmark,
   Calendar, Building2, CheckCircle2, AlertCircle, Navigation, Info,
-  ShieldCheck, ArrowRight, ChevronRight, Bell, X,
+  ShieldCheck, ArrowRight, ChevronRight, Bell, X, Search,
 } from 'lucide-react'
 import type { RoleType } from '../../types'
 import { useAuth } from '../../contexts/AuthContext'
@@ -283,6 +283,8 @@ const ClubMembersPage: React.FC = () => {
   const [myOrgs,         setMyOrgs]         = useState<OrgItem[]>([])
   const [loading,        setLoading]        = useState(true)
   const [activeFilter,   setActiveFilter]   = useState<string>('all')
+  const [selectedOrgStatus,    setSelectedOrgStatus]    = useState<string | null>(null)
+  const [hasPendingMembership, setHasPendingMembership] = useState(false)
   const [selectedEvent,   setSelectedEvent]   = useState<SheetEvent | null>(null)
   const [notifPerm,       setNotifPerm]       = useState<NotificationPermission | null>(() =>
     'Notification' in window ? Notification.permission : null,
@@ -307,20 +309,31 @@ const ClubMembersPage: React.FC = () => {
         orgId
           ? api.get<{ id: string }[]>(`/organisations/${orgId}/members`, undefined, { useCache: true, cacheTTL: 120000 }).catch(clearStaleOrg)
           : Promise.resolve([] as { id: string }[]),
-        api.get<{ organisation: { id: string; name: string; type: string | null }; role: { name: string; type: RoleType } }[]>('/organisations/my', {}, { useCache: true, cacheTTL: 60000 }).catch(() => []),
+        api.get<{ organisation: { id: string; name: string; type: string | null }; role: { name: string; type: RoleType }; status: string }[]>('/organisations/my', {}, { useCache: false }).catch(() => []),
         api.get<{ children: FamilyChild[] }>('/family/dashboard').catch(() => ({ children: [] })),
       ])
-      setMyEvents(Array.isArray(evtsData) ? evtsData : [])
-      setMemberCount(Array.isArray(membsData) ? membsData.length : 0)
+      // Vérifier le statut du membership pour l'org sélectionnée
+      const selectedOrgMembership = Array.isArray(orgsData) && orgId
+        ? orgsData.find((m) => m.organisation.id === orgId)
+        : null
+      setSelectedOrgStatus(selectedOrgMembership?.status ?? null)
+      setHasPendingMembership(Array.isArray(orgsData) && orgsData.some((m) => m.status === 'pending'))
+
+      // Org events only si le membre est actif dans cette org
+      const isActiveMember = !orgId || selectedOrgMembership?.status === 'active'
+      setMyEvents(isActiveMember && Array.isArray(evtsData) ? evtsData : [])
+      setMemberCount(isActiveMember && Array.isArray(membsData) ? membsData.length : 0)
       setMyOrgs(
         Array.isArray(orgsData)
-          ? orgsData.map((item) => ({
-            id: item.organisation.id,
-            name: item.organisation.name,
-            type: (item.organisation.type ?? 'club') as 'club' | 'association' | 'independant',
-            roleType: item.role.type,
-            roleName: item.role.name,
-          }))
+          ? orgsData
+            .filter((item) => item.status === 'active')
+            .map((item) => ({
+              id: item.organisation.id,
+              name: item.organisation.name,
+              type: (item.organisation.type ?? 'club') as 'club' | 'association' | 'independant',
+              roleType: item.role.type,
+              roleName: item.role.name,
+            }))
           : [],
       )
       setChildren(famData.children ?? [])
@@ -539,8 +552,61 @@ const ClubMembersPage: React.FC = () => {
     )
   }
 
+  // Aucun club actif → état vide complet
+  if (myOrgs.length === 0 && children.length === 0 && !hasPendingMembership) {
+    return (
+      <div className="flex items-center justify-center min-h-[70vh]">
+        <div className="max-w-sm w-full text-center space-y-5 px-4">
+          <div className="relative">
+            <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shadow-lg shadow-primary/10">
+              <Dumbbell className="w-10 h-10 text-primary shrink-0" />
+            </div>
+          </div>
+          <div>
+            <h2 className="font-display text-2xl font-bold text-foreground">Rejoignez un club</h2>
+            <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+              Inscrivez-vous à une association pour accéder à votre planning, vos événements et suivre vos activités.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2.5">
+            <Link
+              to="/clubs"
+              className="inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-bold px-6 py-3 rounded-full active:scale-95 transition-transform shadow-lg shadow-primary/25"
+            >
+              <Search className="w-4 h-4 shrink-0" /> Découvrir des clubs
+            </Link>
+            <Link
+              to="/club/famille"
+              className="inline-flex items-center justify-center gap-2 border border-border text-foreground text-sm font-semibold px-6 py-2.5 rounded-full active:scale-95 transition-transform hover:border-primary/40"
+            >
+              Gérer ma famille
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-5">
+
+      {/* Notice adhésion en attente pour l'org sélectionnée */}
+      {(orgId ? selectedOrgStatus === 'pending' : hasPendingMembership) && (
+        <div className="flex items-start gap-3 bg-amber-500/5 border border-amber-500/20 rounded-2xl px-4 py-3.5">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center shrink-0 mt-0.5">
+            <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-amber-800 dark:text-amber-400">Adhésion en attente</p>
+            <p className="text-xs text-amber-700/80 dark:text-amber-400/70 mt-0.5">
+              Votre demande est en cours de validation. Les activités seront disponibles dès qu'elle sera approuvée.
+            </p>
+          </div>
+          <Link to="/clubs" className="text-xs font-bold text-amber-700 hover:underline shrink-0 mt-0.5">
+            Gérer →
+          </Link>
+        </div>
+      )}
 
       {/* Portail admin */}
       {isManager && orgId && (
