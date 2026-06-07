@@ -3,7 +3,9 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, User, Heart, FileCheck, Building2,
   Plus, X, CheckCircle, Loader2, UserPlus,
+  FileText, ShieldCheck, Upload, AlertCircle, CheckCircle2, Clock,
 } from 'lucide-react'
+import { cn } from '../../lib/utils'
 import { api } from '../../lib/api'
 import AvatarUpload from '../../components/AvatarUpload'
 
@@ -70,9 +72,43 @@ interface Authorization {
   id: string | null; is_signed: boolean; signed_at: string | null;
 }
 
-type Tab = 'profil' | 'sante' | 'autorisations' | 'clubs'
+interface ChildMemberDocument {
+  id: string
+  required_document_id: string
+  organisation_id: string
+  original_name: string
+  mime_type: string
+  size_bytes: number
+  status: 'pending' | 'approved' | 'rejected'
+  uploaded_at: string
+  expires_at: string | null
+  rejection_reason: string | null
+  required_document: {
+    id: string
+    name: string
+    category: string
+    expires_after_months: number | null
+  }
+  organisation: { id: string; name: string }
+}
+
+interface RequiredDoc {
+  id: string
+  name: string
+  description: string | null
+  required: boolean
+  category: string
+  expires_after_months: number | null
+}
+
+type Tab = 'profil' | 'sante' | 'autorisations' | 'documents' | 'clubs'
 
 const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 
 // ─── Tag input ────────────────────────────────────────────────────────────────
 
@@ -117,13 +153,314 @@ const TagInput: React.FC<{
   )
 }
 
+// ─── ClubDocumentSection ──────────────────────────────────────────────────────
+
+const ClubDocumentSection: React.FC<{
+  childId: string
+  membership: { id: string; organisation: { id: string; name: string } }
+  childDocs: ChildMemberDocument[]
+  localPending: Record<string, boolean>
+  uploadProgress: Record<string, number>
+  uploading: Record<string, boolean>
+  onUpload: (file: File, requiredDocId: string, orgId: string, compositeKey: string) => void
+  onGetSignedUrl: (docId: string) => Promise<string | null>
+  refetch: () => void
+}> = ({
+  membership, childDocs, localPending, uploadProgress, uploading,
+  onUpload, onGetSignedUrl,
+}) => {
+  const [requiredDocs, setRequiredDocs] = useState<RequiredDoc[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    api.get<RequiredDoc[]>(`/organisations/${membership.organisation.id}/required-documents`)
+      .then(setRequiredDocs)
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [membership.organisation.id])
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-6">
+        <Loader2 className="w-5 h-5 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (requiredDocs.length === 0) {
+    return (
+      <div className="bg-card border border-border rounded-2xl p-4">
+        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold mb-2">
+          {membership.organisation.name}
+        </p>
+        <p className="text-xs text-muted-foreground">Aucun document requis pour ce club.</p>
+      </div>
+    )
+  }
+
+  const validatedCount = requiredDocs.filter((rd) => {
+    const doc = childDocs.find(
+      (d) =>
+        d.required_document_id === rd.id &&
+        d.organisation_id === membership.organisation.id &&
+        d.status === 'approved' &&
+        (!d.expires_at || new Date(d.expires_at) > new Date()),
+    )
+    return !!doc
+  }).length
+
+  const allConform = validatedCount === requiredDocs.length
+
+  return (
+    <div className="space-y-3">
+      {/* Header club */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <Building2 className="w-3.5 h-3.5 text-primary shrink-0" />
+          </div>
+          <p className="text-sm font-display font-bold text-foreground">
+            {membership.organisation.name}
+          </p>
+        </div>
+        <span className="text-xs text-muted-foreground">{validatedCount}/{requiredDocs.length} conformes</span>
+      </div>
+
+      {/* Barre de progression ou banner conforme */}
+      {allConform ? (
+        <div className="flex items-center gap-3 p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+          <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0" />
+          <p className="text-xs font-bold text-emerald-800">Dossier complet pour {membership.organisation.name} ✓</p>
+        </div>
+      ) : (
+        <div className="h-1.5 rounded-full bg-border overflow-hidden">
+          <div
+            className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+            style={{ width: requiredDocs.length ? `${(validatedCount / requiredDocs.length) * 100}%` : '0%' }}
+          />
+        </div>
+      )}
+
+      {/* Cards documents */}
+      {requiredDocs.map((requiredDoc) => {
+        const compositeKey = `${membership.organisation.id}-${requiredDoc.id}`
+        const myDoc = childDocs
+          .filter(
+            (d) =>
+              d.required_document_id === requiredDoc.id &&
+              d.organisation_id === membership.organisation.id,
+          )
+          .sort((a, b) => new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime())[0]
+
+        const effectiveStatus = (() => {
+          if (localPending[compositeKey]) { return 'pending' as const }
+          if (!myDoc) { return requiredDoc.required ? 'missing' as const : 'optional_missing' as const }
+          if (myDoc.status === 'rejected') { return 'rejected' as const }
+          if (myDoc.status === 'pending') { return 'pending' as const }
+          if (myDoc.status === 'approved') {
+            if (myDoc.expires_at && new Date(myDoc.expires_at) < new Date()) { return 'expired' as const }
+            const dl = myDoc.expires_at
+              ? Math.ceil((new Date(myDoc.expires_at).getTime() - Date.now()) / 86400000)
+              : null
+            if (dl !== null && dl < 30) { return 'expiring_soon' as const }
+            return 'approved' as const
+          }
+          return 'missing' as const
+        })()
+
+        const daysLeft = myDoc?.expires_at
+          ? Math.ceil((new Date(myDoc.expires_at).getTime() - Date.now()) / 86400000)
+          : null
+
+        const showDropZone = ['missing', 'optional_missing', 'rejected', 'expired'].includes(effectiveStatus)
+
+        return (
+          <div
+            key={requiredDoc.id}
+            className={cn(
+              'bg-card border rounded-2xl p-4 space-y-3 transition-all',
+              effectiveStatus === 'rejected'
+                ? 'border-destructive/40'
+                : effectiveStatus === 'missing'
+                  ? 'border-destructive/20'
+                  : 'border-border',
+            )}
+          >
+            {/* Header doc */}
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                {requiredDoc.category === 'medical' ? (
+                  <Heart className="w-4 h-4" />
+                ) : requiredDoc.category === 'identity' ? (
+                  <User className="w-4 h-4" />
+                ) : (
+                  <FileText className="w-4 h-4" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm text-foreground">{requiredDoc.name}</p>
+                {requiredDoc.description && (
+                  <p className="text-[11px] text-muted-foreground">{requiredDoc.description}</p>
+                )}
+              </div>
+              <span
+                className={cn(
+                  'text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0',
+                  requiredDoc.required
+                    ? 'bg-destructive/10 text-destructive'
+                    : 'bg-muted text-muted-foreground',
+                )}
+              >
+                {requiredDoc.required ? 'Obligatoire' : 'Optionnel'}
+              </span>
+            </div>
+
+            {/* approved */}
+            {effectiveStatus === 'approved' && myDoc && (
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700">
+                  <CheckCircle2 className="w-3 h-3 shrink-0" /> Validé
+                </span>
+                {myDoc.expires_at && (
+                  <span className="text-[10px] font-semibold text-muted-foreground">
+                    Expire le {fmtDate(myDoc.expires_at)}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const u = await onGetSignedUrl(myDoc.id)
+                    if (u) { window.open(u, '_blank', 'noopener,noreferrer') }
+                  }}
+                  className="text-xs font-semibold text-primary hover:underline active:scale-95 transition-transform"
+                >
+                  Voir →
+                </button>
+              </div>
+            )}
+
+            {/* expiring_soon */}
+            {effectiveStatus === 'expiring_soon' && myDoc && (
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-700">
+                  <Clock className="w-3 h-3 shrink-0" /> Expire dans {daysLeft} jour{daysLeft !== 1 ? 's' : ''}
+                </span>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const u = await onGetSignedUrl(myDoc.id)
+                    if (u) { window.open(u, '_blank', 'noopener,noreferrer') }
+                  }}
+                  className="text-xs font-semibold text-primary hover:underline active:scale-95 transition-transform"
+                >
+                  Voir →
+                </button>
+              </div>
+            )}
+
+            {/* expired */}
+            {effectiveStatus === 'expired' && myDoc && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-destructive/10 text-destructive">
+                <AlertCircle className="w-3 h-3 shrink-0" /> Expiré le {fmtDate(myDoc.expires_at!)}
+              </span>
+            )}
+
+            {/* pending */}
+            {effectiveStatus === 'pending' && (
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-700 animate-pulse">
+                  <Clock className="w-3 h-3 shrink-0" /> En cours de validation
+                </span>
+                {myDoc && (
+                  <>
+                    <p className="text-[10px] text-muted-foreground">Déposé le {fmtDate(myDoc.uploaded_at)}</p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const u = await onGetSignedUrl(myDoc.id)
+                        if (u) { window.open(u, '_blank', 'noopener,noreferrer') }
+                      }}
+                      className="text-xs font-semibold text-muted-foreground hover:text-foreground active:scale-95 transition-transform"
+                    >
+                      Voir →
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* rejected */}
+            {effectiveStatus === 'rejected' && myDoc && (
+              <div className="rounded-xl bg-destructive/5 border border-destructive/30 p-3 space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+                  <p className="text-xs font-bold text-destructive">Document refusé — envoyez-en un nouveau ↓</p>
+                </div>
+                {myDoc.rejection_reason && (
+                  <p className="text-[11px] text-destructive/80 pl-5">Motif : {myDoc.rejection_reason}</p>
+                )}
+              </div>
+            )}
+
+            {/* optional_missing */}
+            {effectiveStatus === 'optional_missing' && (
+              <p className="text-[11px] text-muted-foreground italic">
+                Document optionnel — vous pouvez le fournir si vous le souhaitez.
+              </p>
+            )}
+
+            {/* Zone de dépôt */}
+            {showDropZone && (
+              uploading[compositeKey] ? (
+                <div className="space-y-2 p-4 bg-muted/30 rounded-2xl">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Upload en cours…</span>
+                    <span>{uploadProgress[compositeKey] ?? 0}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-border overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all duration-300"
+                      style={{ width: `${uploadProgress[compositeKey] ?? 0}%` }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <label className="block border-2 border-dashed border-border rounded-2xl p-5 text-center cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-all group">
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0]
+                      if (f) { onUpload(f, requiredDoc.id, membership.organisation.id, compositeKey) }
+                      e.target.value = ''
+                    }}
+                  />
+                  <Upload className="w-6 h-6 mx-auto text-muted-foreground group-hover:text-primary transition-colors mb-2 shrink-0" />
+                  <p className="text-xs font-semibold text-foreground">
+                    {effectiveStatus === 'rejected'
+                      ? 'Renvoyer un document corrigé'
+                      : effectiveStatus === 'optional_missing'
+                        ? 'Fournir ce document (optionnel)'
+                        : 'Choisir un fichier'}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">PDF, JPG, PNG ou WEBP · 5 Mo max</p>
+                </label>
+              )
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 const ChildDetailPage: React.FC = () => {
   const { childId } = useParams<{ childId: string }>()
   const location = useLocation()
   const navigate = useNavigate()
-  // Préfère la navigation historique (toujours correcte), sinon l'origine passée en state
   const goBack = () => {
     const from = (location.state as { from?: string } | null)?.from
     if (from) { navigate(from) } else { navigate(-1) }
@@ -145,7 +482,31 @@ const ChildDetailPage: React.FC = () => {
   const [showEnrollModal, setShowEnrollModal] = useState(false)
   const [enrollError, setEnrollError] = useState<string | null>(null)
 
+  // ── Documents état ────────────────────────────────────────────────────────
+  const [childDocs, setChildDocs] = useState<ChildMemberDocument[]>([])
+  const [loadingDocs, setLoadingDocs] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({})
+  const [uploading, setUploading] = useState<Record<string, boolean>>({})
+  const [localPending, setLocalPending] = useState<Record<string, boolean>>({})
+  const [docUploadNotice, setDocUploadNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+
+  useEffect(() => {
+    if (!docUploadNotice) { return undefined }
+    const id = window.setTimeout(() => setDocUploadNotice(null), 4000)
+    return () => clearTimeout(id)
+  }, [docUploadNotice])
+
   const showSuccess = (msg: string) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(null), 3000) }
+
+  const refetchChildDocs = useCallback(async () => {
+    if (!childId) { return }
+    const docs = await api.get<ChildMemberDocument[]>(
+      `/family/children/${childId}/documents`,
+      undefined,
+      { useCache: false },
+    ).catch(() => [])
+    setChildDocs(docs)
+  }, [childId])
 
   const loadAll = useCallback(async () => {
     if (!childId) { return }
@@ -173,6 +534,79 @@ const ChildDetailPage: React.FC = () => {
   }, [childId])
 
   useEffect(() => { loadAll() }, [loadAll])
+
+  // Charger les documents enfant indépendamment (pas bloquant pour le reste)
+  useEffect(() => {
+    if (!childId) { return }
+    setLoadingDocs(true)
+    api.get<ChildMemberDocument[]>(`/family/children/${childId}/documents`)
+      .then(setChildDocs)
+      .catch(() => {})
+      .finally(() => setLoadingDocs(false))
+  }, [childId])
+
+  const handleChildUpload = useCallback(async (
+    file: File,
+    requiredDocId: string,
+    orgId: string,
+    compositeKey: string,
+  ) => {
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+    if (!allowed.includes(file.type)) {
+      setDocUploadNotice({ type: 'error', message: 'Format non supporté — PDF, JPG, PNG ou WEBP uniquement.' })
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setDocUploadNotice({ type: 'error', message: 'Fichier trop lourd — 5 Mo maximum.' })
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('requiredDocumentId', requiredDocId)
+    formData.append('organisationId', orgId)
+
+    setUploading((u) => ({ ...u, [compositeKey]: true }))
+    setUploadProgress((p) => ({ ...p, [compositeKey]: 0 }))
+
+    try {
+      await api.getInstance().post(
+        `/family/children/${childId}/documents`,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (ev) => {
+            if (ev.total) {
+              setUploadProgress((p) => ({ ...p, [compositeKey]: Math.round((ev.loaded / ev.total!) * 100) }))
+            }
+          },
+        },
+      )
+      setLocalPending((p) => ({ ...p, [compositeKey]: true }))
+      setUploadProgress((p) => ({ ...p, [compositeKey]: 0 }))
+      setUploading((u) => ({ ...u, [compositeKey]: false }))
+      setDocUploadNotice({ type: 'success', message: 'Document envoyé — en attente de validation.' })
+      void refetchChildDocs()
+    } catch {
+      setUploading((u) => ({ ...u, [compositeKey]: false }))
+      setUploadProgress((p) => ({ ...p, [compositeKey]: 0 }))
+      setDocUploadNotice({ type: 'error', message: "Erreur lors de l'envoi. Veuillez réessayer." })
+    }
+  }, [childId, refetchChildDocs])
+
+  const getChildSignedUrl = useCallback(async (docId: string): Promise<string | null> => {
+    try {
+      const res = await api.get<{ url: string }>(
+        `/family/children/${childId}/documents/${docId}/signed-url`,
+        undefined,
+        { useCache: false },
+      )
+      return res.url
+    } catch {
+      setDocUploadNotice({ type: 'error', message: "Impossible d'ouvrir le fichier." })
+      return null
+    }
+  }, [childId])
 
   const saveProfil = async () => {
     if (!childId) { return }
@@ -205,7 +639,6 @@ const ChildDetailPage: React.FC = () => {
   const toggleAuthorization = async (auth: Authorization) => {
     if (!childId) { return }
     setSaving(true)
-    // Mise à jour optimiste immédiate
     setAuthorizations((prev) =>
       prev.map((a) =>
         a.type === auth.type
@@ -219,7 +652,6 @@ const ChildDetailPage: React.FC = () => {
       } else {
         await api.post(`/family/children/${childId}/authorizations/${auth.type}/sign`, {})
       }
-      // Sync avec le serveur sans cache
       api.clearCache(`/family/children/${childId}/authorizations`)
       const updated = await api.get<Authorization[]>(
         `/family/children/${childId}/authorizations`,
@@ -229,7 +661,6 @@ const ChildDetailPage: React.FC = () => {
       setAuthorizations(updated)
       showSuccess(auth.is_signed ? 'Autorisation retirée.' : 'Autorisation signée ! ✓')
     } catch (e) {
-      // Rollback en cas d'erreur
       setAuthorizations((prev) =>
         prev.map((a) =>
           a.type === auth.type ? { ...a, is_signed: auth.is_signed, signed_at: auth.signed_at } : a,
@@ -278,10 +709,11 @@ const ChildDetailPage: React.FC = () => {
   }
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: 'profil', label: 'Profil', icon: <User className="w-4 h-4 shrink-0" /> },
-    { id: 'sante', label: 'Santé', icon: <Heart className="w-4 h-4 shrink-0" /> },
+    { id: 'profil',        label: 'Profil',        icon: <User className="w-4 h-4 shrink-0" /> },
+    { id: 'sante',         label: 'Santé',         icon: <Heart className="w-4 h-4 shrink-0" /> },
     { id: 'autorisations', label: 'Autorisations', icon: <FileCheck className="w-4 h-4 shrink-0" /> },
-    { id: 'clubs', label: 'Clubs', icon: <Building2 className="w-4 h-4 shrink-0" /> },
+    { id: 'documents',     label: 'Documents',     icon: <FileText className="w-4 h-4 shrink-0" /> },
+    { id: 'clubs',         label: 'Clubs',         icon: <Building2 className="w-4 h-4 shrink-0" /> },
   ]
 
   const enrolledIds = new Set(child.memberships.map((m) => m.organisation.id))
@@ -347,7 +779,6 @@ const ChildDetailPage: React.FC = () => {
         <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
           <h2 className="font-display text-base font-bold text-foreground">Informations personnelles</h2>
 
-          {/* Photo de profil */}
           <div className="flex justify-center pb-2">
             <AvatarUpload
               currentUrl={editForm.avatar_url || null}
@@ -433,13 +864,11 @@ const ChildDetailPage: React.FC = () => {
       {/* ── Tab: Santé ── */}
       {tab === 'sante' && (
         <div className="space-y-4">
-          {/* Score de complétion */}
           <div className="flex items-center justify-between">
             <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">Fiche santé</p>
             <HealthBadge score={calcHealthScore(healthForm)} />
           </div>
 
-          {/* Groupe sanguin */}
           <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
             <h2 className="font-display text-base font-bold text-foreground">Groupe sanguin</h2>
             <div className="flex flex-wrap gap-2">
@@ -457,7 +886,6 @@ const ChildDetailPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Allergies */}
           <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
             <h2 className="font-display text-base font-bold text-foreground">Allergies</h2>
             <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -485,7 +913,6 @@ const ChildDetailPage: React.FC = () => {
             )}
           </div>
 
-          {/* Traitements */}
           <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
             <h2 className="font-display text-base font-bold text-foreground">Traitements en cours</h2>
             <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -513,7 +940,6 @@ const ChildDetailPage: React.FC = () => {
             )}
           </div>
 
-          {/* Notes médicales */}
           <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
             <h2 className="font-display text-base font-bold text-foreground">Notes médicales</h2>
             <textarea
@@ -525,7 +951,6 @@ const ChildDetailPage: React.FC = () => {
             />
           </div>
 
-          {/* Contact d'urgence */}
           <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
             <h2 className="font-display text-base font-bold text-foreground">Contact d'urgence</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -615,6 +1040,72 @@ const ChildDetailPage: React.FC = () => {
                 </button>
               </div>
             </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Tab: Documents ── */}
+      {tab === 'documents' && (
+        <div className="space-y-4">
+          {/* Header */}
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">
+              Documents administratifs
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Documents requis par les clubs de {child.firstname}
+            </p>
+          </div>
+
+          {/* Notice upload */}
+          {docUploadNotice && (
+            <div
+              className={cn(
+                'flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium',
+                docUploadNotice.type === 'success'
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700'
+                  : 'border-destructive/30 bg-destructive/10 text-destructive',
+              )}
+            >
+              {docUploadNotice.type === 'success'
+                ? <CheckCircle2 className="w-4 h-4 shrink-0" />
+                : <AlertCircle className="w-4 h-4 shrink-0" />}
+              {docUploadNotice.message}
+            </div>
+          )}
+
+          {/* Aucun club */}
+          {child.memberships.length === 0 && (
+            <div className="bg-card border border-dashed border-border rounded-2xl p-8 text-center space-y-2">
+              <FileText className="w-8 h-8 mx-auto text-muted-foreground/40" />
+              <p className="text-sm font-semibold text-foreground">Aucun club</p>
+              <p className="text-xs text-muted-foreground">
+                {child.firstname} doit être inscrit dans un club pour avoir des documents à fournir.
+              </p>
+            </div>
+          )}
+
+          {/* Chargement initial */}
+          {loadingDocs && child.memberships.length > 0 && (
+            <div className="flex justify-center py-6">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          )}
+
+          {/* Un bloc par club */}
+          {!loadingDocs && child.memberships.map((membership) => (
+            <ClubDocumentSection
+              key={membership.id}
+              childId={childId!}
+              membership={membership}
+              childDocs={childDocs}
+              localPending={localPending}
+              uploadProgress={uploadProgress}
+              uploading={uploading}
+              onUpload={handleChildUpload}
+              onGetSignedUrl={getChildSignedUrl}
+              refetch={refetchChildDocs}
+            />
           ))}
         </div>
       )}

@@ -5,7 +5,11 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
+import { addMonths } from 'date-fns';
+
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
+import { isAllowedMime, MAX_FILE_SIZE_BYTES } from '../storage/storage.constants';
 import { CreateChildDto, UpdateChildDto, EnrollChildDto, UpsertChildHealthDto } from './dto';
 
 const AUTHORIZATION_META: Record<string, { title: string; description: string }> = {
@@ -16,7 +20,10 @@ const AUTHORIZATION_META: Record<string, { title: string; description: string }>
 
 @Injectable()
 export class FamilyService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   async createChild(parentId: string, dto: CreateChildDto) {
     const username = `child_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -409,6 +416,110 @@ export class FamilyService {
       update: { is_signed: false, signed_at: null },
       create: { child_id: childId, parent_id: parentId, type: type as any, title: AUTHORIZATION_META[type].title, description: AUTHORIZATION_META[type].description, is_signed: false },
     });
+  }
+
+  // ─── Child documents ──────────────────────────────────────────────────────
+
+  async getChildDocuments(parentId: string, childId: string) {
+    await this.assertParentOwnsChild(parentId, childId);
+
+    return this.prisma.memberDocument.findMany({
+      where: { user_id: childId },
+      include: {
+        required_document: {
+          select: { id: true, name: true, category: true, expires_after_months: true },
+        },
+        organisation: { select: { id: true, name: true } },
+      },
+      orderBy: { uploaded_at: 'desc' },
+    });
+  }
+
+  async uploadChildDocument(
+    parentId: string,
+    childId: string,
+    requiredDocumentId: string,
+    organisationId: string,
+    file: Express.Multer.File,
+  ) {
+    await this.assertParentOwnsChild(parentId, childId);
+
+    if (!isAllowedMime(file.mimetype)) {
+      throw new BadRequestException('Type de fichier non autorisé (PDF, JPG, PNG, WEBP uniquement).');
+    }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      throw new BadRequestException('Fichier trop volumineux (5 Mo maximum).');
+    }
+
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        user_id: childId,
+        organisation_id: organisationId,
+        left_at: null,
+        deleted_at: null,
+        status: { notIn: ['resigned', 'banned', 'expired'] },
+      },
+    });
+    if (!membership) {
+      throw new ForbiddenException("L'enfant n'est pas membre actif de cette organisation.");
+    }
+
+    const requiredDoc = await this.prisma.requiredDocument.findFirst({
+      where: { id: requiredDocumentId, organisation_id: organisationId },
+    });
+    if (!requiredDoc) throw new NotFoundException('Type de document introuvable.');
+
+    const now = new Date();
+    const existing = await this.prisma.memberDocument.findFirst({
+      where: {
+        user_id: childId,
+        organisation_id: organisationId,
+        required_document_id: requiredDocumentId,
+        OR: [
+          { status: 'pending' },
+          { status: 'approved', expires_at: null },
+          { status: 'approved', expires_at: { gt: now } },
+        ],
+      },
+    });
+    if (existing) {
+      throw new ConflictException(
+        'Un document est déjà en cours de validation ou validé pour ce type.',
+      );
+    }
+
+    const key = this.storage.generateKey(organisationId, childId, file.originalname);
+    await this.storage.uploadFile(file.buffer, key, file.mimetype);
+
+    const expiresAt = requiredDoc.expires_after_months
+      ? addMonths(new Date(), requiredDoc.expires_after_months)
+      : null;
+
+    return this.prisma.memberDocument.create({
+      data: {
+        organisation_id: organisationId,
+        user_id: childId,
+        required_document_id: requiredDocumentId,
+        storage_key: key,
+        original_name: file.originalname,
+        mime_type: file.mimetype,
+        size_bytes: file.size,
+        expires_at: expiresAt,
+      },
+    });
+  }
+
+  async getChildDocumentSignedUrl(parentId: string, childId: string, docId: string) {
+    await this.assertParentOwnsChild(parentId, childId);
+
+    const doc = await this.prisma.memberDocument.findFirst({
+      where: { id: docId, user_id: childId },
+    });
+    if (!doc) throw new NotFoundException('Document introuvable.');
+
+    const url = await this.storage.getSignedUrl(doc.storage_key);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    return { url, expiresAt };
   }
 
   private async assertParentOwnsChild(parentId: string, childId: string) {

@@ -10,6 +10,7 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
 import { cn } from '../lib/utils'
+import { useMemberDocumentsAlert } from '../hooks/useMemberDocumentsAlert'
 import type { RoleType } from '../types'
 
 // ─── types ───────────────────────────────────────────────────────────────────
@@ -66,6 +67,9 @@ const ClubLayout: React.FC = () => {
   const [isDark,           setIsDark]           = useState(() =>
     typeof window !== 'undefined' && document.documentElement.classList.contains('dark'),
   )
+
+  // Must be called unconditionally — before any early return
+  const { alertCount: docAlertCount } = useMemberDocumentsAlert(orgId)
 
   useEffect(() => {
     const root = document.documentElement
@@ -303,6 +307,8 @@ const ClubLayout: React.FC = () => {
     <nav className="p-2 space-y-0.5">
       {nav.map(({ path, icon: Icon, label, badge, end }) => {
         const active = isActive(path, end)
+        const isDocsLink = path === `/club/${orgId}/documents`
+        const effectiveBadge = isDocsLink ? docAlertCount : badge
         return (
           <Link
             key={path}
@@ -314,11 +320,18 @@ const ClubLayout: React.FC = () => {
                 : 'text-muted-foreground hover:bg-muted hover:text-foreground',
             )}
           >
-            <Icon className="w-4 h-4 shrink-0" />
+            <div className="relative shrink-0">
+              <Icon className="w-4 h-4" />
+              {!active && effectiveBadge !== undefined && effectiveBadge > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center">
+                  {effectiveBadge > 9 ? '9+' : effectiveBadge}
+                </span>
+              )}
+            </div>
             <span className="flex-1">{label}</span>
-            {badge !== undefined && badge > 0 && (
-              <span className="w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center shrink-0">
-                {badge}
+            {active && effectiveBadge !== undefined && effectiveBadge > 0 && (
+              <span className="w-5 h-5 rounded-full bg-primary-foreground/20 text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0">
+                {effectiveBadge > 9 ? '9+' : effectiveBadge}
               </span>
             )}
           </Link>
