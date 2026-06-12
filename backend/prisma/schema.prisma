@@ -61,6 +61,8 @@ model User {
   healthInfo                 ChildHealthInfo?
   childAuthorizations        ChildAuthorization[] @relation("ChildAuthorizations")
   parentAuthorizations       ChildAuthorization[] @relation("ParentAuthorizations")
+  member_documents           MemberDocument[]     @relation("MemberDocumentOwner")
+  member_documents_reviewed  MemberDocument[]     @relation("MemberDocumentReviewer")
 
   @@map("users")
 }
@@ -174,10 +176,12 @@ model Organisation {
   memberships   Membership[]
   memberTags    OrganisationMemberTag[]
   categories    OrganisationCategory[]
-  created_by    User                   @relation(fields: [created_by_id], references: [id])
-  Payment       Payment[]
-  plans         Plan[]
-  subscriptions Subscription[]
+  created_by        User                   @relation(fields: [created_by_id], references: [id])
+  Payment           Payment[]
+  plans             Plan[]
+  subscriptions     Subscription[]
+  requiredDocuments RequiredDocument[]
+  memberDocuments   MemberDocument[]
 
   @@map("organisations")
 }
@@ -280,11 +284,13 @@ model Event {
   is_recurring          Boolean            @default(false)
   recurrence_pattern    String? // JSON string pour la récurrence
   status                EventStatus        @default(draft)
-  cover_url             String?
-  created_at            DateTime           @default(now())
-  updated_at            DateTime           @updatedAt
-  deleted_at            DateTime?
-  Attendance            Attendance[]
+  cover_url                            String?
+  attendance_checkin_token             String?   @unique
+  attendance_checkin_token_expires_at  DateTime?
+  created_at                           DateTime  @default(now())
+  updated_at                           DateTime  @updatedAt
+  deleted_at                           DateTime?
+  Attendance                           Attendance[]
   AvailabilitySlot      AvailabilitySlot[]
   EventCategory         EventCategory[]
   created_by            User               @relation("EventCreatedBy", fields: [created_by_id], references: [id])
@@ -617,6 +623,13 @@ enum Gender {
   prefer_not_to_say
 }
 
+enum DocCategory {
+  identity
+  medical
+  administrative
+  other
+}
+
 enum UserStatus {
   active
   suspended
@@ -713,6 +726,7 @@ enum DocumentType {
 enum DocumentStatus {
   pending
   validated
+  approved
   rejected
 }
 
@@ -917,4 +931,48 @@ model ChildAuthorization {
   @@unique([child_id, type])
   @@index([parent_id])
   @@map("child_authorizations")
+}
+
+model RequiredDocument {
+  id                 String       @id @default(cuid())
+  organisation_id    String
+  name               String
+  description        String?
+  required           Boolean      @default(true)
+  category           DocCategory  @default(other)
+  expires_after_months Int?
+  created_at         DateTime     @default(now())
+  updated_at         DateTime     @updatedAt
+
+  organisation    Organisation   @relation(fields: [organisation_id], references: [id], onDelete: Cascade)
+  memberDocuments MemberDocument[]
+
+  @@index([organisation_id])
+  @@map("required_documents")
+}
+
+model MemberDocument {
+  id                   String         @id @default(cuid())
+  organisation_id      String
+  user_id              String
+  required_document_id String
+  storage_key          String
+  original_name        String
+  mime_type            String
+  size_bytes           Int
+  status               DocumentStatus @default(pending)
+  rejection_reason     String?
+  reviewed_by_id       String?
+  reviewed_at          DateTime?
+  expires_at           DateTime?
+  uploaded_at          DateTime       @default(now())
+
+  organisation      Organisation     @relation(fields: [organisation_id], references: [id], onDelete: Cascade)
+  user              User             @relation("MemberDocumentOwner", fields: [user_id], references: [id], onDelete: Cascade)
+  required_document RequiredDocument @relation(fields: [required_document_id], references: [id], onDelete: Cascade)
+  reviewed_by       User?            @relation("MemberDocumentReviewer", fields: [reviewed_by_id], references: [id])
+
+  @@index([organisation_id, status])
+  @@index([user_id, organisation_id])
+  @@map("member_documents")
 }

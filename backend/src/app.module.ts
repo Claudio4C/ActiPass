@@ -15,6 +15,9 @@ import { AttendanceModule } from './attendance/attendance.module';
 import { FamilyModule } from './family/family.module';
 import { UsersModule } from './users/users.module';
 import { UploadModule } from './upload/upload.module';
+import { StorageModule } from './storage/storage.module';
+import { RequiredDocumentsModule } from './required-documents/required-documents.module';
+import { MemberDocumentsModule } from './member-documents/member-documents.module';
 
 @Module({
   imports: [
@@ -32,6 +35,9 @@ import { UploadModule } from './upload/upload.module';
     FamilyModule,
     EmailModule,
     UploadModule,
+    StorageModule,
+    RequiredDocumentsModule,
+    MemberDocumentsModule,
   ],
   controllers: [AppController],
   providers: [

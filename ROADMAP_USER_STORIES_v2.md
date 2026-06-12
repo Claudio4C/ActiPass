@@ -35,9 +35,9 @@
 | ID | User Story | Front | Back |
 |----|-----------|-------|------|
 | P0-1 | Sidebar utilise l'API réelle (plus de getMockMembership) | ✅ | ✅ |
-| P0-2 | Routes /coach/* protégées par ProtectedRoute | ✅ | — |
-| P0-3 | Suppression de toutes les données mock | ✅ | — |
-| P0-4 | Script de seed réaliste (2 clubs, 5 membres, 3 events) | — | ✅ |
+| P0-2 | Routes /coach/* protégées par ProtectedRoute | ✅ | ✅ |
+| P0-3 | Suppression de toutes les données mock | ✅ | ✅ |
+| P0-4 | Script de seed réaliste (2 clubs, 5 membres, 3 events) | ✅ | ✅ |
 
 ---
 
@@ -83,27 +83,23 @@ enum MembershipStatus {
 | ID | User Story | Critères d'acceptation | Front | Back |
 |----|-----------|------------------------|-------|------|
 | P1-6 | En tant que membre/parent, je veux envoyer une demande d'adhésion | MemberPickerSheet → POST /organisations/:orgId/memberships → status PENDING. Badge "En attente" sur la card club. | ✅ | ✅ |
-| P1-7 | En tant qu'admin, je veux gérer les demandes en attente | AdminRequests branché API réelle. Accepter → ACTIVE. Refuser → REJECTED + motif. Tout accepter en masse. | ✅ | — |
+| P1-7 | En tant qu'admin, je veux gérer les demandes en attente | AdminRequests branché API réelle. Accepter → ACTIVE. Refuser → REJECTED + motif. Tout accepter en masse. | ✅ | ✅ |
 | P1-8 | En tant que membre, je veux suivre le statut de ma demande | Badge statut sur card club : PENDING amber, ACTIVE emerald, REJECTED rouge + motif. | ✅ | ✅ |
 | P1-9 | En tant qu'admin, je veux suspendre ou archiver un membre actif | Bouton Suspendre → SUSPENDED + motif. Bouton Archiver → EXPIRED. | ✅ | ✅ |
-| P1-10 | En tant que membre, je veux quitter un club | Bouton "Quitter ce club" → confirmation → RESIGNED. Notification à l'admin. | ✅ | — |
+| P1-10 | En tant que membre, je veux quitter un club | Bouton "Quitter ce club" → confirmation → RESIGNED. Notification à l'admin. | ✅ | ✅ |
 
 ---
 
-## Epic 1.3 — Documents & Pièces administratives ⏳
+## Epic 1.3 — Documents & Pièces administratives ✅
 
-> **Note technique :** Inclut la migration du stockage vers OVH Object Storage (S3-compatible via `@aws-sdk/client-s3`). Actuellement fichiers en local `backend/uploads/`. Frontends admin (`AdminDocuments` avec 3 onglets) déjà construits. Hooks `useRequiredDocuments`, `useMemberDocuments`, `useClubCompliance` existent, APIs backend manquantes.
-
-```bash
-npm install @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
-```
+> **Note technique :** Stockage OVH Object Storage (S3-compatible via `@aws-sdk/client-s3`). Backend complet : RequiredDocuments CRUD, MemberDocuments upload/review/signed-URL/compliance, endpoints famille pour documents enfants. Tous les guards, validations MIME/taille, et cas edge (re-upload expiré, cleanup S3, documents optionnels) traités.
 
 | ID | User Story | Critères d'acceptation | Front | Back |
 |----|-----------|------------------------|-------|------|
-| P1-11 | En tant qu'admin, je veux définir les documents obligatoires pour l'adhésion | Onglet "Paramètres" AdminDocuments. CRUD RequiredDocument. Présets standards (certificat médical, pièce d'identité, photo, B3, attestation assurance). | ✅ | — |
-| P1-12 | En tant que membre/parent, je veux uploader mes documents depuis mon profil | Upload PDF/JPG/PNG (5 Mo max). Barre de progression XHR. Statut par type. Si refusé : motif + renvoyer. | — | — |
-| P1-13 | En tant qu'admin, je veux valider ou refuser un document soumis | Onglet "À valider". Bouton "Voir" → URL signée 15 min. Valider / Refuser avec motif. | ✅ | — |
-| P1-14 | En tant qu'admin, je veux voir les membres avec documents manquants ou expirés | Onglet "Conformité". Accordéon par membre, pills manquant/expiré/en attente/refusé. | ✅ | — |
+| P1-11 | En tant qu'admin, je veux définir les documents obligatoires pour l'adhésion | Onglet "Paramètres" AdminDocuments. CRUD RequiredDocument. Présets standards (certificat médical, pièce d'identité, photo, B3, attestation assurance). | ✅ | ✅ |
+| P1-12 | En tant que membre/parent, je veux uploader mes documents depuis mon profil | Upload PDF/JPG/PNG/WEBP (5 Mo max). Barre de progression. Statut par type (pending/approved/rejected/expired/expiring_soon). Re-upload après refus ou expiration. Documents enfants depuis ChildDetailPage. | ✅ | ✅ |
+| P1-13 | En tant qu'admin, je veux valider ou refuser un document soumis | Onglet "À valider". Bouton "Voir" → URL signée 15 min. Valider / Refuser avec motif (5 chars min). | ✅ | ✅ |
+| P1-14 | En tant qu'admin, je veux voir les membres avec documents manquants ou expirés | Onglet "Conformité". Accordéon par membre, pills manquant/expiré/en attente/refusé. Filtrage rôles admin exclu. | ✅ | ✅ |
 
 ---
 
@@ -254,7 +250,7 @@ npm install @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
 - [x] Fiche membre detail avec tuteur pour les mineurs
 - [x] Export CSV membres + tags membres
 - [ ] **Flux d'adhésion — brancher front sur API réelle (Epic 1.2)** ← en cours
-- [ ] **Documents administratifs + OVH Storage (Epic 1.3)** ← suivant
+- [x] **Documents administratifs + OVH Storage (Epic 1.3)**
 - [ ] Licences fédérales (Epic 1.4)
 - [ ] Gestion des saisons (Epic 2.1)
 - [ ] Paiement cotisation en ligne Stripe (Epic 2.2)

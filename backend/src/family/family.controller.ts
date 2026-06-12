@@ -10,7 +10,11 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { Request } from 'express';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -137,5 +141,40 @@ export class FamilyController {
   ) {
     const parentId = req.user?.['sub'] as string;
     return this.familyService.unsignAuthorization(parentId, childId, type);
+  }
+
+  // ─── Child documents ──────────────────────────────────────────────────────
+
+  /** GET /family/children/:childId/documents */
+  @Get('children/:childId/documents')
+  async getChildDocuments(@Param('childId') childId: string, @Req() req: Request) {
+    const parentId = req.user?.['sub'] as string;
+    return this.familyService.getChildDocuments(parentId, childId);
+  }
+
+  /** POST /family/children/:childId/documents */
+  @Post('children/:childId/documents')
+  @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FileInterceptor('file', { storage: memoryStorage() }))
+  async uploadChildDocument(
+    @Param('childId') childId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('requiredDocumentId') requiredDocumentId: string,
+    @Body('organisationId') organisationId: string,
+    @Req() req: Request,
+  ) {
+    const parentId = req.user?.['sub'] as string;
+    return this.familyService.uploadChildDocument(parentId, childId, requiredDocumentId, organisationId, file);
+  }
+
+  /** GET /family/children/:childId/documents/:docId/signed-url */
+  @Get('children/:childId/documents/:docId/signed-url')
+  async getChildDocumentSignedUrl(
+    @Param('childId') childId: string,
+    @Param('docId') docId: string,
+    @Req() req: Request,
+  ) {
+    const parentId = req.user?.['sub'] as string;
+    return this.familyService.getChildDocumentSignedUrl(parentId, childId, docId);
   }
 }
