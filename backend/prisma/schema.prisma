@@ -136,6 +136,7 @@ model Membership {
   deleted_at         DateTime?
   updated_at         DateTime                @updatedAt
   Invoice            Invoice[]
+  payments           Payment[]
   organisation       Organisation            @relation(fields: [organisation_id], references: [id])
   role               Role                    @relation(fields: [role_id], references: [id])
   user               User                    @relation(fields: [user_id], references: [id])
@@ -166,9 +167,13 @@ model Organisation {
   phone         String?
   website_url   String?
   member_limit  Int?
-  is_public     Boolean                @default(true)
-  status        OrganisationStatus     @default(active)
-  created_by_id String
+  is_public                Boolean                @default(true)
+  status                   OrganisationStatus     @default(active)
+  stripe_account_id        String?
+  stripe_onboarding_done   Boolean                @default(false)
+  stripe_charges_enabled   Boolean                @default(false)
+  stripe_payouts_enabled   Boolean                @default(false)
+  created_by_id            String
   created_at    DateTime               @default(now())
   updated_at    DateTime               @updatedAt
   deleted_at    DateTime?
@@ -185,7 +190,8 @@ model Organisation {
   subscriptions     Subscription[]
   requiredDocuments RequiredDocument[]
   memberDocuments   MemberDocument[]
-  seasons           Season[]
+  seasons             Season[]
+  subscription_plans  SubscriptionPlan[]
 
   @@map("organisations")
 }
@@ -423,13 +429,22 @@ model Payment {
   payment_date    DateTime?
   created_at      DateTime          @default(now())
   updated_at      DateTime          @updatedAt
-  target_id       String
-  target_type     PaymentTargetType
-  purpose         PaymentPurpose
-  created_by      User?             @relation("PaymentsCreated", fields: [created_by_id], references: [id])
-  organisation    Organisation?     @relation(fields: [organisation_id], references: [id])
-  user            User              @relation("PaymentsMade", fields: [user_id], references: [id])
-  PrivateCourse   PrivateCourse[]
+  target_id              String
+  target_type            PaymentTargetType
+  purpose                PaymentPurpose
+  subscription_plan_id         String?
+  membership_id                String?
+  stripe_payment_intent_id     String?       @unique
+  stripe_session_id            String?       @unique
+  installment_number           Int           @default(1)
+  total_installments           Int           @default(1)
+  paid_at                      DateTime?
+  created_by                   User?             @relation("PaymentsCreated", fields: [created_by_id], references: [id])
+  organisation                 Organisation?     @relation(fields: [organisation_id], references: [id])
+  user                         User              @relation("PaymentsMade", fields: [user_id], references: [id])
+  PrivateCourse                PrivateCourse[]
+  subscription_plan            SubscriptionPlan? @relation(fields: [subscription_plan_id], references: [id])
+  membership                   Membership?       @relation(fields: [membership_id], references: [id])
 
   @@index([target_type, target_id])
   @@index([user_id, target_type])
@@ -964,12 +979,35 @@ model Season {
   is_active       Boolean      @default(false)
   created_at      DateTime     @default(now())
 
-  organisation    Organisation @relation(fields: [organisation_id], references: [id], onDelete: Cascade)
-  memberships     Membership[]
+  organisation       Organisation       @relation(fields: [organisation_id], references: [id], onDelete: Cascade)
+  memberships        Membership[]
+  subscription_plans SubscriptionPlan[]
 
   @@unique([organisation_id, name])
   @@index([organisation_id])
   @@map("seasons")
+}
+
+model SubscriptionPlan {
+  id               String        @id @default(cuid())
+  organisation_id  String
+  season_id        String?
+  name             String
+  description      String?
+  amount           Int
+  currency         String        @default("eur")
+  stripe_price_id  String?
+  max_installments Int           @default(1)
+  is_active        Boolean       @default(true)
+  target_audience  String?
+  created_at       DateTime      @default(now())
+
+  organisation Organisation @relation(fields: [organisation_id], references: [id], onDelete: Cascade)
+  season       Season?      @relation(fields: [season_id], references: [id])
+  payments     Payment[]
+
+  @@index([organisation_id, is_active])
+  @@map("subscription_plans")
 }
 
 model MemberDocument {

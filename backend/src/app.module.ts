@@ -19,6 +19,9 @@ import { StorageModule } from './storage/storage.module';
 import { RequiredDocumentsModule } from './required-documents/required-documents.module';
 import { MemberDocumentsModule } from './member-documents/member-documents.module';
 import { SeasonsModule } from './seasons/seasons.module';
+import { StripeModule } from './stripe/stripe.module';
+import { SubscriptionPlansModule } from './subscription-plans/subscription-plans.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -40,6 +43,9 @@ import { SeasonsModule } from './seasons/seasons.module';
     RequiredDocumentsModule,
     MemberDocumentsModule,
     SeasonsModule,
+    StripeModule,
+    SubscriptionPlansModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [

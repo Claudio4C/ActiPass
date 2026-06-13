@@ -46,7 +46,7 @@ const makeNav = (orgId: string) => [
   { path: `/club/${orgId}/coaches`,       icon: Users2,          label: 'Coachs' },
   { path: `/club/${orgId}/deplacements`,  icon: Car,             label: 'Déplacements' },
   { path: `/club/${orgId}/notifications`, icon: Bell,            label: 'Notifications', badge: 0 },
-  { path: `/club/${orgId}/abonnements`,   icon: CreditCard,      label: 'Abonnements & paiements' },
+  { path: `/club/${orgId}/payment`,        icon: CreditCard,      label: 'Cotisation' },
   { path: `/club/${orgId}/fidelite`,      icon: Sparkles,        label: 'Fidélité' },
   { path: `/club/${orgId}/documents`,     icon: FileText,        label: 'Documents' },
   { path: `/club/${orgId}/inviter`,       icon: UserPlus,        label: 'Inviter' },

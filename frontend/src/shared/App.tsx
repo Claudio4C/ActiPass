@@ -28,6 +28,9 @@ import ClubHomePage from '../pages/club/ClubHomePage'
 import ClubPlanningPage from '../pages/club/ClubPlanningPage'
 import ClubDocumentsPage from '../pages/club/ClubDocumentsPage'
 import ClubOrgEventsPage from '../pages/club/ClubOrgEventsPage'
+import PaymentPage from '../pages/club/PaymentPage'
+import PaymentSuccessPage from '../pages/club/PaymentSuccessPage'
+import PaymentCancelPage from '../pages/club/PaymentCancelPage'
 import ComingSoon from '../components/shared/ComingSoon'
 
 // Club / member pages
@@ -76,6 +79,7 @@ import SettingsPage from '../pages/dashboard/SettingsPage'
 import AdminRequests from '../pages/dashboard/AdminRequests'
 import AdminDocumentsPage from '../pages/dashboard/AdminDocumentsPage'
 import AdminSeasonsPage from '../pages/dashboard/AdminSeasonsPage'
+import AdminFinancePage from '../pages/dashboard/AdminFinancePage'
 
 interface AppProps {
     mode: AppMode;
@@ -212,6 +216,9 @@ const AppContent: React.FC<{
           <Route path="/club/:orgId/coaches" element={<ComingSoon title="Coachs" description="L'annuaire des coachs sera disponible prochainement." />} />
           <Route path="/club/:orgId/deplacements" element={<ComingSoon title="Déplacements" description="La gestion des déplacements sera disponible prochainement." />} />
           <Route path="/club/:orgId/notifications" element={<ComingSoon title="Notifications" description="Vos notifications seront disponibles prochainement." />} />
+          <Route path="/club/:orgId/payment" element={<PaymentPage />} />
+          <Route path="/club/:orgId/payment/success" element={<PaymentSuccessPage />} />
+          <Route path="/club/:orgId/payment/cancel" element={<PaymentCancelPage />} />
           <Route path="/club/:orgId/abonnements" element={<ComingSoon title="Abonnements & paiements" description="La gestion des abonnements sera disponible prochainement." />} />
           <Route path="/club/:orgId/fidelite" element={<ComingSoon title="Fidélité" description="Votre programme de fidélité sera disponible prochainement." />} />
           <Route path="/club/:orgId/documents" element={<ClubDocumentsPage />} />
@@ -270,6 +277,7 @@ const AppContent: React.FC<{
           <Route path="/dashboard/:organisationId/requests" element={<AdminRequests />} />
           <Route path="/dashboard/:organisationId/documents" element={<AdminDocumentsPage />} />
           <Route path="/dashboard/:organisationId/seasons" element={<AdminSeasonsPage />} />
+          <Route path="/dashboard/:organisationId/payments" element={<AdminFinancePage />} />
         </Route>
 
         {/* ═══════════════════════════════════════

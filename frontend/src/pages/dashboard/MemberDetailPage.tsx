@@ -364,16 +364,27 @@ const MemberDetailPage: React.FC = () => {
                 Statuts
               </p>
               <div className="flex flex-wrap gap-2">
-                {[
-                  { label: 'Adhésion', value: member.membership_status },
-                  { label: 'Documents', value: member.docs_status },
-                  { label: 'Paiement', value: member.payment_status },
-                ].map(({ label, value }) => (
-                  <div key={label} className="bg-muted rounded-xl px-3 py-2 text-center">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">{label}</p>
-                    <p className="text-sm font-semibold text-foreground mt-0.5 capitalize">{value?.replace('_', ' ') ?? '—'}</p>
+                <div className="bg-muted rounded-xl px-3 py-2 text-center">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Adhésion</p>
+                  <p className="text-sm font-semibold text-foreground mt-0.5 capitalize">{member.membership_status?.replace('_', ' ') ?? '—'}</p>
+                </div>
+                {member.is_minor ? (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-muted rounded-xl text-xs text-muted-foreground italic">
+                    <Baby className="h-3.5 w-3.5 shrink-0" />
+                    Les documents et paiements des mineurs sont gérés via le compte parent.
                   </div>
-                ))}
+                ) : (
+                  <>
+                    <div className="bg-muted rounded-xl px-3 py-2 text-center">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Documents</p>
+                      <p className="text-sm font-semibold text-foreground mt-0.5 capitalize">{member.docs_status?.replace('_', ' ') ?? '—'}</p>
+                    </div>
+                    <div className="bg-muted rounded-xl px-3 py-2 text-center">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Paiement</p>
+                      <p className="text-sm font-semibold text-foreground mt-0.5 capitalize">{member.payment_status?.replace('_', ' ') ?? '—'}</p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>

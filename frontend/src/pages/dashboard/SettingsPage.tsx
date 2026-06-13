@@ -1,18 +1,22 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Save, Globe, Phone, Mail, MapPin, Image, Eye, Loader2, CheckCircle, Construction } from 'lucide-react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { useParams, useLocation, Link } from 'react-router-dom'
+import {
+  ArrowLeft, Save, Globe, Phone, Image, Eye, Loader2, CheckCircle,
+  Construction, Clock, ShieldCheck, Check, CreditCard,
+} from 'lucide-react'
 import { api } from '../../lib/api'
 import AvatarUpload from '../../components/AvatarUpload'
 import RoleBasedRoute from '../../components/shared/RoleBasedRoute'
+import PlansSection from './PlansSection'
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const ORG_TYPES = [
-  { value: 'sport',       label: 'Sport',       emoji: '⚽' },
-  { value: 'association', label: 'Association',  emoji: '🤝' },
-  { value: 'culture',     label: 'Culture',     emoji: '🎭' },
-  { value: 'loisir',      label: 'Loisir',      emoji: '🎨' },
-  { value: 'other',       label: 'Autre',       emoji: '🏢' },
+  { value: 'sport',       label: 'Sport',      emoji: '⚽' },
+  { value: 'association', label: 'Association', emoji: '🤝' },
+  { value: 'culture',     label: 'Culture',    emoji: '🎭' },
+  { value: 'loisir',      label: 'Loisir',     emoji: '🎨' },
+  { value: 'other',       label: 'Autre',      emoji: '🏢' },
 ] as const
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -22,6 +26,17 @@ interface OrgData {
   address: string | null; city: string | null; zip_code: string | null;
   phone: string | null; email: string | null; website_url: string | null;
   logo_url: string | null; is_public: boolean; status: string;
+}
+
+interface MyRole {
+  type: string;
+}
+
+interface StripeStatus {
+  connected: boolean;
+  charges_enabled: boolean;
+  payouts_enabled: boolean;
+  stripe_account_id: string | null;
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -65,15 +80,158 @@ const ComingSoon: React.FC<{ title: string; description: string }> = ({ title, d
   </div>
 )
 
+// ─── Stripe Section ───────────────────────────────────────────────────────────
+
+const STRIPE_ADVANTAGES = [
+  'Paiement sécurisé par Stripe',
+  'Virements automatiques sur votre compte bancaire',
+  'Tableau de bord des paiements intégré',
+  'Paiement en plusieurs fois disponible',
+]
+
+const StripeSection: React.FC<{
+  orgId: string;
+  status: StripeStatus | null;
+  loading: boolean;
+  successToast: boolean;
+  onStatusRefresh: () => void;
+}> = ({ orgId, status, loading, successToast, onStatusRefresh }) => {
+  const [connecting, setConnecting] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const onboard = async () => {
+    setConnecting(true)
+    setErr(null)
+    try {
+      const res = await api.post<{ url: string }>('/stripe/connect/onboard', { organisationId: orgId })
+      window.location.href = res.url
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Erreur lors de la connexion Stripe.')
+      setConnecting(false)
+    }
+  }
+
+  const continueOnboarding = async () => {
+    setConnecting(true)
+    setErr(null)
+    try {
+      const res = await api.post<{ url: string }>('/stripe/connect/refresh', { organisationId: orgId })
+      window.location.href = res.url
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Erreur lors de la reconnexion Stripe.')
+      setConnecting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="bg-card border border-border rounded-2xl p-5 flex items-center justify-center h-24">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground shrink-0" />
+      </div>
+    )
+  }
+
+  // Connected and active
+  if (status?.connected && status.charges_enabled) {
+    return (
+      <div className="space-y-3">
+        {successToast && (
+          <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 flex items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-[hsl(160,84%,39%)] shrink-0" />
+            <p className="text-sm font-semibold text-[hsl(160,84%,39%)]">Compte Stripe connecté !</p>
+          </div>
+        )}
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-center gap-3">
+          <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-emerald-800">Stripe connecté — Vous pouvez recevoir des paiements.</p>
+          </div>
+          <a
+            href="https://dashboard.stripe.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-bold text-emerald-700 hover:underline shrink-0 whitespace-nowrap"
+          >
+            Accéder au dashboard →
+          </a>
+        </div>
+      </div>
+    )
+  }
+
+  // Connected but onboarding incomplete
+  if (status?.connected && !status.charges_enabled) {
+    return (
+      <div className="space-y-3">
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-start gap-3">
+          <Clock className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800">Vérification en cours — Stripe examine votre dossier.</p>
+            <p className="text-xs text-amber-700/70 mt-0.5">Si votre demande a expiré, relancez l'onboarding.</p>
+          </div>
+        </div>
+        {err && <p className="text-xs text-destructive px-1">{err}</p>}
+        <button
+          onClick={continueOnboarding}
+          disabled={connecting}
+          className="w-full h-11 bg-amber-500 text-white rounded-2xl font-bold text-sm inline-flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-transform disabled:opacity-50"
+        >
+          {connecting
+            ? <><Loader2 className="w-4 h-4 animate-spin shrink-0" /> Chargement…</>
+            : 'Continuer l\'onboarding'}
+        </button>
+        <button
+          onClick={onStatusRefresh}
+          className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
+        >
+          Rafraîchir le statut
+        </button>
+      </div>
+    )
+  }
+
+  // Not connected
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Recevez les paiements de vos membres directement sur votre compte bancaire.
+        Actipass prend une commission de 2% par transaction.
+      </p>
+      <ul className="space-y-2">
+        {STRIPE_ADVANTAGES.map((adv) => (
+          <li key={adv} className="flex items-center gap-2 text-sm text-foreground">
+            <Check className="w-4 h-4 text-[hsl(160,84%,39%)] shrink-0" />
+            {adv}
+          </li>
+        ))}
+      </ul>
+      {err && <p className="text-xs text-destructive">{err}</p>}
+      <button
+        onClick={onboard}
+        disabled={connecting}
+        className="w-full h-12 bg-primary text-primary-foreground rounded-2xl font-bold text-sm inline-flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-transform shadow-lg shadow-primary/25 disabled:opacity-50"
+      >
+        {connecting
+          ? <><Loader2 className="w-4 h-4 animate-spin shrink-0" /> Connexion en cours…</>
+          : <><CreditCard className="w-4 h-4 shrink-0" /> Connecter Stripe</>}
+      </button>
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 const SettingsPage: React.FC = () => {
   const { organisationId } = useParams<{ organisationId: string }>()
+  const location = useLocation()
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const feedbackRef = useRef<HTMLDivElement>(null)
+
+  const [myRole, setMyRole] = useState<MyRole | null>(null)
 
   const [form, setForm] = useState({
     name: '', description: '', type: 'sport',
@@ -82,10 +240,29 @@ const SettingsPage: React.FC = () => {
     logo_url: '', is_public: true,
   })
 
+  // Stripe state
+  const [stripeStatus, setStripeStatus] = useState<StripeStatus | null>(null)
+  const [stripeLoading, setStripeLoading] = useState(false)
+  const [stripeSuccessToast, setStripeSuccessToast] = useState(false)
+
+  const fetchStripeStatus = useCallback(async () => {
+    if (!organisationId) { return }
+    setStripeLoading(true)
+    try {
+      const res = await api.get<StripeStatus>(`/stripe/connect/status/${organisationId}`, undefined, { useCache: false })
+      setStripeStatus(res)
+    } catch {
+      // silently fail — Stripe section will just not show
+    } finally {
+      setStripeLoading(false)
+    }
+  }, [organisationId])
+
+  // Load org + role
   useEffect(() => {
     if (!organisationId) { return }
-    api.get<{ organisation: OrgData }>(`/organisations/${organisationId}`, undefined, { useCache: false })
-      .then(({ organisation: o }) => {
+    api.get<{ organisation: OrgData; myRole: MyRole }>(`/organisations/${organisationId}`, undefined, { useCache: false })
+      .then(({ organisation: o, myRole: r }) => {
         setForm({
           name:        o.name ?? '',
           description: o.description ?? '',
@@ -99,10 +276,39 @@ const SettingsPage: React.FC = () => {
           logo_url:    o.logo_url ?? '',
           is_public:   o.is_public ?? true,
         })
+        setMyRole(r)
       })
       .catch(() => setError('Impossible de charger les paramètres.'))
       .finally(() => setLoading(false))
   }, [organisationId])
+
+  // Handle Stripe return query params
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const stripeParam = params.get('stripe')
+    if (!stripeParam) { return }
+
+    if (stripeParam === 'success') {
+      fetchStripeStatus().then(() => {
+        setStripeSuccessToast(true)
+        setTimeout(() => setStripeSuccessToast(false), 5000)
+      })
+    } else if (stripeParam === 'refresh') {
+      // Auto-relaunch onboarding
+      if (organisationId) {
+        api.post<{ url: string }>('/stripe/connect/refresh', { organisationId })
+          .then((res) => { window.location.href = res.url })
+          .catch(() => { fetchStripeStatus() })
+      }
+    }
+  }, [location.search, organisationId, fetchStripeStatus])
+
+  // Load Stripe status for owners
+  useEffect(() => {
+    if (myRole?.type === 'club_owner') {
+      fetchStripeStatus()
+    }
+  }, [myRole, fetchStripeStatus])
 
   const set = (k: keyof typeof form, v: string | boolean) =>
     setForm((f) => ({ ...f, [k]: v }))
@@ -144,6 +350,8 @@ const SettingsPage: React.FC = () => {
       </div>
     )
   }
+
+  const isOwner = myRole?.type === 'club_owner'
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
@@ -217,7 +425,7 @@ const SettingsPage: React.FC = () => {
       </Section>
 
       {/* Localisation */}
-      <Section title="Localisation" icon={<MapPin className="w-4 h-4 shrink-0" />}>
+      <Section title="Localisation" icon={<Globe className="w-4 h-4 shrink-0" />}>
         <Field label="Adresse">
           <input value={form.address} onChange={(e) => set('address', e.target.value)} placeholder="12 rue des Lilas" className={inputCls} />
         </Field>
@@ -260,7 +468,6 @@ const SettingsPage: React.FC = () => {
             size="xl"
             onUpload={async (url) => {
               set('logo_url', url)
-              // Sauvegarde immédiate du logo (sans attendre le bouton "Enregistrer")
               await api.put(`/organisations/${organisationId}`, { logo_url: url })
               api.clearCache(`/organisations/${organisationId}`)
             }}
@@ -287,13 +494,37 @@ const SettingsPage: React.FC = () => {
         </div>
       </Section>
 
+      {/* Paiements Stripe — visible uniquement pour le propriétaire */}
+      {isOwner && (
+        <Section title="Paiements Stripe" icon={<CreditCard className="w-4 h-4 shrink-0" />}>
+          <StripeSection
+            orgId={organisationId!}
+            status={stripeStatus}
+            loading={stripeLoading}
+            successToast={stripeSuccessToast}
+            onStatusRefresh={fetchStripeStatus}
+          />
+        </Section>
+      )}
+
+      {/* Formules de cotisation — visible uniquement si Stripe actif */}
+      {isOwner && (
+        <Section title="Formules de cotisation" icon={<span className="text-base leading-none">💳</span>}>
+          {stripeStatus?.charges_enabled ? (
+            <PlansSection orgId={organisationId!} />
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-2">
+              Connectez Stripe pour créer des formules de paiement.
+            </p>
+          )}
+        </Section>
+      )}
+
       {/* Bientôt */}
       <div>
         <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold mb-3">Fonctionnalités à venir</p>
         <div className="space-y-2">
-          <ComingSoon title="Tarifs & abonnements"    description="Configurez vos plans d'adhésion et gérez les paiements en ligne." />
-          <ComingSoon title="Documents requis"         description="Définissez les pièces justificatives à fournir lors de l'inscription." />
-          <ComingSoon title="Notifications & emails"  description="Personnalisez les emails automatiques envoyés à vos membres." />
+          <ComingSoon title="Notifications & emails" description="Personnalisez les emails automatiques envoyés à vos membres." />
         </div>
       </div>
 
