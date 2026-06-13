@@ -18,6 +18,7 @@ import { UploadModule } from './upload/upload.module';
 import { StorageModule } from './storage/storage.module';
 import { RequiredDocumentsModule } from './required-documents/required-documents.module';
 import { MemberDocumentsModule } from './member-documents/member-documents.module';
+import { SeasonsModule } from './seasons/seasons.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { MemberDocumentsModule } from './member-documents/member-documents.modul
     StorageModule,
     RequiredDocumentsModule,
     MemberDocumentsModule,
+    SeasonsModule,
   ],
   controllers: [AppController],
   providers: [

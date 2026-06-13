@@ -637,16 +637,21 @@ export class OrganisationsService {
       throw new Error('Organisation non trouvée');
     }
 
-    // Vérifier que l'utilisateur n'est pas déjà membre
+    // Bloquer uniquement si l'adhésion est encore active/en attente/suspendue/bannie
+    // expired et resigned peuvent se réinscrire
     const existingMembership = await this.prisma.membership.findFirst({
       where: {
         user_id: userId,
         organisation_id: organisationId,
-        left_at: null, // Pas encore parti
+        status: { in: ['active', 'pending', 'suspended', 'banned'] },
+        deleted_at: null,
       },
     });
 
     if (existingMembership) {
+      if (existingMembership.status === 'banned') {
+        throw new Error('Votre accès à cette organisation a été révoqué.');
+      }
       throw new Error('Vous êtes déjà membre de cette organisation');
     }
 
@@ -825,6 +830,8 @@ export class OrganisationsService {
       is_paid: membership.is_paid,
       validated: membership.validated,
       joined_at: membership.joined_at,
+      left_at: membership.left_at,
+      license_number: membership.license_number,
       comment: membership.comment,
       role: membership.role,
       organisation: membership.organisation,

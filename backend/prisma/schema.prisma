@@ -120,6 +120,7 @@ model Membership {
   user_id            String
   organisation_id    String
   role_id            String
+  season_id          String?
   license_number     String?
   joined_at          DateTime                @default(now())
   left_at            DateTime?
@@ -138,11 +139,13 @@ model Membership {
   organisation       Organisation            @relation(fields: [organisation_id], references: [id])
   role               Role                    @relation(fields: [role_id], references: [id])
   user               User                    @relation(fields: [user_id], references: [id])
+  season             Season?                 @relation(fields: [season_id], references: [id])
   Reservation        Reservation[]
   tagAssignments     MembershipTagAssignment[]
 
   @@index([user_id, organisation_id])
   @@index([user_id, status])
+  @@index([season_id])
   @@map("memberships")
 }
 
@@ -182,6 +185,7 @@ model Organisation {
   subscriptions     Subscription[]
   requiredDocuments RequiredDocument[]
   memberDocuments   MemberDocument[]
+  seasons           Season[]
 
   @@map("organisations")
 }
@@ -949,6 +953,23 @@ model RequiredDocument {
 
   @@index([organisation_id])
   @@map("required_documents")
+}
+
+model Season {
+  id              String       @id @default(cuid())
+  organisation_id String
+  name            String
+  starts_at       DateTime
+  ends_at         DateTime
+  is_active       Boolean      @default(false)
+  created_at      DateTime     @default(now())
+
+  organisation    Organisation @relation(fields: [organisation_id], references: [id], onDelete: Cascade)
+  memberships     Membership[]
+
+  @@unique([organisation_id, name])
+  @@index([organisation_id])
+  @@map("seasons")
 }
 
 model MemberDocument {

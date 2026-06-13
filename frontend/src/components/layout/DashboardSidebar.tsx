@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Calendar, ClipboardCheck, Euro,
-  FileText, Settings, Menu, X, MessageSquare, UserCog, ClipboardList,
+  FileText, Settings, Menu, X, MessageSquare, UserCog, ClipboardList, CalendarRange,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { api } from '../../lib/api'
@@ -84,6 +84,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
     { icon: ClipboardCheck,  label: 'Présences',       path: `/dashboard/${organisationId}/attendance`,     roles: ['club_owner', 'club_manager'] },
     { icon: Euro,            label: 'Finances',        path: `/dashboard/${organisationId}/payments`,       roles: ['club_owner', 'club_manager', 'treasurer'] },
     { icon: FileText,        label: 'Documents',       path: `/dashboard/${organisationId}/documents`,      roles: ['club_owner', 'club_manager'] },
+    { icon: CalendarRange,   label: 'Saisons',         path: `/dashboard/${organisationId}/seasons`,        roles: ['club_owner', 'club_manager'] },
     { icon: MessageSquare,   label: 'Communication',   path: `/dashboard/${organisationId}/communication`,  roles: ['club_owner', 'club_manager'] },
     { icon: UserCog,         label: 'Équipe',          path: `/dashboard/${organisationId}/settings/team`,  roles: ['club_owner', 'club_manager'] },
     { icon: Settings,        label: 'Paramètres',      path: `/dashboard/${organisationId}/settings`,       roles: ['club_owner', 'club_manager'] },

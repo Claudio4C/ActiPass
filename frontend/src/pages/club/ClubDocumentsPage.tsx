@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import {
   FileText, CheckCircle2, Clock, AlertCircle,
   CreditCard, ChevronRight, Loader2, ArrowLeft, ShieldCheck,
-  LogOut, X, ShieldOff, Archive, Upload, Heart, User,
+  LogOut, X, ShieldOff, Archive, Upload, Heart, User, CalendarDays,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { api } from '../../lib/api'
@@ -25,6 +25,13 @@ interface MyMembership {
   comment?: string | null
   role: { id: string; name: string; type: string }
   organisation: { id: string; name: string; logo_url: string | null }
+}
+
+interface MembershipHistoryItem {
+  id: string
+  status: string
+  joined_at: string
+  season: { id: string; name: string; starts_at: string; ends_at: string } | null
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -209,6 +216,10 @@ const ClubDocumentsPage: React.FC = () => {
   const [refreshKey, setRefreshKey]         = useState(0)
   const cardRef = useRef<Record<string, HTMLDivElement | null>>({})
 
+  // ── Historique d'adhésion ────────────────────────────────────────────────────
+  const [history, setHistory]           = useState<MembershipHistoryItem[]>([])
+  const [loadingHistory, setLoadingHistory] = useState(false)
+
   useEffect(() => {
     if (!uploadNotice) { return undefined }
     const id = window.setTimeout(() => setUploadNotice(null), 4000)
@@ -322,6 +333,15 @@ const ClubDocumentsPage: React.FC = () => {
       .then(setMembership)
       .catch(() => setError('Vous n\'êtes pas membre de cette organisation.'))
       .finally(() => setLoading(false))
+  }, [orgId])
+
+  useEffect(() => {
+    if (!orgId) { return }
+    setLoadingHistory(true)
+    api.get<MembershipHistoryItem[]>(`/organisations/${orgId}/seasons/mine`, undefined, { useCache: false })
+      .then(setHistory)
+      .catch(() => {})
+      .finally(() => setLoadingHistory(false))
   }, [orgId])
 
   const handleLeave = async () => {
@@ -805,6 +825,84 @@ const ClubDocumentsPage: React.FC = () => {
           })}
         </section>
       )}
+
+      {/* ── Historique d'adhésion ─────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">Historique d'adhésion</p>
+
+        {loadingHistory && (
+          <div className="flex justify-center py-6">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          </div>
+        )}
+
+        {!loadingHistory && history.length === 0 && (
+          <div className="border-2 border-dashed border-border rounded-2xl p-8 text-center space-y-3">
+            <div className="w-10 h-10 mx-auto rounded-2xl bg-primary/10 flex items-center justify-center">
+              <CalendarDays className="w-5 h-5 text-primary shrink-0" />
+            </div>
+            <p className="text-sm text-muted-foreground">Aucun historique d'adhésion pour le moment.</p>
+          </div>
+        )}
+
+        {!loadingHistory && history.length > 0 && (
+          <div className="relative pl-5">
+            {/* Ligne verticale */}
+            <div className="absolute left-2 top-2 bottom-2 w-px bg-border" />
+
+            <div className="space-y-4">
+              {history.map((item) => {
+                const dotCls = item.status === 'active'
+                  ? 'bg-emerald-500'
+                  : item.status === 'pending'
+                    ? 'bg-amber-500'
+                    : 'bg-muted-foreground/40'
+
+                const badgeCls = item.status === 'active'
+                  ? 'bg-emerald-500/15 text-emerald-700'
+                  : item.status === 'pending'
+                    ? 'bg-amber-500/15 text-amber-700'
+                    : 'bg-muted text-muted-foreground'
+
+                const statusLabel: Record<string, string> = {
+                  active: 'Active',
+                  pending: 'En attente',
+                  expired: 'Expirée',
+                  banned: 'Refusée',
+                  suspended: 'Suspendue',
+                  resigned: 'Démissionnaire',
+                }
+
+                return (
+                  <div key={item.id} className="relative flex items-start gap-4">
+                    {/* Dot */}
+                    <div className={cn('w-3 h-3 rounded-full shrink-0 mt-1 -ml-[5px] border-2 border-background', dotCls)} />
+
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-display font-semibold text-sm text-foreground">
+                          {item.season ? item.season.name : <span className="text-muted-foreground italic">Hors saison</span>}
+                        </p>
+                        <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0', badgeCls)}>
+                          {statusLabel[item.status] ?? item.status}
+                        </span>
+                      </div>
+                      {item.season && (
+                        <p className="text-xs text-muted-foreground">
+                          {fmtDate(item.season.starts_at)} → {fmtDate(item.season.ends_at)}
+                        </p>
+                      )}
+                      <p className="text-[11px] text-muted-foreground">
+                        Rejoint le {fmtDate(item.joined_at)}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* Contact gestionnaire */}
       <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">

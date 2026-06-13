@@ -75,6 +75,7 @@ import AttendanceStatsPage from '../pages/dashboard/AttendanceStatsPage'
 import SettingsPage from '../pages/dashboard/SettingsPage'
 import AdminRequests from '../pages/dashboard/AdminRequests'
 import AdminDocumentsPage from '../pages/dashboard/AdminDocumentsPage'
+import AdminSeasonsPage from '../pages/dashboard/AdminSeasonsPage'
 
 interface AppProps {
     mode: AppMode;
@@ -268,6 +269,7 @@ const AppContent: React.FC<{
           <Route path="/dashboard/:organisationId/settings" element={<SettingsPage />} />
           <Route path="/dashboard/:organisationId/requests" element={<AdminRequests />} />
           <Route path="/dashboard/:organisationId/documents" element={<AdminDocumentsPage />} />
+          <Route path="/dashboard/:organisationId/seasons" element={<AdminSeasonsPage />} />
         </Route>
 
         {/* ═══════════════════════════════════════

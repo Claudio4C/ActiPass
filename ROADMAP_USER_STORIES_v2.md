@@ -103,7 +103,7 @@ enum MembershipStatus {
 
 ---
 
-## Epic 1.4 — Licences fédérales ⏳
+## Epic 1.4 — Licences fédérales ❌❌❌
 
 > Clubs affiliés FFF, FFG, FFJ, FFN, etc. Le numéro de licence est obligatoire pour la compétition et les assurances fédérales.
 
@@ -133,9 +133,9 @@ enum MembershipStatus {
 
 | ID | User Story | Critères d'acceptation | Front | Back |
 |----|-----------|------------------------|-------|------|
-| P2-1 | En tant qu'admin, je veux créer et gérer les saisons de mon club | Une saison a un nom (2024-2025), une date de début et de fin. Une seule saison active à la fois. | — | — |
-| P2-2 | En tant qu'admin, je veux clôturer une saison et en ouvrir une nouvelle | Clôture : tous les memberships ACTIVE passent en EXPIRED. Ouverture : workflow de renouvellement déclenché. | — | — |
-| P2-3 | En tant que membre, je veux voir ma saison en cours et mon historique d'adhésions | Vue timeline des saisons passées avec statut et paiement associé. | — | — |
+| P2-1 | En tant qu'admin, je veux créer et gérer les saisons de mon club | Une saison a un nom (2024-2025), une date de début et de fin. Une seule saison active à la fois. | ✅ | ✅ |
+| P2-2 | En tant qu'admin, je veux clôturer une saison et en ouvrir une nouvelle | Clôture : tous les memberships ACTIVE passent en EXPIRED. Ouverture : workflow de renouvellement déclenché. | ✅ | ✅ |
+| P2-3 | En tant que membre, je veux voir ma saison en cours et mon historique d'adhésions | Vue timeline des saisons passées avec statut et paiement associé. | ✅ | ✅ |
 
 ## Epic 2.2 — Intégration Stripe & Cotisations ⏳
 
