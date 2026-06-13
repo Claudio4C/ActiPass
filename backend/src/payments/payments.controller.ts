@@ -50,4 +50,17 @@ export class PaymentsController {
   ) {
     return this.service.getAdminPayments(orgId, this.userId(req), { status, userId: filterUserId });
   }
+
+  /** GET /payments/:paymentId/receipt-url */
+  @Get(':paymentId/receipt-url')
+  getReceiptUrl(@Param('paymentId') paymentId: string, @Req() req: Request) {
+    return this.service.getReceiptUrl(paymentId, this.userId(req));
+  }
+
+  /** POST /payments/:paymentId/refund */
+  @Post(':paymentId/refund')
+  @HttpCode(HttpStatus.OK)
+  refund(@Param('paymentId') paymentId: string, @Req() req: Request) {
+    return this.service.refund(paymentId, this.userId(req));
+  }
 }

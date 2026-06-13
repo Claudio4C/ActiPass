@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
@@ -29,6 +30,16 @@ export class PaymentsService {
     });
     if (!m || !['club_owner', 'club_manager'].includes(m.role.type)) {
       throw new ForbiddenException('Accès réservé aux gestionnaires du club.');
+    }
+  }
+
+  private async assertIsOwner(orgId: string, userId: string): Promise<void> {
+    const m = await this.prisma.membership.findFirst({
+      where: { organisation_id: orgId, user_id: userId, deleted_at: null },
+      include: { role: true },
+    });
+    if (!m || m.role.type !== 'club_owner') {
+      throw new ForbiddenException('Accès réservé au propriétaire du club.');
     }
   }
 
@@ -192,5 +203,143 @@ export class PaymentsService {
       },
       orderBy: { created_at: 'desc' },
     });
+  }
+
+  // ── P2-11 : Unpaid members ────────────────────────────────────────────────────
+
+  async getUnpaidMembers(orgId: string, userId: string) {
+    await this.assertIsAdminOrOwner(orgId, userId);
+
+    const activeSeason = await this.prisma.season.findFirst({
+      where: { organisation_id: orgId, is_active: true },
+    });
+    if (!activeSeason) {
+      return [];
+    }
+
+    const memberships = await this.prisma.membership.findMany({
+      where: {
+        organisation_id: orgId,
+        season_id: activeSeason.id,
+        status: 'active',
+        payment_status: { not: 'paid' },
+        deleted_at: null,
+        role: { type: { in: ['member', 'coach'] } },
+      },
+      include: { user: { select: { id: true, firstname: true, lastname: true, email: true } } },
+      orderBy: { joined_at: 'desc' },
+    });
+
+    return memberships.map((m) => ({
+      userId:        m.user_id,
+      firstname:     m.user.firstname,
+      lastname:      m.user.lastname,
+      email:         m.user.email,
+      joined_at:     m.joined_at,
+      membership_id: m.id,
+    }));
+  }
+
+  async remindMember(orgId: string, targetUserId: string, userId: string) {
+    await this.assertIsAdminOrOwner(orgId, userId);
+
+    const member = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { email: true },
+    });
+    if (!member) {
+      throw new NotFoundException('Membre introuvable.');
+    }
+
+    const frontendUrl = this.config.getOrThrow<string>('FRONTEND_URL').replace(/\/+$/, '');
+    console.log(
+      `[Reminder] REMINDER EMAIL would be sent to ${member.email} with link ${frontendUrl}/club/${orgId}/payment`
+    );
+
+    return { reminded: true, email: member.email };
+  }
+
+  // ── P2-12 : Receipt URL ───────────────────────────────────────────────────────
+
+  async getReceiptUrl(paymentId: string, userId: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: { organisation: true },
+    });
+    if (!payment) {
+      throw new NotFoundException('Paiement introuvable.');
+    }
+
+    // Allow payment owner OR admin/manager
+    const isOwner = payment.user_id === userId;
+    if (!isOwner && payment.organisation_id) {
+      await this.assertIsAdminOrOwner(payment.organisation_id, userId);
+    } else if (!isOwner) {
+      throw new ForbiddenException('Accès refusé.');
+    }
+
+    if (!payment.stripe_payment_intent_id || !payment.organisation?.stripe_account_id) {
+      return { receipt_url: null };
+    }
+
+    const pi = await this.stripe.client.paymentIntents.retrieve(
+      payment.stripe_payment_intent_id,
+      { expand: ['latest_charge'] },
+      { stripeAccount: payment.organisation.stripe_account_id }
+    );
+
+    const latestCharge = (pi as any).latest_charge;
+    const receipt_url: string | null =
+      typeof latestCharge === 'object' && latestCharge?.receipt_url
+        ? latestCharge.receipt_url
+        : null;
+
+    return { receipt_url };
+  }
+
+  // ── P2-13 : Refund ───────────────────────────────────────────────────────────
+
+  async refund(paymentId: string, userId: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id: paymentId },
+      include: { organisation: true },
+    });
+    if (!payment) {
+      throw new NotFoundException('Paiement introuvable.');
+    }
+
+    if (!payment.organisation_id) {
+      throw new BadRequestException('Paiement sans organisation associée.');
+    }
+    await this.assertIsOwner(payment.organisation_id, userId);
+
+    if (payment.status !== 'paid') {
+      throw new BadRequestException('Seuls les paiements validés peuvent être remboursés.');
+    }
+    if (!payment.stripe_session_id || !payment.organisation?.stripe_account_id) {
+      throw new BadRequestException('Données Stripe manquantes pour ce paiement.');
+    }
+
+    const session = await this.stripe.client.checkout.sessions.retrieve(
+      payment.stripe_session_id,
+      {},
+      { stripeAccount: payment.organisation.stripe_account_id }
+    );
+
+    if (!session.payment_intent) {
+      throw new BadRequestException('Aucun PaymentIntent associé à cette session.');
+    }
+
+    await this.stripe.client.refunds.create(
+      { payment_intent: session.payment_intent as string },
+      { stripeAccount: payment.organisation.stripe_account_id }
+    );
+
+    await this.prisma.payment.update({
+      where: { id: paymentId },
+      data: { status: 'refunded' },
+    });
+
+    return { refunded: true, amount: Number(payment.amount) };
   }
 }

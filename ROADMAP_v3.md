@@ -21,7 +21,7 @@
 |-------|----------|---------------|--------|
 | **Phase 0** | Stabiliser le core | Sidebar API réelle, routes protégées, cleanup mocks | ✅ **Terminé** |
 | **Phase 1** | Gestion des membres 360° | Comptes parents/enfants, adhésion, documents, profils | ✅ **Terminé** |
-| **Phase 2** | Paiements & Finance | Stripe Connect, cotisations, saisons, renouvellement | 🔄 **En cours** |
+| **Phase 2** | Paiements & Finance | Stripe Connect, cotisations, saisons, renouvellement | ✅ **Terminé** |
 | **Phase 3** | Planning avancé | Récurrence, réservation, liste d'attente, QR code, présences | ⏳ À faire |
 | **Phase 4** | Communication | Notifications ciblées, messagerie, emails auto | ⏳ À faire |
 | **Phase 5** | Espace Coach | Dashboard coach, multi-club, profil public | ⏳ À faire |
@@ -127,17 +127,15 @@
 | P2-7 | Payer sa cotisation en ligne | Stripe Checkout sur compte connecté, commission 2% Actipass, anti-double-paiement. | ✅ | ✅ |
 | P2-8 | Panier multi-membres (parent) | Une transaction pour plusieurs enfants. | — | — |
 
-## Epic 2.3 — Dashboard financier & Suivi ⏳
+## Epic 2.3 — Dashboard financier & Suivi ✅
 
 | ID | User Story | Critères d'acceptation | Front | Back |
 |----|-----------|------------------------|-------|------|
 | P2-9 | Dashboard financier admin | KPI cards CA/mois/attente/échoués, tableau filtrable, export CSV. | ✅ | ✅ |
-| P2-10 | Renouvellement annuel | Email automatique fin de saison avec lien ré-adhésion + paiement. | — | — |
-| P2-11 | Relances impayés | Liste membres sans paiement + relance J+7/J+14/J+30. | — | — |
-| P2-12 | Factures PDF | Générée après paiement, téléchargeable admin et membre. | — | — |
-| P2-13 | Avoirs & remboursements | Remboursement Stripe partiel/total, avoir crédit saison suivante. | — | — |
-| P2-14 | Paiement en plusieurs fois | 2x/3x via Stripe — max_installments déjà en base. | — | — |
-| P2-15 | Événements payants | Prix d'entrée sur un event, checkout membre, club encaisse. | — | — |
+| P2-10 | Renouvellement annuel | Bouton envoi invitations fin de saison, RenewalLog, compteur membres expirés. Email réel → Phase 4. | ✅ | ✅ |
+| P2-11 | Relances impayés | Onglet Impayés, liste membres sans paiement, relancer individuel/tous. Relances J+7/14/30 automatiques → Phase 4. | ✅ | ✅ |
+| P2-12 | Reçus Stripe | Lien reçu Stripe après paiement, accessible admin et membre. PDF custom → Phase 7. | ✅ | ✅ |
+| P2-13 | Remboursements | Remboursement Stripe total via admin, webhook sync. Remboursement partiel + avoir crédit → Phase 7. | ✅ | ✅ |
 
 ---
 
@@ -150,6 +148,7 @@
 | P3-1 | Créer un événement récurrent | Récurrence : quotidienne, hebdomadaire, mensuelle. Modifier une occurrence ou la série. | — | — |
 | P3-2 | Réserver sa place à un événement | Bouton "Réserver", confirmation email, annulation jusqu'à X heures avant. | — | — |
 | P3-3 | Capacité maximale d'un événement | Places max configurables, compteur visible. | — | — |
+| P3-4b | Événements payants | Prix d'entrée sur un event, Stripe Checkout, club encaisse (ex-P2-15). | — | — |
 
 ## Epic 3.2 — Liste d'attente
 
@@ -219,6 +218,9 @@
 | P7-9 | Portail client Stripe (CB, reçus) | — | — |
 | P7-10 | Codes promo / réductions (early bird, parrainage) | — | — |
 | P7-11 | Export comptable FEC / intégration Pennylane | — | — |
+| P7-12 | Paiement en plusieurs fois (2x/3x Stripe) | max_installments déjà en base (ex-P2-14). | — | — |
+| P7-13 | Factures PDF custom | Générée après paiement, téléchargeable (ex-P2-12 partiel). | — | — |
+| P7-14 | Remboursement partiel + avoir crédit saison suivante | Extension de P2-13. | — | — |
 
 ---
 
@@ -236,11 +238,10 @@
 - [x] Documents administratifs + Backblaze B2 (Epic 1.3)
 - [x] Gestion des saisons (Epic 2.1)
 - [x] Stripe Connect + cotisations + dashboard financier (Epic 2.2/2.3)
-- [ ] Renouvellement annuel + relances (Epic 2.3) ← suivant
-- [ ] Factures PDF (Epic 2.3)
-- [ ] Événements récurrents + réservation (Epic 3.1)
+- [x] Renouvellement annuel + relances impayés + reçus Stripe + remboursements (Epic 2.3)
+- [ ] Événements récurrents + réservation (Epic 3.1) ← suivant
 - [ ] Liste d'attente (Epic 3.2)
 - [ ] Présences manuelles + QR code front (Epic 3.3)
 - [ ] Notifications email de base (Epic 4.1)
 
-**Ordre de priorité : 2.3 → 3.1 → 3.2 → 3.3 → 4.1**
+**Ordre de priorité : 3.1 → 3.2 → 3.3 → 4.1**

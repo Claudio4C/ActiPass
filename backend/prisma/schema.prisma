@@ -192,6 +192,7 @@ model Organisation {
   memberDocuments   MemberDocument[]
   seasons             Season[]
   subscription_plans  SubscriptionPlan[]
+  renewal_logs        RenewalLog[]
 
   @@map("organisations")
 }
@@ -982,10 +983,25 @@ model Season {
   organisation       Organisation       @relation(fields: [organisation_id], references: [id], onDelete: Cascade)
   memberships        Membership[]
   subscription_plans SubscriptionPlan[]
+  renewal_logs       RenewalLog[]
 
   @@unique([organisation_id, name])
   @@index([organisation_id])
   @@map("seasons")
+}
+
+model RenewalLog {
+  id              String   @id @default(cuid())
+  organisation_id String
+  season_id       String
+  sent_at         DateTime @default(now())
+  members_count   Int
+
+  organisation Organisation @relation(fields: [organisation_id], references: [id], onDelete: Cascade)
+  season       Season       @relation(fields: [season_id], references: [id], onDelete: Cascade)
+
+  @@index([organisation_id, sent_at])
+  @@map("renewal_logs")
 }
 
 model SubscriptionPlan {

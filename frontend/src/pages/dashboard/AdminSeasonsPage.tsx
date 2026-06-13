@@ -2,13 +2,18 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   CalendarRange, CalendarDays, Plus, Zap, Lock, Trash2,
-  CheckCircle2, Clock, X, AlertCircle, Loader2,
+  CheckCircle2, Clock, X, AlertCircle, Loader2, Mail,
 } from 'lucide-react'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/utils'
 import RoleBasedRoute from '../../components/shared/RoleBasedRoute'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface RenewalLog {
+  sent_at: string
+  members_count: number
+}
 
 interface Season {
   id: string
@@ -18,6 +23,8 @@ interface Season {
   is_active: boolean
   created_at: string
   active_members_count: number
+  expired_members_count: number
+  last_renewal_log: RenewalLog | null
 }
 
 type SeasonState = 'active' | 'upcoming' | 'closed'
@@ -295,6 +302,7 @@ const AdminSeasonsPage: React.FC = () => {
   const [closeTarget, setCloseTarget]   = useState<Season | null>(null)
   const [activating, setActivating]     = useState<string | null>(null)
   const [deleting, setDeleting]         = useState<string | null>(null)
+  const [renewing, setRenewing]         = useState<string | null>(null)
   const [notice, setNotice]             = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   const showNotice = (type: 'success' | 'error', message: string) => {
@@ -329,6 +337,22 @@ const AdminSeasonsPage: React.FC = () => {
       showNotice('error', e instanceof Error ? e.message : 'Erreur lors de l\'activation.')
     } finally {
       setActivating(null)
+    }
+  }
+
+  const handleSendRenewal = async (seasonId: string) => {
+    if (!organisationId) { return }
+    setRenewing(seasonId)
+    try {
+      const res = await api.post<{ sent: number; season_name: string }>(
+        `/organisations/${organisationId}/seasons/${seasonId}/send-renewal`,
+      )
+      showNotice('success', `Invitations envoyées à ${res.sent} membre${res.sent !== 1 ? 's' : ''}.`)
+      await load()
+    } catch (e) {
+      showNotice('error', e instanceof Error ? e.message : 'Erreur lors de l\'envoi.')
+    } finally {
+      setRenewing(null)
     }
   }
 
@@ -420,6 +444,8 @@ const AdminSeasonsPage: React.FC = () => {
           const isActivating = activating === season.id
           const isDeleting   = deleting === season.id
 
+          const isRenewing = renewing === season.id
+
           return (
             <div
               key={season.id}
@@ -487,6 +513,32 @@ const AdminSeasonsPage: React.FC = () => {
                   )}
                 </div>
               </div>
+
+              {/* Renouvellement — saisons clôturées avec membres expirés */}
+              {state === 'closed' && season.expired_members_count > 0 && (
+                <div className="mt-3 pt-3 border-t border-border flex items-center justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-semibold text-foreground">{season.expired_members_count}</span> membre{season.expired_members_count !== 1 ? 's' : ''} à renouveler
+                    </p>
+                    {season.last_renewal_log && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Dernier envoi : {fmtDate(season.last_renewal_log.sent_at)} · {season.last_renewal_log.members_count} membre{season.last_renewal_log.members_count !== 1 ? 's' : ''} contacté{season.last_renewal_log.members_count !== 1 ? 's' : ''}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => void handleSendRenewal(season.id)}
+                    disabled={isRenewing}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 active:scale-95 transition-all disabled:opacity-50 shrink-0"
+                  >
+                    {isRenewing
+                      ? <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                      : <Mail className="w-3 h-3 shrink-0" />}
+                    {isRenewing ? 'Envoi…' : 'Envoyer les invitations de renouvellement'}
+                  </button>
+                </div>
+              )}
             </div>
           )
         })}

@@ -489,7 +489,10 @@ export class OrganisationsService {
       throw new ForbiddenException('Seul le propriétaire peut modifier les rôles');
     }
 
-    // Trouver le nouveau rôle
+    const org = await this.prisma.organisation.findUnique({ where: { id: organisationId } });
+    const space = org?.type === 'sport' ? 'club_360' : 'municipality';
+
+    // Trouver le nouveau rôle dans le bon espace
     const newRole = await this.prisma.role.findFirst({
       where: {
         type: roleType as
@@ -501,6 +504,7 @@ export class OrganisationsService {
           | 'municipal_admin'
           | 'municipal_manager'
           | 'municipal_viewer',
+        space,
       },
     });
 
@@ -757,12 +761,20 @@ export class OrganisationsService {
       throw new BadRequestException('Seuls les membres suspendus peuvent être réactivés');
     }
 
+    let approveSeasonId: string | undefined;
+    if (action === 'approve') {
+      const activeSeason = await this.prisma.season.findFirst({
+        where: { organisation_id: organisationId, is_active: true },
+      });
+      approveSeasonId = activeSeason?.id;
+    }
+
     const dataMap: Record<string, object> = {
-      approve:    { status: 'active',    validated: true,  comment: reason ?? null },
-      reject:     { status: 'banned',                      comment: reason ?? null, left_at: new Date() },
-      suspend:    { status: 'suspended',                   comment: reason ?? null },
-      archive:    { status: 'expired',                     left_at: new Date() },
-      reactivate: { status: 'active',    comment: null },
+      approve:    { status: 'active', validated: true, comment: reason ?? null, ...(approveSeasonId ? { season_id: approveSeasonId } : {}) },
+      reject:     { status: 'banned',                  comment: reason ?? null, left_at: new Date() },
+      suspend:    { status: 'suspended',               comment: reason ?? null },
+      archive:    { status: 'expired',                 left_at: new Date() },
+      reactivate: { status: 'active', comment: null },
     };
 
     const updated = await this.prisma.membership.update({
@@ -802,9 +814,14 @@ export class OrganisationsService {
 
   async bulkApproveMemberships(organisationId: string, ids: string[], userId: string) {
     await this.assertCanManageMemberships(organisationId, userId);
+
+    const activeSeason = await this.prisma.season.findFirst({
+      where: { organisation_id: organisationId, is_active: true },
+    });
+
     const result = await this.prisma.membership.updateMany({
       where: { id: { in: ids }, organisation_id: organisationId, status: 'pending' },
-      data: { status: 'active', validated: true },
+      data: { status: 'active', validated: true, ...(activeSeason ? { season_id: activeSeason.id } : {}) },
     });
     return {
       message: `${result.count} adhésion${result.count > 1 ? 's' : ''} approuvée${result.count > 1 ? 's' : ''}`,

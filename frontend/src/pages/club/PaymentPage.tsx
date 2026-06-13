@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   CreditCard, CheckCircle2, Clock, AlertCircle, Loader2,
-  ChevronRight, Receipt,
+  ChevronRight, Receipt, ExternalLink,
 } from 'lucide-react'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/utils'
@@ -110,11 +110,37 @@ const PlanCard: React.FC<{
 
 // ─── Payment history row ──────────────────────────────────────────────────────
 
-const PaymentRow: React.FC<{ payment: Payment }> = ({ payment }) => {
+const PaymentRow: React.FC<{ payment: Payment; orgId: string }> = ({ payment, orgId }) => {
   const meta = PAYMENT_STATUS[payment.status] ?? PAYMENT_STATUS.pending
   const Icon = meta.icon
+  const [receiptLoading, setReceiptLoading] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+
+  const handleReceipt = async () => {
+    setReceiptLoading(true)
+    try {
+      const { receipt_url } = await api.get<{ receipt_url: string | null }>(`/payments/${payment.id}/receipt-url`)
+      if (receipt_url) {
+        window.open(receipt_url, '_blank')
+      } else {
+        setToast('Reçu non disponible')
+        setTimeout(() => setToast(null), 3000)
+      }
+    } catch {
+      setToast('Impossible de récupérer le reçu')
+      setTimeout(() => setToast(null), 3000)
+    } finally {
+      setReceiptLoading(false)
+    }
+  }
+
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-border last:border-0">
+    <div className="flex items-center gap-3 py-3 border-b border-border last:border-0 relative">
+      {toast && (
+        <div className="absolute -top-8 left-0 right-0 text-center text-xs text-muted-foreground bg-card border border-border rounded-lg px-2 py-1">
+          {toast}
+        </div>
+      )}
       <div className={cn('w-8 h-8 rounded-xl flex items-center justify-center bg-muted shrink-0')}>
         <Icon className={cn('w-4 h-4 shrink-0', meta.color)} />
       </div>
@@ -126,9 +152,21 @@ const PaymentRow: React.FC<{ payment: Payment }> = ({ payment }) => {
           {fmtDate(payment.paid_at ?? payment.created_at)}
         </p>
       </div>
-      <div className="text-right shrink-0">
+      <div className="text-right shrink-0 space-y-1">
         <p className="text-sm font-semibold text-foreground">{fmtAmount(payment.amount * 100)}</p>
         <p className={cn('text-xs font-medium', meta.color)}>{meta.label}</p>
+        {payment.status === 'paid' && (
+          <button
+            onClick={() => void handleReceipt()}
+            disabled={receiptLoading}
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50"
+          >
+            {receiptLoading
+              ? <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+              : <ExternalLink className="w-3 h-3 shrink-0" />}
+            Voir le reçu
+          </button>
+        )}
       </div>
     </div>
   )
@@ -258,7 +296,7 @@ const PaymentPage: React.FC = () => {
             <h3 className="text-sm font-semibold text-foreground">Historique des paiements</h3>
           </div>
           <div className="px-5">
-            {payments.map(p => <PaymentRow key={p.id} payment={p} />)}
+            {payments.map(p => <PaymentRow key={p.id} payment={p} orgId={orgId ?? ''} />)}
           </div>
         </div>
       )}

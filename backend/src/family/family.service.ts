@@ -102,7 +102,16 @@ export class FamilyService {
       where: { parent_id_child_id: { parent_id: parentId, child_id: childId } },
     });
 
-    return { message: 'Lien familial supprimé' };
+    const otherParents = await this.prisma.familyLink.count({ where: { child_id: childId } });
+    if (otherParents === 0) {
+      await this.prisma.childHealthInfo.deleteMany({ where: { child_id: childId } });
+      await this.prisma.childAuthorization.deleteMany({ where: { child_id: childId } });
+      await this.prisma.memberDocument.deleteMany({ where: { user_id: childId } });
+      await this.prisma.membership.deleteMany({ where: { user_id: childId } });
+      await this.prisma.user.delete({ where: { id: childId } });
+    }
+
+    return { message: 'Enfant supprimé' };
   }
 
   async enrollChild(parentId: string, childId: string, dto: EnrollChildDto) {
@@ -123,7 +132,7 @@ export class FamilyService {
     }
 
     const memberRole = await this.prisma.role.findFirst({
-      where: { type: 'member' },
+      where: { type: 'member', space: organisation.type === 'sport' ? 'club_360' : 'municipality' },
     });
     if (!memberRole) {
       throw new BadRequestException('Rôle membre introuvable');

@@ -115,4 +115,15 @@ export class SeasonsController {
     const dto = CloseSeasonSchema.parse(body) as CloseSeasonDto
     return this.service.close(orgId, seasonId, dto, this.userId(req))
   }
+
+  /** POST /organisations/:orgId/seasons/:seasonId/send-renewal */
+  @Post(':seasonId/send-renewal')
+  @HttpCode(HttpStatus.OK)
+  sendRenewal(
+    @Param('orgId') orgId: string,
+    @Param('seasonId') seasonId: string,
+    @Req() req: Request,
+  ) {
+    return this.service.sendRenewal(orgId, seasonId, this.userId(req))
+  }
 }

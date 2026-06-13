@@ -514,7 +514,7 @@ const ChildDetailPage: React.FC = () => {
       setLoading(true)
       setError(null)
       const [kids, healthData, authData, orgsRaw] = await Promise.all([
-        api.get<Child[]>('/family/children'),
+        api.get<Child[]>('/family/children', undefined, { useCache: false }),
         api.get<HealthInfo>(`/family/children/${childId}/health`),
         api.get<Authorization[]>(`/family/children/${childId}/authorizations`),
         api.get<Array<{ organisation: { id: string; name: string; type: string } }>>('/users/me/organisations').catch(() => []),
@@ -525,7 +525,8 @@ const ChildDetailPage: React.FC = () => {
       setEditForm({ firstname: found.firstname, lastname: found.lastname, birthdate: found.birthdate ? found.birthdate.slice(0, 10) : '', gender: found.gender || 'male', phone: found.phone || '', avatar_url: found.avatar_url || '' })
       setHealthForm(healthData)
       setAuthorizations(authData)
-      setOrganisations(orgsRaw.map((o) => o.organisation))
+      const seenIds = new Set<string>()
+      setOrganisations(orgsRaw.map((o) => o.organisation).filter((o) => { if (seenIds.has(o.id)) return false; seenIds.add(o.id); return true }))
     } catch {
       setError('Impossible de charger les données.')
     } finally {

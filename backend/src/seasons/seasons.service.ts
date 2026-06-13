@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -12,7 +13,10 @@ import type { CreateSeasonDto, UpdateSeasonDto, CloseSeasonDto } from './dto/sea
 
 @Injectable()
 export class SeasonsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
 
   // ── Role assertions ──────────────────────────────────────────────────────────
 
@@ -89,22 +93,40 @@ export class SeasonsService {
       return [];
     }
 
-    const activeCounts = await this.prisma.membership.groupBy({
-      by: ['season_id'],
-      where: {
-        organisation_id: orgId,
-        season_id: { in: seasons.map((s) => s.id) },
-        status: 'active',
-        deleted_at: null,
-      },
-      _count: { _all: true },
-    });
+    const seasonIds = seasons.map((s) => s.id);
 
-    const countMap = new Map(activeCounts.map((c) => [c.season_id, c._count._all]));
+    const [activeCounts, expiredCounts, renewalLogs] = await Promise.all([
+      this.prisma.membership.groupBy({
+        by: ['season_id'],
+        where: { organisation_id: orgId, season_id: { in: seasonIds }, status: 'active', deleted_at: null },
+        _count: { _all: true },
+      }),
+      this.prisma.membership.groupBy({
+        by: ['season_id'],
+        where: { organisation_id: orgId, season_id: { in: seasonIds }, status: 'expired', deleted_at: null },
+        _count: { _all: true },
+      }),
+      this.prisma.renewalLog.findMany({
+        where: { organisation_id: orgId, season_id: { in: seasonIds } },
+        orderBy: { sent_at: 'desc' },
+      }),
+    ]);
+
+    const activeCountMap   = new Map(activeCounts.map((c) => [c.season_id, c._count._all]));
+    const expiredCountMap  = new Map(expiredCounts.map((c) => [c.season_id, c._count._all]));
+
+    const lastRenewalMap = new Map<string, { sent_at: Date; members_count: number }>();
+    for (const log of renewalLogs) {
+      if (!lastRenewalMap.has(log.season_id)) {
+        lastRenewalMap.set(log.season_id, { sent_at: log.sent_at, members_count: log.members_count });
+      }
+    }
 
     return seasons.map((s) => ({
       ...s,
-      active_members_count: countMap.get(s.id) ?? 0,
+      active_members_count:  activeCountMap.get(s.id)  ?? 0,
+      expired_members_count: expiredCountMap.get(s.id) ?? 0,
+      last_renewal_log:      lastRenewalMap.get(s.id)  ?? null,
     }));
   }
 
@@ -283,6 +305,48 @@ export class SeasonsService {
     });
 
     return season ?? null;
+  }
+
+  // ── Send renewal invitations ──────────────────────────────────────────────────
+
+  async sendRenewal(orgId: string, seasonId: string, userId: string) {
+    await this.assertIsOwner(orgId, userId);
+    const season = await this.findOrFail(seasonId, orgId);
+
+    if (season.is_active) {
+      throw new BadRequestException('Impossible d\'envoyer des renouvellements pour une saison active.');
+    }
+
+    const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:5173').replace(/\/+$/, '');
+
+    const expiredMemberships = await this.prisma.membership.findMany({
+      where: { organisation_id: orgId, season_id: seasonId, status: 'expired', deleted_at: null },
+      include: { user: { select: { email: true } } },
+    });
+
+    for (const m of expiredMemberships) {
+      console.log(
+        `[Season ${seasonId}] RENEWAL EMAIL would be sent to ${m.user.email} with link ${frontendUrl}/club/${orgId}/payment`
+      );
+    }
+
+    await this.prisma.renewalLog.create({
+      data: { organisation_id: orgId, season_id: seasonId, members_count: expiredMemberships.length },
+    });
+
+    return { sent: expiredMemberships.length, season_name: season.name };
+  }
+
+  // ── List renewal logs ─────────────────────────────────────────────────────────
+
+  async getRenewals(orgId: string, userId: string) {
+    await this.assertIsAdmin(orgId, userId);
+
+    return this.prisma.renewalLog.findMany({
+      where: { organisation_id: orgId },
+      include: { season: { select: { id: true, name: true } } },
+      orderBy: { sent_at: 'desc' },
+    });
   }
 
   // ── Mine (membership history) ─────────────────────────────────────────────────

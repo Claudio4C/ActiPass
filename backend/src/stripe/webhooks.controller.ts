@@ -99,6 +99,17 @@ export class WebhooksController {
       });
     }
 
+    // ── charge.refunded ───────────────────────────────────────────────────────
+    if (event.type === 'charge.refunded') {
+      const charge = event.data.object as { payment_intent: string | null };
+      if (charge.payment_intent) {
+        await this.prisma.payment.updateMany({
+          where: { stripe_payment_intent_id: charge.payment_intent },
+          data: { status: 'refunded' },
+        });
+      }
+    }
+
     return { received: true };
   }
 }
