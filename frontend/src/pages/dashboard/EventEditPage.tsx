@@ -26,6 +26,7 @@ const EventEditPage: React.FC = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [event, setEvent] = useState<Event | null>(null);
   const [formData, setFormData] = useState({
     title: '',
@@ -82,17 +83,22 @@ const EventEditPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!organisationId || !eventId) { return }
+    setSaveError(null);
     try {
       setSaving(true);
       await api.put(`/organisations/${organisationId}/events/${eventId}`, {
         ...formData,
         capacity: formData.capacity ? parseInt(formData.capacity) : undefined,
         price: parseFloat(formData.price) || 0,
+        registration_required: formData.registration_required || registrationForced,
       });
       api.clearCache(`/organisations/${organisationId}/events`);
       navigate(`/dashboard/${organisationId}/events/${eventId}`);
-    } catch {
-      // erreur silencieuse — naviguer reste possible
+    } catch (err) {
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        'Erreur lors de la sauvegarde';
+      setSaveError(msg);
     } finally {
       setSaving(false);
     }
@@ -105,6 +111,13 @@ const EventEditPage: React.FC = () => {
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
     }));
   };
+
+  const registrationForced =
+    parseFloat(formData.price) > 0 || (formData.capacity !== '' && parseInt(formData.capacity) > 0)
+
+  const registrationForcedReason = parseFloat(formData.price) > 0
+    ? 'événement payant'
+    : 'capacité limitée'
 
   if (loading) {
     return (
@@ -260,17 +273,24 @@ const EventEditPage: React.FC = () => {
           </Field>
 
           <div className="space-y-3 pt-1">
-            <label className="flex items-center gap-3 cursor-pointer">
+            <label className={`flex items-center gap-3 ${registrationForced ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
               <div
-                onClick={() => setFormData((p) => ({ ...p, registration_required: !p.registration_required }))}
-                className={`w-11 h-6 rounded-full transition-colors shrink-0 flex items-center px-0.5 ${formData.registration_required ? 'bg-primary' : 'bg-border'}`}
+                onClick={() => !registrationForced && setFormData((p) => ({ ...p, registration_required: !p.registration_required }))}
+                className={`w-11 h-6 rounded-full transition-colors shrink-0 flex items-center px-0.5 ${formData.registration_required || registrationForced ? 'bg-primary' : 'bg-border'} ${registrationForced ? 'opacity-70' : ''}`}
               >
-                <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${formData.registration_required ? 'translate-x-5' : 'translate-x-0'}`} />
+                <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${formData.registration_required || registrationForced ? 'translate-x-5' : 'translate-x-0'}`} />
               </div>
-              <span className="text-sm text-foreground font-medium">Inscription requise</span>
+              <span className="text-sm text-foreground font-medium">
+                Inscription requise
+                {registrationForced && (
+                  <span className="ml-1.5 text-[11px] font-bold text-primary/70 uppercase tracking-wide">
+                    — imposé ({registrationForcedReason})
+                  </span>
+                )}
+              </span>
             </label>
 
-            {event.is_recurring && (
+            {(event.is_recurring || !!event.parent_event_id) && (
               <label className="flex items-center gap-3 cursor-pointer">
                 <div
                   onClick={() => setFormData((p) => ({ ...p, apply_to_all_occurrences: !p.apply_to_all_occurrences }))}
@@ -283,6 +303,13 @@ const EventEditPage: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* Save error */}
+        {saveError && (
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3">
+            <p className="text-sm font-semibold text-destructive">{saveError}</p>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex gap-3 pb-8">

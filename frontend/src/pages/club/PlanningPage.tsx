@@ -673,7 +673,16 @@ const PlanningPage: React.FC = () => {
         </>
       )}
 
-      <EventDetailSheet event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+      <EventDetailSheet
+        event={selectedEvent}
+        onClose={() => setSelectedEvent(null)}
+        onRegistrationChange={(eventId, reservation) => {
+          setMyEvents(prev => prev.map(e =>
+            e.id === eventId ? { ...e, myReservation: reservation } : e,
+          ))
+          if (orgId) { api.clearCache(`/organisations/${orgId}/events`) }
+        }}
+      />
     </div>
   )
 }

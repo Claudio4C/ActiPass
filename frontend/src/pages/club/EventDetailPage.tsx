@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Calendar, Clock, MapPin, Users, Euro,
-  CheckCircle2, Clock3, XCircle, AlertCircle, UserPlus, Plane,
+  CheckCircle2, Clock3, XCircle, AlertCircle, UserPlus, UserMinus, Plane,
+  CreditCard, Receipt, Loader2,
 } from 'lucide-react'
 import { api } from '../../lib/api'
 import { useAuth } from '../../contexts/AuthContext'
@@ -12,9 +13,17 @@ import type { Event, EventType } from '../../types'
 // ─── types ───────────────────────────────────────────────────────────────────
 
 interface EventWithRegistration extends Event {
-  myReservation?: { id: string; status: 'confirmed' | 'pending' | 'cancelled' }
+  myReservation?: { id: string; status: 'confirmed' | 'pending' | 'cancelled'; waitlist_position?: number | null }
   current_registrations?: number
   available_spots?: number | null
+}
+
+interface EventPayment {
+  id: string
+  status: 'paid' | 'pending' | 'failed' | 'refunded' | 'cancelled'
+  amount: number
+  paid_at: string | null
+  stripe_session_id: string | null
 }
 
 // ─── meta ────────────────────────────────────────────────────────────────────
@@ -48,7 +57,11 @@ const EventDetailPage: React.FC = () => {
   const [event, setEvent]       = useState<EventWithRegistration | null>(null)
   const [loading, setLoading]   = useState(true)
   const [error, setError]       = useState<string | null>(null)
-  const [registering, setRegistering] = useState(false)
+  const [registering, setRegistering]     = useState(false)
+  const [unregistering, setUnregistering] = useState(false)
+  const [myPayment, setMyPayment]   = useState<EventPayment | null>(null)
+  const [checkingOut, setCheckingOut] = useState(false)
+  const [loadingReceipt, setLoadingReceipt] = useState(false)
 
   // Org from localStorage
   useEffect(() => {
@@ -84,10 +97,63 @@ const EventDetailPage: React.FC = () => {
         `/organisations/${orgId}/events/${eventId}`,
       )
       setEvent(data)
+      // Charge le paiement uniquement pour les événements payants
+      if (data.price > 0) {
+        const payment = await api
+          .get<EventPayment | null>(
+            `/organisations/${orgId}/events/${eventId}/my-payment`,
+            undefined,
+            { useCache: false },
+          )
+          .catch(() => null)
+        setMyPayment(payment)
+      } else {
+        setMyPayment(null)
+      }
     } catch {
       setError('Impossible de charger cet événement.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCheckout = async () => {
+    if (!eventId || !orgId || checkingOut) { return }
+    setCheckingOut(true)
+    setError(null)
+    try {
+      const { checkout_url } = await api.post<{ checkout_url: string }>(
+        `/organisations/${orgId}/events/${eventId}/checkout`,
+      )
+      if (checkout_url) { window.location.href = checkout_url }
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } }; message?: string })
+          ?.response?.data?.message ?? 'Impossible de démarrer le paiement.'
+      setError(msg)
+      setCheckingOut(false)
+    }
+  }
+
+  const handleViewReceipt = async () => {
+    if (!myPayment || loadingReceipt) { return }
+    setLoadingReceipt(true)
+    setError(null)
+    try {
+      const { receipt_url } = await api.get<{ receipt_url: string | null }>(
+        `/payments/${myPayment.id}/receipt-url`,
+        undefined,
+        { useCache: false },
+      )
+      if (receipt_url) {
+        window.open(receipt_url, '_blank', 'noopener,noreferrer')
+      } else {
+        setError('Reçu indisponible pour le moment.')
+      }
+    } catch {
+      setError('Impossible de récupérer le reçu.')
+    } finally {
+      setLoadingReceipt(false)
     }
   }
 
@@ -100,23 +166,22 @@ const EventDetailPage: React.FC = () => {
         message: string
         reservation: { id: string; status: 'confirmed' | 'pending' }
       }>(`/organisations/${orgId}/events/${eventId}/register`)
+      const confirmed = result.reservation.status === 'confirmed'
       setEvent(prev => {
         if (!prev) { return prev }
-        const confirmed = result.reservation.status === 'confirmed'
         return {
           ...prev,
           myReservation: result.reservation,
           current_registrations: confirmed
             ? (prev.current_registrations ?? 0) + 1
-            : (prev.current_registrations ?? 0),
+            : prev.current_registrations,
           available_spots: prev.capacity
             ? confirmed
-              ? (prev.available_spots ?? prev.capacity) - 1
-              : (prev.available_spots ?? prev.capacity)
+              ? Math.max(0, (prev.available_spots ?? prev.capacity) - 1)
+              : prev.available_spots
             : null,
         }
       })
-      await loadEvent()
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { message?: string } }; message?: string })
@@ -124,6 +189,37 @@ const EventDetailPage: React.FC = () => {
       setError(msg)
     } finally {
       setRegistering(false)
+    }
+  }
+
+  const handleUnregister = async () => {
+    if (!eventId || !event || !orgId) { return }
+    setUnregistering(true)
+    setError(null)
+    try {
+      await api.delete(`/organisations/${orgId}/events/${eventId}/register`)
+      setMyPayment(null)
+      setEvent(prev => {
+        if (!prev) { return prev }
+        const wasConfirmed = prev.myReservation?.status === 'confirmed'
+        return {
+          ...prev,
+          myReservation: undefined,
+          current_registrations: wasConfirmed
+            ? Math.max(0, (prev.current_registrations ?? 0) - 1)
+            : prev.current_registrations,
+          available_spots: wasConfirmed && prev.capacity
+            ? (prev.available_spots ?? 0) + 1
+            : prev.available_spots,
+        }
+      })
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { message?: string } }; message?: string })
+          ?.response?.data?.message ?? 'Erreur lors de la désinscription'
+      setError(msg)
+    } finally {
+      setUnregistering(false)
     }
   }
 
@@ -135,11 +231,13 @@ const EventDetailPage: React.FC = () => {
     return { label: 'Annulé', icon: XCircle, cls: 'text-muted-foreground bg-muted' }
   }
 
+  const isFull = (ev: EventWithRegistration) =>
+    !!(ev.capacity && (ev.available_spots ?? 1) <= 0)
+
   const canRegister = (ev: EventWithRegistration) =>
     ev.registration_required &&
     !ev.myReservation &&
-    ev.status === 'published' &&
-    !(ev.capacity && (ev.available_spots ?? 1) <= 0)
+    ev.status === 'published'
 
   // Back URL — toujours vers /club/:orgId/events
   const backUrl = orgId ? `/club/${orgId}/events` : '/club/members'
@@ -147,6 +245,11 @@ const EventDetailPage: React.FC = () => {
   const regStatus  = event ? getRegStatus(event) : null
   const StatusIcon = regStatus?.icon
   const typeMeta   = event ? TYPE_META[event.event_type] : null
+
+  // P3-4b — état de paiement (événements payants)
+  const isPaid             = !!event && event.price > 0
+  const hasPaidReservation = myPayment?.status === 'paid'
+  const hasPendingPayment  = myPayment?.status === 'pending'
 
   return (
     <div className="space-y-6">
@@ -292,33 +395,148 @@ const EventDetailPage: React.FC = () => {
 
               {/* Registration status */}
               {regStatus && StatusIcon && (
-                <div className={cn('inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full', regStatus.cls)}>
-                  <StatusIcon className="w-3.5 h-3.5 shrink-0" />
-                  {regStatus.label}
+                <div>
+                  <div className={cn('inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full', regStatus.cls)}>
+                    <StatusIcon className="w-3.5 h-3.5 shrink-0" />
+                    {regStatus.label}
+                  </div>
+                  {event.myReservation?.status === 'pending' && event.myReservation.waitlist_position && (
+                    <p className="text-[10px] text-amber-700 font-semibold mt-1.5 ml-1">
+                      Position #{event.myReservation.waitlist_position} dans la file d'attente
+                    </p>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Register CTA */}
-            {event.registration_required ? (
-              canRegister(event) ? (
-                <button
-                  type="button"
-                  onClick={handleRegister}
-                  disabled={registering}
-                  className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-bold py-3 rounded-full active:scale-95 transition-transform disabled:opacity-50"
-                >
-                  {registering ? (
-                    <><div className="w-4 h-4 rounded-full border-2 border-primary-foreground border-t-transparent animate-spin" /> Inscription…</>
-                  ) : (
-                    <><UserPlus className="w-4 h-4 shrink-0" /> Je m'inscris</>
-                  )}
-                </button>
-              ) : regStatus ? null : (
-                <p className="text-xs text-muted-foreground text-center">
-                  {(event.available_spots ?? 1) <= 0 ? 'Événement complet.' : 'Inscription non disponible.'}
-                </p>
-              )
+            {/* Register / Unregister CTA */}
+            {event.registration_required && isPaid ? (
+              /* ── Événement payant (P3-4b) ── */
+              <div className="space-y-2">
+                {hasPaidReservation ? (
+                  <>
+                    <div className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-700">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Place confirmée
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleViewReceipt}
+                      disabled={loadingReceipt}
+                      className="w-full inline-flex items-center justify-center gap-2 bg-card border border-border text-foreground text-sm font-semibold py-2.5 rounded-full hover:bg-muted transition-colors active:scale-95 disabled:opacity-50"
+                    >
+                      {loadingReceipt
+                        ? <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        : <Receipt className="w-4 h-4 shrink-0" />}
+                      Voir le reçu
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleUnregister}
+                      disabled={unregistering}
+                      className="w-full inline-flex items-center justify-center gap-2 bg-destructive/10 text-destructive text-sm font-semibold py-2.5 rounded-full active:scale-95 transition-transform disabled:opacity-50 border border-destructive/20"
+                    >
+                      {unregistering
+                        ? <><div className="w-4 h-4 rounded-full border-2 border-destructive border-t-transparent animate-spin" /> Annulation…</>
+                        : <><UserMinus className="w-4 h-4 shrink-0" /> Se désinscrire (remboursé)</>}
+                    </button>
+                  </>
+                ) : hasPendingPayment ? (
+                  <>
+                    <div className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-700">
+                      <Clock3 className="w-3.5 h-3.5 shrink-0" /> Paiement en attente
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Complétez votre paiement pour confirmer votre place.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleCheckout}
+                      disabled={checkingOut}
+                      className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-bold py-3 rounded-full active:scale-95 transition-transform disabled:opacity-50"
+                    >
+                      {checkingOut
+                        ? <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        : <CreditCard className="w-4 h-4 shrink-0" />}
+                      Reprendre le paiement
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleUnregister}
+                      disabled={unregistering}
+                      className="w-full inline-flex items-center justify-center gap-2 text-sm font-semibold text-destructive/70 hover:text-destructive py-2 transition-colors disabled:opacity-50"
+                    >
+                      {unregistering
+                        ? <><div className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin" /> Annulation…</>
+                        : <><UserMinus className="w-4 h-4 shrink-0" /> Annuler la réservation</>}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-display text-2xl font-bold text-foreground">
+                      {event.price.toFixed(2).replace('.', ',')} €
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleCheckout}
+                      disabled={checkingOut || !canRegister(event)}
+                      className="w-full inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground text-sm font-bold py-3 rounded-full active:scale-95 transition-transform disabled:opacity-50"
+                    >
+                      {checkingOut
+                        ? <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        : <CreditCard className="w-4 h-4 shrink-0" />}
+                      Réserver — {event.price.toFixed(2).replace('.', ',')}€
+                    </button>
+                    {!canRegister(event) && (
+                      <p className="text-xs text-muted-foreground text-center">
+                        Inscription non disponible.
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : event.registration_required ? (
+              <div className="space-y-2">
+                {canRegister(event) && (
+                  <button
+                    type="button"
+                    onClick={handleRegister}
+                    disabled={registering}
+                    className={cn(
+                      'w-full inline-flex items-center justify-center gap-2 text-sm font-bold py-3 rounded-full active:scale-95 transition-transform disabled:opacity-50',
+                      isFull(event)
+                        ? 'bg-amber-500/10 text-amber-600 border border-amber-500/30'
+                        : 'bg-primary text-primary-foreground',
+                    )}
+                  >
+                    {registering ? (
+                      <><div className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" /> Inscription…</>
+                    ) : isFull(event) ? (
+                      <><Clock3 className="w-4 h-4 shrink-0" /> Rejoindre la liste d'attente</>
+                    ) : (
+                      <><UserPlus className="w-4 h-4 shrink-0" /> Je m'inscris</>
+                    )}
+                  </button>
+                )}
+
+                {(event.myReservation?.status === 'confirmed' || event.myReservation?.status === 'pending') && (
+                  <button
+                    type="button"
+                    onClick={handleUnregister}
+                    disabled={unregistering}
+                    className="w-full inline-flex items-center justify-center gap-2 bg-destructive/10 text-destructive text-sm font-semibold py-2.5 rounded-full active:scale-95 transition-transform disabled:opacity-50 border border-destructive/20"
+                  >
+                    {unregistering ? (
+                      <><div className="w-4 h-4 rounded-full border-2 border-destructive border-t-transparent animate-spin" /> Annulation…</>
+                    ) : (
+                      <><UserMinus className="w-4 h-4 shrink-0" /> Me désinscrire</>
+                    )}
+                  </button>
+                )}
+
+                {!canRegister(event) && !event.myReservation && (
+                  <p className="text-xs text-muted-foreground text-center">Inscription non disponible.</p>
+                )}
+              </div>
             ) : (
               <p className="text-xs text-muted-foreground text-center">
                 Cet événement ne nécessite pas d'inscription.

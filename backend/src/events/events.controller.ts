@@ -145,13 +145,12 @@ export class EventsController {
   async deleteEvent(
     @Param('organisationId') organisationId: string,
     @Param('eventId') eventId: string,
+    @Query('delete_series') deleteSeries: string,
     @Req() req: Request
   ) {
     const userId = req.user?.['sub'] as string;
-    if (!userId) {
-      throw new Error('Utilisateur non authentifié');
-    }
-    return this.eventsService.deleteEvent(eventId, organisationId, userId);
+    if (!userId) { throw new Error('Utilisateur non authentifié'); }
+    return this.eventsService.deleteEvent(eventId, organisationId, userId, deleteSeries === 'true');
   }
 
   /**
@@ -181,8 +180,8 @@ export class EventsController {
   async manageWaitlist(
     @Param('organisationId') organisationId: string,
     @Param('eventId') eventId: string,
-    @Param('action') action: 'add' | 'remove',
-    @Body() body: { membershipId: string; justification?: string },
+    @Param('action') action: 'add' | 'remove' | 'promote',
+    @Body() body: { membershipId?: string; reservationId?: string; justification?: string },
     @Req() req: Request
   ) {
     const userId = req.user?.['sub'] as string;
@@ -195,7 +194,8 @@ export class EventsController {
       userId,
       action,
       body.membershipId,
-      body.justification
+      body.justification,
+      body.reservationId,
     );
   }
 
@@ -215,6 +215,51 @@ export class EventsController {
     const userId = req.user?.['sub'] as string;
     if (!userId) { throw new Error('Utilisateur non authentifié'); }
     return this.eventsService.registerToEvent(eventId, organisationId, userId);
+  }
+
+  @Delete(':eventId/reservations/:reservationId')
+  @HttpCode(HttpStatus.OK)
+  @RequireEventManage('organisation')
+  async cancelReservation(
+    @Param('organisationId') organisationId: string,
+    @Param('eventId') eventId: string,
+    @Param('reservationId') reservationId: string,
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) { throw new Error('Utilisateur non authentifié'); }
+    return this.eventsService.cancelReservation(eventId, reservationId, organisationId, userId);
+  }
+
+  /**
+   * P3-4b — Démarrer le paiement Stripe d'un événement payant
+   */
+  @Post(':eventId/checkout')
+  @HttpCode(HttpStatus.OK)
+  @RequireEventRead('organisation')
+  async checkoutEvent(
+    @Param('organisationId') organisationId: string,
+    @Param('eventId') eventId: string,
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) { throw new Error('Utilisateur non authentifié'); }
+    return this.eventsService.checkoutEvent(eventId, organisationId, userId);
+  }
+
+  /**
+   * P3-4b — Récupérer le paiement event du membre connecté
+   */
+  @Get(':eventId/my-payment')
+  @RequireEventRead('organisation')
+  async getMyEventPayment(
+    @Param('organisationId') organisationId: string,
+    @Param('eventId') eventId: string,
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) { throw new Error('Utilisateur non authentifié'); }
+    return this.eventsService.getMyEventPayment(eventId, organisationId, userId);
   }
 
   @Delete(':eventId/register')

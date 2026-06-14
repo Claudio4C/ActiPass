@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   X, Clock, MapPin, Navigation, Calendar, Sparkles,
   UserCheck, UserX, Loader2, CheckCircle2, AlertCircle, Euro,
-  Users,
+  Users, Clock3, CreditCard, Receipt,
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { api } from '../lib/api'
@@ -53,14 +54,22 @@ interface FullEvent {
   myReservation?: { id: string; status: string } | null
 }
 
+interface EventPayment {
+  id: string
+  status: 'paid' | 'pending' | 'failed' | 'refunded' | 'cancelled'
+  amount: number
+  paid_at: string | null
+  stripe_session_id: string | null
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const TYPE_META: Record<EventType, { label: string; from: string; to: string; text: string }> = {
-  training: { label: 'Entraînement', from: 'from-accent', to: 'to-accent/70', text: 'text-white' },
-  match: { label: 'Match', from: 'from-destructive', to: 'to-destructive/70', text: 'text-white' },
-  meeting: { label: 'Réunion', from: 'from-primary', to: 'to-primary/70', text: 'text-white' },
-  workshop: { label: 'Atelier', from: 'from-cat-music', to: 'to-cat-music/70', text: 'text-white' },
-  other: { label: 'Autre', from: 'from-muted-foreground', to: 'to-muted-foreground/70', text: 'text-white' },
+  training: { label: 'Entraînement', from: 'from-accent',           to: 'to-accent/70',           text: 'text-white' },
+  match:    { label: 'Match',        from: 'from-destructive',      to: 'to-destructive/70',      text: 'text-white' },
+  meeting:  { label: 'Réunion',      from: 'from-primary',          to: 'to-primary/70',          text: 'text-white' },
+  workshop: { label: 'Atelier',      from: 'from-cat-music',        to: 'to-cat-music/70',        text: 'text-white' },
+  other:    { label: 'Autre',        from: 'from-muted-foreground', to: 'to-muted-foreground/70', text: 'text-white' },
 }
 
 const fmtDate = (iso: string) =>
@@ -69,22 +78,35 @@ const fmtDate = (iso: string) =>
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
+const getErrMsg = (e: unknown, fallback: string) =>
+  (e as { response?: { data?: { message?: string } }; message?: string })?.response?.data?.message ??
+  (e as { message?: string })?.message ??
+  fallback
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const EventDetailSheet: React.FC<{
   event: SheetEvent | null
   onClose: () => void
-}> = ({ event, onClose }) => {
-  const [fullEvent,       setFullEvent]       = useState<FullEvent | null>(null)
-  const [fetchLoading,    setFetchLoading]    = useState(false)
-  const [registering,     setRegistering]     = useState(false)
-  const [regError,        setRegError]        = useState<string | null>(null)
-  const [localRegistered, setLocalRegistered] = useState<boolean | null>(null)
+  onRegistrationChange?: (eventId: string, reservation: { id: string; status: string } | null) => void
+}> = ({ event, onClose, onRegistrationChange }) => {
+  const navigate = useNavigate()
+  const [fullEvent,      setFullEvent]      = useState<FullEvent | null>(null)
+  const [fetchLoading,   setFetchLoading]   = useState(false)
+  const [acting,         setActing]         = useState(false)
+  const [regError,       setRegError]       = useState<string | null>(null)
+  const [myPayment,      setMyPayment]      = useState<EventPayment | null>(null)
+  const [checkingOut,    setCheckingOut]    = useState(false)
+  const [loadingReceipt, setLoadingReceipt] = useState(false)
+
+  // Local reservation state — overrides API data after actions (no reload)
+  const [localReg, setLocalReg] = useState<{ registered: boolean; status: 'confirmed' | 'pending' | null } | null>(null)
 
   useEffect(() => {
-    if (!event) { setFullEvent(null); setLocalRegistered(null); return }
+    if (!event) { setFullEvent(null); setLocalReg(null); setMyPayment(null); return }
     setRegError(null)
-    setLocalRegistered(null)
+    setLocalReg(null)
+    setMyPayment(null)
 
     if (event.registrationRequired !== undefined) {
       setFullEvent({
@@ -102,63 +124,142 @@ export const EventDetailSheet: React.FC<{
 
     if (!event.orgId) { return }
     setFetchLoading(true)
-    api.get<FullEvent>(`/organisations/${event.orgId}/events/${event.id}`, undefined, { useCache: false })
+    api
+      .get<FullEvent>(`/organisations/${event.orgId}/events/${event.id}`, undefined, { useCache: false })
       .then(setFullEvent)
       .catch(() => {})
       .finally(() => setFetchLoading(false))
+
+    // FIX 4 — fetch payment status for paid events
+    if ((event.price ?? 0) > 0) {
+      api
+        .get<EventPayment | null>(
+          `/organisations/${event.orgId}/events/${event.id}/my-payment`,
+          undefined,
+          { useCache: false },
+        )
+        .then(p => setMyPayment(p))
+        .catch(() => {})
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [event?.id, event?.orgId])
 
+  const goToDetail = () => {
+    if (!event?.orgId) { return }
+    navigate(`/club/events/${event.id}`)
+    onClose()
+  }
+
+  const handleCheckout = async () => {
+    if (!event?.orgId || checkingOut) { return }
+    setCheckingOut(true)
+    setRegError(null)
+    try {
+      const { checkout_url } = await api.post<{ checkout_url: string }>(
+        `/organisations/${event.orgId}/events/${event.id}/checkout`,
+      )
+      if (checkout_url) { window.location.href = checkout_url }
+    } catch (e: unknown) {
+      setRegError(getErrMsg(e, 'Impossible de démarrer le paiement.'))
+      setCheckingOut(false)
+    }
+  }
+
+  const handleViewReceipt = async () => {
+    if (!myPayment || loadingReceipt) { return }
+    setLoadingReceipt(true)
+    try {
+      const { receipt_url } = await api.get<{ receipt_url: string | null }>(
+        `/payments/${myPayment.id}/receipt-url`,
+        undefined,
+        { useCache: false },
+      )
+      if (receipt_url) { window.open(receipt_url, '_blank', 'noopener,noreferrer') }
+      else { setRegError('Reçu indisponible pour le moment.') }
+    } catch {
+      setRegError('Impossible de récupérer le reçu.')
+    } finally {
+      setLoadingReceipt(false)
+    }
+  }
+
   if (!event) { return null }
 
-  const meta = TYPE_META[event.event_type] ?? TYPE_META.other
+  const meta    = TYPE_META[event.event_type] ?? TYPE_META.other
   const isChild = event.memberId !== 'me'
   const allMembers: SheetMember[] = [
     { id: event.memberId, name: event.memberName, color: event.memberColor, avatarUrl: event.memberAvatarUrl },
     ...(event.extraMembers ?? []),
   ]
 
-  const baseRegistered = isChild ? (event.isRegistered ?? false) : !!fullEvent?.myReservation
-  const effectiveReg   = localRegistered !== null ? localRegistered : baseRegistered
-  const reservationSt  = isChild ? null : fullEvent?.myReservation?.status
-  const regRequired    = fullEvent?.registration_required ?? false
-  const isPublished    = fullEvent?.status === 'published'
-  const spotsLeft      = fullEvent?.available_spots
-  const canRegister    = regRequired && !effectiveReg && isPublished && (spotsLeft === null || spotsLeft === undefined || spotsLeft > 0)
-  const canUnregister  = regRequired && effectiveReg
-  const isFull         = regRequired && !effectiveReg && spotsLeft === 0
+  // Derive registration state — localReg takes priority over API data
+  const apiRegistered = isChild ? (event.isRegistered ?? false) : !!fullEvent?.myReservation
+  const apiStatus     = isChild ? null : (fullEvent?.myReservation?.status ?? null)
+  const isRegistered  = localReg !== null ? localReg.registered  : apiRegistered
+  const resvStatus    = localReg !== null ? localReg.status       : apiStatus
+
+  const regRequired = fullEvent?.registration_required ?? false
+  const isPublished = fullEvent?.status === 'published'
+  const spotsLeft   = localReg?.registered
+    ? (fullEvent?.available_spots != null ? fullEvent.available_spots - 1 : null)
+    : fullEvent?.available_spots
+  const isFull      = regRequired && !isRegistered && spotsLeft != null && spotsLeft <= 0
+
+  // FIX 3+4 — état paiement pour events payants (non-enfant uniquement)
+  const eventPrice        = fullEvent?.price ?? event.price ?? 0
+  const isPaidEvent       = !isChild && eventPrice > 0
+  const hasPaidPayment    = myPayment?.status === 'paid'
+  const hasPendingPayment = myPayment?.status === 'pending'
+
+  // Adjust the displayed registrations count to match local state immediately
+  const displayedRegistrations = (() => {
+    const base = fullEvent?.current_registrations ?? 0
+    if (localReg === null) { return base }
+    if (localReg.registered && localReg.status === 'confirmed') { return base + 1 }
+    if (!localReg.registered && apiStatus === 'confirmed') { return Math.max(0, base - 1) }
+    return base
+  })()
+  const canRegister = regRequired && !isRegistered && isPublished
+  const canUnregister = regRequired && isRegistered
 
   const handleRegister = async () => {
-    if (!event.orgId || registering) { return }
-    setRegistering(true); setRegError(null)
+    if (!event.orgId || acting) { return }
+    setActing(true); setRegError(null)
     try {
       if (isChild) {
         await api.post(`/family/children/${event.memberId}/events/${event.id}/register`, {})
+        setLocalReg({ registered: true, status: 'confirmed' })
+        onRegistrationChange?.(event.id, { id: '', status: 'confirmed' })
       } else {
-        await api.post(`/organisations/${event.orgId}/events/${event.id}/register`, {})
+        const result = await api.post<{ message: string; reservation: { id: string; status: 'confirmed' | 'pending' } }>(
+          `/organisations/${event.orgId}/events/${event.id}/register`, {},
+        )
+        setLocalReg({ registered: true, status: result.reservation.status })
+        onRegistrationChange?.(event.id, result.reservation)
       }
-      setLocalRegistered(true)
     } catch (e: unknown) {
-      setRegError((e as { message?: string })?.message ?? "Erreur lors de l'inscription")
+      setRegError(getErrMsg(e, "Erreur lors de l'inscription"))
     } finally {
-      setRegistering(false)
+      setActing(false)
     }
   }
 
   const handleUnregister = async () => {
-    if (!event.orgId || registering) { return }
-    setRegistering(true); setRegError(null)
+    if (!event.orgId || acting) { return }
+    setActing(true); setRegError(null)
     try {
       if (isChild) {
         await api.delete(`/family/children/${event.memberId}/events/${event.id}/register`)
       } else {
         await api.delete(`/organisations/${event.orgId}/events/${event.id}/register`)
       }
-      setLocalRegistered(false)
+      setLocalReg({ registered: false, status: null })
+      setMyPayment(null)
+      onRegistrationChange?.(event.id, null)
     } catch (e: unknown) {
-      setRegError((e as { message?: string })?.message ?? 'Erreur lors de la désinscription')
+      setRegError(getErrMsg(e, 'Erreur lors de la désinscription'))
     } finally {
-      setRegistering(false)
+      setActing(false)
     }
   }
 
@@ -208,15 +309,15 @@ export const EventDetailSheet: React.FC<{
               </button>
             </div>
 
-            {/* Badge statut dans le hero */}
+            {/* Status badge in hero */}
             {regRequired && (
-              <div className="mt-3">
-                {effectiveReg && reservationSt === 'pending' && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {isRegistered && resvStatus === 'pending' && (
                   <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-amber-500/30 text-amber-100 px-3 py-1.5 rounded-full">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" /> Liste d'attente
+                    <Clock3 className="w-3.5 h-3.5 shrink-0" /> Liste d'attente
                   </span>
                 )}
-                {effectiveReg && (reservationSt === 'confirmed' || isChild) && (
+                {isRegistered && (resvStatus === 'confirmed' || isChild) && (
                   <span className="inline-flex items-center gap-1.5 text-xs font-bold bg-emerald-500/30 text-emerald-100 px-3 py-1.5 rounded-full">
                     <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Inscrit{isChild ? ` — ${event.memberName}` : ''}
                   </span>
@@ -230,7 +331,7 @@ export const EventDetailSheet: React.FC<{
             )}
           </div>
 
-          {/* Corps scrollable */}
+          {/* Scrollable body */}
           <div className="overflow-y-auto flex-1 px-4 pb-4 pt-4 space-y-4">
 
             {fetchLoading && (
@@ -252,7 +353,7 @@ export const EventDetailSheet: React.FC<{
                   <div className="bg-muted rounded-2xl p-3 text-center">
                     <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Places</p>
                     <p className="font-display text-lg font-bold text-foreground">
-                      {fullEvent.current_registrations ?? 0}
+                      {displayedRegistrations}
                       <span className="text-muted-foreground font-normal text-sm">/{fullEvent.capacity}</span>
                     </p>
                   </div>
@@ -291,7 +392,6 @@ export const EventDetailSheet: React.FC<{
               </div>
             )}
 
-            {/* Coach — TODO: brancher quand feature coach disponible */}
             <div className="rounded-2xl border border-dashed border-border p-4 opacity-50">
               <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Coach de séance</p>
               <p className="text-sm text-muted-foreground flex items-center gap-2">
@@ -305,7 +405,8 @@ export const EventDetailSheet: React.FC<{
               </div>
             )}
 
-            <div className={cn('grid gap-3', event.location && (canRegister || canUnregister) ? 'grid-cols-2' : 'grid-cols-1')}>
+            {/* CTAs */}
+            <div className="grid gap-3">
               {event.location && (
                 <a
                   href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`}
@@ -318,30 +419,110 @@ export const EventDetailSheet: React.FC<{
                 </a>
               )}
 
-              {canRegister && (
-                <button
-                  onClick={handleRegister}
-                  disabled={registering}
-                  className="h-12 inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-2xl font-bold text-sm hover:opacity-90 active:scale-95 transition-transform shadow-lg shadow-primary/25 disabled:opacity-50"
-                >
-                  {registering
-                    ? <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                    : <UserCheck className="w-4 h-4 shrink-0" />}
-                  {registering ? 'Inscription…' : `S'inscrire${isChild ? ` — ${event.memberName}` : ''}`}
-                </button>
-              )}
+              {/* FIX 3+4 — événement payant */}
+              {isPaidEvent ? (
+                hasPaidPayment ? (
+                  <>
+                    <div className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-700 self-start">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> Place confirmée
+                    </div>
+                    <button
+                      onClick={handleViewReceipt}
+                      disabled={loadingReceipt}
+                      className="h-12 inline-flex items-center justify-center gap-2 border border-border rounded-2xl text-foreground font-bold text-sm hover:bg-muted transition-colors active:scale-95 disabled:opacity-50"
+                    >
+                      {loadingReceipt
+                        ? <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        : <Receipt className="w-4 h-4 shrink-0" />}
+                      Voir le reçu
+                    </button>
+                    <button
+                      onClick={handleUnregister}
+                      disabled={acting}
+                      className="h-12 inline-flex items-center justify-center gap-2 border border-destructive/30 bg-destructive/5 text-destructive rounded-2xl font-bold text-sm hover:bg-destructive/10 active:scale-95 transition-transform disabled:opacity-50"
+                    >
+                      {acting
+                        ? <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        : <UserX className="w-4 h-4 shrink-0" />}
+                      {acting ? 'Annulation…' : 'Se désinscrire (remboursé)'}
+                    </button>
+                  </>
+                ) : hasPendingPayment ? (
+                  <>
+                    <div className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full bg-amber-500/10 text-amber-700 self-start">
+                      <Clock3 className="w-3.5 h-3.5 shrink-0" /> Paiement en attente
+                    </div>
+                    <p className="text-xs text-muted-foreground -mt-1">
+                      Complétez votre paiement pour confirmer votre place.
+                    </p>
+                    <button
+                      onClick={handleCheckout}
+                      disabled={checkingOut}
+                      className="h-12 inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-2xl font-bold text-sm active:scale-95 transition-transform disabled:opacity-50 shadow-lg shadow-primary/25"
+                    >
+                      {checkingOut
+                        ? <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        : <CreditCard className="w-4 h-4 shrink-0" />}
+                      Compléter le paiement
+                    </button>
+                    <button
+                      onClick={handleUnregister}
+                      disabled={acting}
+                      className="h-10 inline-flex items-center justify-center gap-2 text-sm font-semibold text-destructive/70 hover:text-destructive transition-colors disabled:opacity-50"
+                    >
+                      {acting ? <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" /> : <UserX className="w-3.5 h-3.5 shrink-0" />}
+                      {acting ? 'Annulation…' : 'Annuler la réservation'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={goToDetail}
+                    disabled={!isPublished}
+                    className="h-12 inline-flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-2xl font-bold text-sm active:scale-95 transition-transform disabled:opacity-50 shadow-lg shadow-primary/25"
+                  >
+                    <CreditCard className="w-4 h-4 shrink-0" />
+                    Réserver — {eventPrice.toFixed(2).replace('.', ',')}€
+                  </button>
+                )
+              ) : (
+                <>
+                  {canRegister && (
+                    <button
+                      onClick={handleRegister}
+                      disabled={acting}
+                      className={cn(
+                        'h-12 inline-flex items-center justify-center gap-2 rounded-2xl font-bold text-sm active:scale-95 transition-transform disabled:opacity-50',
+                        isFull
+                          ? 'bg-amber-500/10 text-amber-700 border border-amber-500/30 hover:bg-amber-500/20'
+                          : 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:opacity-90',
+                      )}
+                    >
+                      {acting
+                        ? <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        : isFull
+                          ? <AlertCircle className="w-4 h-4 shrink-0" />
+                          : <UserCheck className="w-4 h-4 shrink-0" />}
+                      {acting
+                        ? 'En cours…'
+                        : isFull
+                          ? "Liste d'attente"
+                          : `S'inscrire${isChild ? ` — ${event.memberName}` : ''}`}
+                    </button>
+                  )}
 
-              {canUnregister && (
-                <button
-                  onClick={handleUnregister}
-                  disabled={registering}
-                  className="h-12 inline-flex items-center justify-center gap-2 border border-destructive/30 bg-destructive/5 text-destructive rounded-2xl font-bold text-sm hover:bg-destructive/10 active:scale-95 transition-transform disabled:opacity-50"
-                >
-                  {registering
-                    ? <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-                    : <UserX className="w-4 h-4 shrink-0" />}
-                  {registering ? 'Désinscription…' : 'Se désinscrire'}
-                </button>
+                  {canUnregister && (
+                    <button
+                      onClick={handleUnregister}
+                      disabled={acting}
+                      className="h-12 inline-flex items-center justify-center gap-2 border border-destructive/30 bg-destructive/5 text-destructive rounded-2xl font-bold text-sm hover:bg-destructive/10 active:scale-95 transition-transform disabled:opacity-50"
+                    >
+                      {acting
+                        ? <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                        : <UserX className="w-4 h-4 shrink-0" />}
+                      {acting ? 'Désinscription…' : 'Se désinscrire'}
+                    </button>
+                  )}
+                </>
               )}
             </div>
 

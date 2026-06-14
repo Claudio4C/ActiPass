@@ -49,12 +49,17 @@ export class CreateEventDto {
   price?: number;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  cancellation_deadline_hours?: number;
+
+  @IsOptional()
   @IsBoolean()
   is_recurring?: boolean;
 
   @IsOptional()
   @IsString()
-  recurrence_pattern?: string; // JSON string pour la récurrence
+  recurrence_pattern?: string;
 
   @IsOptional()
   @IsEnum(EventStatus)

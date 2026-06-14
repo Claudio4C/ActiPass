@@ -47,6 +47,7 @@ import NewsDetailPage from '../pages/club/NewsDetailPage'
 import PlanningPage from '../pages/club/PlanningPage'
 import EventsPageClub from '../pages/club/EventsPage'
 import EventDetailPageClub from '../pages/club/EventDetailPage'
+import EventPaymentSuccessPage from '../pages/club/EventPaymentSuccessPage'
 import CreateTripPage from '../pages/club/CreateTripPage'
 import TripViewPage from '../pages/club/TripViewPage'
 import LoyaltyPage from '../pages/club/LoyaltyPage'
@@ -218,6 +219,7 @@ const AppContent: React.FC<{
           <Route path="/club/:orgId/notifications" element={<ComingSoon title="Notifications" description="Vos notifications seront disponibles prochainement." />} />
           <Route path="/club/:orgId/payment" element={<PaymentPage />} />
           <Route path="/club/:orgId/payment/success" element={<PaymentSuccessPage />} />
+          <Route path="/club/:orgId/events/:eventId/payment-success" element={<EventPaymentSuccessPage />} />
           <Route path="/club/:orgId/payment/cancel" element={<PaymentCancelPage />} />
           <Route path="/club/:orgId/abonnements" element={<ComingSoon title="Abonnements & paiements" description="La gestion des abonnements sera disponible prochainement." />} />
           <Route path="/club/:orgId/fidelite" element={<ComingSoon title="Fidélité" description="Votre programme de fidélité sera disponible prochainement." />} />

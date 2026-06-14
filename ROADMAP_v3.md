@@ -145,17 +145,17 @@
 
 | ID | User Story | Critères d'acceptation | Front | Back |
 |----|-----------|------------------------|-------|------|
-| P3-1 | Créer un événement récurrent | Récurrence : quotidienne, hebdomadaire, mensuelle. Modifier une occurrence ou la série. | — | — |
-| P3-2 | Réserver sa place à un événement | Bouton "Réserver", confirmation email, annulation jusqu'à X heures avant. | — | — |
-| P3-3 | Capacité maximale d'un événement | Places max configurables, compteur visible. | — | — |
-| P3-4b | Événements payants | Prix d'entrée sur un event, Stripe Checkout, club encaisse (ex-P2-15). | — | — |
+| P3-1 | Créer un événement récurrent | Récurrence : quotidienne, hebdomadaire, mensuelle. Modifier une occurrence ou la série. | ✅ | ✅ |
+| P3-2 | Réserver sa place à un événement | Bouton "Réserver", confirmation email, annulation jusqu'à X heures avant. | ✅ | — |
+| P3-3 | Capacité maximale d'un événement | Places max configurables, compteur visible. | ✅ | ✅ |
+| P3-4b | Événements payants | Prix d'entrée sur un event, Stripe Checkout, club encaisse (ex-P2-15). | ✅ | ✅ |
 
 ## Epic 3.2 — Liste d'attente
 
 | ID | User Story | Critères d'acceptation | Front | Back |
 |----|-----------|------------------------|-------|------|
-| P3-4 | Rejoindre la liste d'attente | Bouton si event complet, position visible, notification si place libre. | — | — |
-| P3-5 | Gérer la liste d'attente (admin) | Vue par événement, promotion manuelle ou automatique. | — | — |
+| P3-4 | Rejoindre la liste d'attente | Bouton si event complet, position visible, notification si place libre. | ✅ | ✅ |
+| P3-5 | Gérer la liste d'attente (admin) | Vue par événement, promotion manuelle ou automatique. | ✅ | ✅ |
 
 ## Epic 3.3 — Présences & QR Code
 

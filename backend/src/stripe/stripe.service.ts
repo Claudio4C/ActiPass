@@ -17,9 +17,8 @@ export class StripeService {
     return this.stripe;
   }
 
-  // Returns the raw Stripe Event (type inferred from SDK)
-  constructEvent(payload: Buffer, sig: string) {
-    const secret = this.config.getOrThrow<string>('STRIPE_WEBHOOK_SECRET');
-    return this.stripe.webhooks.constructEvent(payload, sig, secret);
+  constructEvent(payload: Buffer, sig: string, secret?: string) {
+    const webhookSecret = secret ?? this.config.getOrThrow<string>('STRIPE_WEBHOOK_SECRET');
+    return this.stripe.webhooks.constructEvent(payload, sig, webhookSecret);
   }
 }

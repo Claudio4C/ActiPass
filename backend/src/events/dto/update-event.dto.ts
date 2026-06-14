@@ -45,6 +45,11 @@ export class UpdateEventDto {
   price?: number;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  cancellation_deadline_hours?: number;
+
+  @IsOptional()
   @IsBoolean()
   is_recurring?: boolean;
 

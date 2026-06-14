@@ -292,6 +292,7 @@ model Event {
   capacity              Int?
   registration_required Boolean            @default(false)
   price                 Float              @default(0)
+  cancellation_deadline_hours Int?
   is_recurring          Boolean            @default(false)
   recurrence_pattern    String? // JSON string pour la récurrence
   status                EventStatus        @default(draft)

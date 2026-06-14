@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import {
   ArrowLeft, Edit, Trash2, Calendar, MapPin, Users, Euro,
-  Clock, X, CheckCircle2, AlertCircle, Eye, UserCheck,
+  Clock, X, CheckCircle2, AlertCircle, ChevronUp, Loader2,
 } from 'lucide-react'
 import RoleBasedRoute from '../../components/shared/RoleBasedRoute'
 import { api } from '../../lib/api'
@@ -13,6 +13,16 @@ import type { Event, Reservation } from '../../types'
 
 const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+
+const fmtDateShort = (iso: string) =>
+  new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+
+const AVATAR_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316']
+const avatarColor = (name: string) =>
+  AVATAR_COLORS[name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % AVATAR_COLORS.length]
+
+const initials = (first: string, last: string) =>
+  `${first[0] ?? ''}${last[0] ?? ''}`.toUpperCase()
 
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -42,6 +52,8 @@ const EventDetailPage: React.FC = () => {
   const [cancelReason, setCancelReason]       = useState('')
   const [refundAuto, setRefundAuto]           = useState(true)
   const [cancelling, setCancelling]           = useState(false)
+  const [waitlistActing, setWaitlistActing]   = useState<string | null>(null)
+  const [toast, setToast]                     = useState('')
 
   useEffect(() => {
     if (organisationId && eventId) { loadData() }
@@ -90,6 +102,86 @@ const EventDetailPage: React.FC = () => {
     } finally {
       setCancelling(false)
     }
+  }
+
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(''), 3000)
+  }
+
+  const getApiErr = (err: unknown, fallback: string) =>
+    (err as { response?: { data?: { message?: string } } })?.response?.data?.message ?? fallback
+
+  const handlePromote = async (reservationId: string) => {
+    if (!organisationId || !eventId) { return }
+    setWaitlistActing(reservationId)
+    try {
+      await api.post(
+        `/organisations/${organisationId}/events/${eventId}/waitlist/promote`,
+        { reservationId },
+      )
+      showToast('Membre promu avec succès ✓')
+      await loadData()
+    } catch (err) {
+      showToast(getApiErr(err, 'Erreur lors de la promotion'))
+    } finally {
+      setWaitlistActing(null)
+    }
+  }
+
+  const handleRemoveFromWaitlist = async (reservationId: string, membershipId: string) => {
+    if (!organisationId || !eventId) { return }
+    setWaitlistActing(reservationId)
+    try {
+      await api.post(
+        `/organisations/${organisationId}/events/${eventId}/waitlist/remove`,
+        { membershipId },
+      )
+      showToast('Membre retiré de la liste d\'attente')
+      await loadData()
+    } catch (err) {
+      showToast(getApiErr(err, 'Erreur lors du retrait'))
+    } finally {
+      setWaitlistActing(null)
+    }
+  }
+
+  const handleCancelReservation = async (reservationId: string) => {
+    if (!organisationId || !eventId) { return }
+    setWaitlistActing(reservationId)
+    try {
+      await api.delete(
+        `/organisations/${organisationId}/events/${eventId}/reservations/${reservationId}`,
+      )
+      showToast('Place libérée')
+      setWaitlistData(prev => {
+        if (!prev) { return prev }
+        return {
+          ...prev,
+          confirmed: prev.confirmed.filter(r => r.id !== reservationId),
+          event: {
+            ...prev.event,
+            current_registrations: Math.max(0, prev.event.current_registrations - 1),
+            available_spots: prev.event.available_spots != null ? prev.event.available_spots + 1 : null,
+          },
+        }
+      })
+      setEvent(prev => prev ? {
+        ...prev,
+        current_registrations: Math.max(0, (prev.current_registrations ?? 0) - 1),
+        available_spots: prev.available_spots != null ? prev.available_spots + 1 : null,
+      } : prev)
+    } catch (err) {
+      showToast(getApiErr(err, 'Erreur lors de la libération'))
+    } finally {
+      setWaitlistActing(null)
+    }
+  }
+
+  const handlePromoteFirst = async () => {
+    const first = waitlistData?.waitlist[0]
+    if (!first) { return }
+    await handlePromote(first.id)
   }
 
   if (loading) {
@@ -214,69 +306,151 @@ const EventDetailPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Participants */}
+            {/* Inscrits confirmés */}
             {waitlistData && (
               <div className="bg-card border border-border rounded-2xl p-5">
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold mb-4">
-                  Participants & liste d'attente
-                </p>
-
-                {/* Confirmed */}
-                <div className="mb-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />
-                    <p className="text-sm font-semibold text-foreground">
-                      Confirmés ({waitlistData.confirmed.length})
-                    </p>
+                <div className="flex items-center gap-2 mb-4">
+                  <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold flex-1">
+                    Inscrits confirmés
+                  </p>
+                  <span className="text-[11px] font-bold text-accent bg-accent/10 px-2.5 py-0.5 rounded-full">
+                    {waitlistData.confirmed.length}
+                  </span>
+                </div>
+                {waitlistData.confirmed.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+                    Aucun participant confirmé
                   </div>
-                  {waitlistData.confirmed.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Aucun participant confirmé</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {waitlistData.confirmed.map(r => (
-                        <div key={r.id} className="flex items-center justify-between p-3 bg-accent/5 rounded-xl border border-accent/15">
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">
-                              {r.membership?.user.firstname} {r.membership?.user.lastname}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{r.membership?.user.email}</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {waitlistData.confirmed.map(r => {
+                      const first = r.membership?.user.firstname ?? ''
+                      const last  = r.membership?.user.lastname ?? ''
+                      const name  = `${first} ${last}`.trim()
+                      return (
+                        <li key={r.id} className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-border">
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                            style={{ backgroundColor: avatarColor(name || 'A') }}
+                          >
+                            {initials(first, last)}
                           </div>
-                          <span className="text-[11px] font-bold text-accent bg-accent/10 px-2 py-0.5 rounded-full">Confirmé</span>
-                        </div>
-                      ))}
-                    </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-foreground truncate">{name}</p>
+                            <p className="text-[11px] text-muted-foreground truncate">{r.membership?.user.email}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[11px] font-bold text-accent bg-accent/10 px-2 py-0.5 rounded-full">
+                              Confirmé
+                            </span>
+                            {waitlistData.can_manage_capacity && (
+                              <button
+                                type="button"
+                                disabled={!!waitlistActing}
+                                onClick={() => handleCancelReservation(r.id)}
+                                className="inline-flex items-center text-[11px] font-bold text-destructive px-2 py-0.5 rounded-full bg-destructive/10 active:scale-95 transition-transform disabled:opacity-50"
+                              >
+                                {waitlistActing === r.id
+                                  ? <Loader2 className="w-3 h-3 animate-spin" />
+                                  : 'Libérer'}
+                              </button>
+                            )}
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* Liste d'attente */}
+            {waitlistData && event.capacity && (
+              <div className="bg-card border border-border rounded-2xl p-5">
+                {/* Header */}
+                <div className="flex items-center gap-2 mb-4">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold flex-1">
+                    Liste d'attente
+                  </p>
+                  {waitlistData.waitlist.length > 0 && (
+                    <>
+                      <span className="text-[11px] font-bold text-amber-700 bg-amber-500/15 px-2.5 py-0.5 rounded-full">
+                        {waitlistData.waitlist.length} en attente
+                      </span>
+                      {waitlistData.can_manage_capacity && (
+                        <button
+                          type="button"
+                          disabled={!!waitlistActing}
+                          onClick={handlePromoteFirst}
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-500/15 px-3 py-1.5 rounded-full active:scale-95 transition-transform disabled:opacity-50"
+                        >
+                          {waitlistActing === waitlistData.waitlist[0]?.id
+                            ? <Loader2 className="w-3 h-3 shrink-0 animate-spin" />
+                            : <ChevronUp className="w-3 h-3 shrink-0" />}
+                          Promouvoir le premier
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
 
-                {/* Waitlist */}
-                {waitlistData.waitlist.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-3">
-                      <Eye className="w-4 h-4 text-amber-600 shrink-0" />
-                      <p className="text-sm font-semibold text-foreground">
-                        Liste d'attente ({waitlistData.waitlist.length})
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      {waitlistData.waitlist.map((r, i) => (
-                        <div key={r.id} className="flex items-center justify-between p-3 bg-amber-500/5 rounded-xl border border-amber-500/15">
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">
-                              {r.membership?.user.firstname} {r.membership?.user.lastname}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {r.membership?.user.email} · #{i + 1}
+                {waitlistData.waitlist.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+                    Aucun membre en liste d'attente
+                  </div>
+                ) : (
+                  <ul className="space-y-2">
+                    {waitlistData.waitlist.map((r, i) => {
+                      const first = r.membership?.user.firstname ?? ''
+                      const last  = r.membership?.user.lastname ?? ''
+                      const name  = `${first} ${last}`.trim()
+                      const isActing = waitlistActing === r.id
+                      return (
+                        <li key={r.id} className="flex items-center gap-3 p-3 rounded-2xl bg-card border border-border">
+                          {/* Position */}
+                          <span className="w-7 h-7 rounded-full bg-amber-500/15 text-amber-700 text-xs font-bold flex items-center justify-center shrink-0">
+                            {i + 1}
+                          </span>
+                          {/* Avatar */}
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                            style={{ backgroundColor: avatarColor(name || 'A') }}
+                          >
+                            {initials(first, last)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-foreground truncate">{name}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              En attente depuis {fmtDateShort(r.created_at)}
                             </p>
                           </div>
                           {waitlistData.can_manage_capacity && (
-                            <button className="inline-flex items-center gap-1 text-xs font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-full hover:bg-primary/20 transition-colors">
-                              <UserCheck className="w-3 h-3 shrink-0" /> Confirmer
-                            </button>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                disabled={!!waitlistActing}
+                                onClick={() => handlePromote(r.id)}
+                                className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 px-2.5 py-1 rounded-full bg-emerald-500/15 active:scale-95 transition-transform disabled:opacity-50"
+                              >
+                                {isActing
+                                  ? <Loader2 className="w-3 h-3 animate-spin" />
+                                  : 'Promouvoir'}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={!!waitlistActing}
+                                onClick={() => handleRemoveFromWaitlist(r.id, r.membership_id)}
+                                className="inline-flex items-center gap-1 text-xs font-bold text-destructive px-2.5 py-1 rounded-full bg-destructive/10 active:scale-95 transition-transform disabled:opacity-50"
+                              >
+                                {isActing ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Retirer'}
+                              </button>
+                            </div>
                           )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
                 )}
               </div>
             )}
@@ -315,6 +489,13 @@ const EventDetailPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Toast */}
+        {toast && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-foreground text-background text-sm font-semibold rounded-full shadow-lg whitespace-nowrap">
+            {toast}
+          </div>
+        )}
 
         {/* Cancel modal */}
         {showCancelModal && (

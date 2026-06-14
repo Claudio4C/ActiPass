@@ -99,6 +99,8 @@ export interface Event {
   price: number;
   is_recurring: boolean;
   recurrence_pattern?: string;
+  parent_event_id?: string;
+  cancellation_deadline_hours?: number;
   status: EventStatus;
   cover_url?: string;
   created_at: string;
@@ -116,7 +118,7 @@ export interface Event {
   };
   current_registrations?: number;
   available_spots?: number | null;
-  myReservation?: { id: string; status: string } | null;
+  myReservation?: { id: string; status: string; waitlist_position?: number | null } | null;
 }
 
 export interface Reservation {
