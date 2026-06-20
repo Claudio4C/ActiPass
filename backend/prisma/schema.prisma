@@ -296,13 +296,14 @@ model Event {
   is_recurring          Boolean            @default(false)
   recurrence_pattern    String? // JSON string pour la récurrence
   status                EventStatus        @default(draft)
-  cover_url                            String?
-  attendance_checkin_token             String?   @unique
-  attendance_checkin_token_expires_at  DateTime?
-  created_at                           DateTime  @default(now())
-  updated_at                           DateTime  @updatedAt
-  deleted_at                           DateTime?
-  Attendance                           Attendance[]
+  cover_url             String?
+  /// Jeton du QR de pointage : un par séance, partagé par tous les membres jusqu'à expiration ou régénération.
+  attendance_checkin_token            String?   @unique
+  attendance_checkin_token_expires_at DateTime?
+  created_at            DateTime           @default(now())
+  updated_at            DateTime           @updatedAt
+  deleted_at            DateTime?
+  Attendance            Attendance[]
   AvailabilitySlot      AvailabilitySlot[]
   EventCategory         EventCategory[]
   created_by            User               @relation("EventCreatedBy", fields: [created_by_id], references: [id])

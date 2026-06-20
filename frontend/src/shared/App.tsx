@@ -75,12 +75,28 @@ import EventEditPage from '../pages/dashboard/EventEditPage'
 import EventDetailPage from '../pages/dashboard/EventDetailPage'
 import AttendancePage from '../pages/dashboard/AttendancePage'
 import AttendanceDetailPage from '../pages/dashboard/AttendanceDetailPage'
+import AttendanceCheckInPage from '../pages/dashboard/AttendanceCheckInPage'
 import AttendanceStatsPage from '../pages/dashboard/AttendanceStatsPage'
 import SettingsPage from '../pages/dashboard/SettingsPage'
 import AdminRequests from '../pages/dashboard/AdminRequests'
 import AdminDocumentsPage from '../pages/dashboard/AdminDocumentsPage'
 import AdminSeasonsPage from '../pages/dashboard/AdminSeasonsPage'
 import AdminFinancePage from '../pages/dashboard/AdminFinancePage'
+
+// Municipal dashboard
+import MunicipalDashboardLayout from '../layouts/MunicipalDashboardLayout'
+import MunicipalOverviewPage from '../pages/municipalite/OverviewPage'
+import MunicipalAssociationsPage from '../pages/municipalite/AssociationsPage'
+import MunicipalFacilitiesPage from '../pages/municipalite/FacilitiesPage'
+import MunicipalFacilityDetailPage from '../pages/municipalite/FacilityDetailPage'
+import MunicipalStatsPage from '../pages/municipalite/StatsPage'
+import MunicipalPlanningPage from '../pages/municipalite/PlanningPage'
+import MunicipalMaterielPage from '../pages/municipalite/MaterielPage'
+import MunicipalAssociationDetailPage from '../pages/municipalite/AssociationDetailPage'
+import MunicipalPatrimoinePage from '../pages/municipalite/PatrimoinePage'
+import MunicipalPatrimoineDetailPage from '../pages/municipalite/PatrimoineDetailPage'
+import MunicipalReportsPage from '../pages/municipalite/ReportsPage'
+import MunicipalTerritoryMapPage from '../pages/municipalite/TerritoryMapPage'
 
 interface AppProps {
     mode: AppMode;
@@ -117,10 +133,14 @@ const AppContent: React.FC<{
   const { user } = useAuth()
 
   const postLoginTarget = (): string => {
+    if (mode === 'municipalite') { return '/municipalite/dashboard' }
     if (localStorage.getItem('ikivio_onboarding_page_done') === '1') { return '/home' }
     const t = localStorage.getItem('ikivio_onboarding_type')
     return t && t !== 'member' ? '/onboarding' : '/home'
   }
+
+  const defaultAuthedHome = mode === 'municipalite' ? '/municipalite/dashboard' : '/home'
+  const protectedRedirect = mode === 'municipalite' ? '/municipalite/dashboard' : '/club/members'
 
   return (
     <Router>
@@ -178,7 +198,7 @@ const AppContent: React.FC<{
           }
         >
           {/* /club redirige vers /club/members (contenu réel) */}
-          <Route path={protectedPath} element={<Navigate to="/club/members" replace />} />
+          <Route path={protectedPath} element={<Navigate to={protectedRedirect} replace />} />
           <Route path="/club/members" element={<ClubMembersPage />} />
           <Route path="/club/planning" element={<PlanningPage />} />
           <Route path="/club/events" element={<EventsPageClub />} />
@@ -274,6 +294,10 @@ const AppContent: React.FC<{
           <Route path="/dashboard/:organisationId/events/:eventId/edit" element={<EventEditPage />} />
           <Route path="/dashboard/:organisationId/attendance" element={<AttendancePage />} />
           <Route path="/dashboard/:organisationId/attendance/stats" element={<AttendanceStatsPage />} />
+          <Route
+            path="/dashboard/:organisationId/attendance/:eventId/check-in"
+            element={<AttendanceCheckInPage />}
+          />
           <Route path="/dashboard/:organisationId/attendance/:eventId" element={<AttendanceDetailPage />} />
           <Route path="/dashboard/:organisationId/settings" element={<SettingsPage />} />
           <Route path="/dashboard/:organisationId/requests" element={<AdminRequests />} />
@@ -283,11 +307,35 @@ const AppContent: React.FC<{
         </Route>
 
         {/* ═══════════════════════════════════════
+                    Portail municipal  (MunicipalDashboardLayout)
+                ═══════════════════════════════════════ */}
+        <Route
+          element={
+            <ProtectedRoute requiredMode={mode}>
+              <MunicipalDashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/municipalite/dashboard" element={<MunicipalOverviewPage />} />
+          <Route path="/municipalite/dashboard/associations" element={<MunicipalAssociationsPage />} />
+          <Route path="/municipalite/dashboard/associations/:associationId" element={<MunicipalAssociationDetailPage />} />
+          <Route path="/municipalite/dashboard/infrastructures" element={<MunicipalFacilitiesPage />} />
+          <Route path="/municipalite/dashboard/infrastructures/:roomId" element={<MunicipalFacilityDetailPage />} />
+          <Route path="/municipalite/dashboard/planning" element={<MunicipalPlanningPage />} />
+          <Route path="/municipalite/dashboard/materiel" element={<MunicipalMaterielPage />} />
+          <Route path="/municipalite/dashboard/patrimoine" element={<MunicipalPatrimoinePage />} />
+          <Route path="/municipalite/dashboard/patrimoine/:facilityId" element={<MunicipalPatrimoineDetailPage />} />
+          <Route path="/municipalite/dashboard/carte" element={<MunicipalTerritoryMapPage />} />
+          <Route path="/municipalite/dashboard/rapports" element={<MunicipalReportsPage />} />
+          <Route path="/municipalite/dashboard/statistiques" element={<MunicipalStatsPage />} />
+        </Route>
+
+        {/* ═══════════════════════════════════════
                     Fallback
                 ═══════════════════════════════════════ */}
         <Route
           path="/"
-          element={user ? <Navigate to="/home" replace /> : <DiscoverPage />}
+          element={user ? <Navigate to={defaultAuthedHome} replace /> : <DiscoverPage />}
         />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

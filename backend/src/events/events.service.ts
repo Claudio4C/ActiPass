@@ -183,6 +183,10 @@ export class EventsService {
           },
         }),
       },
+      omit: {
+        attendance_checkin_token: true,
+        attendance_checkin_token_expires_at: true,
+      },
       include: {
         created_by: {
           select: {
@@ -264,6 +268,10 @@ export class EventsService {
   async getEventById(eventId: string, userId: string) {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
+      omit: {
+        attendance_checkin_token: true,
+        attendance_checkin_token_expires_at: true,
+      },
       include: {
         created_by: {
           select: {
@@ -382,6 +390,10 @@ export class EventsService {
   ) {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
+      omit: {
+        attendance_checkin_token: true,
+        attendance_checkin_token_expires_at: true,
+      },
     });
 
     if (!event || event.deleted_at) {
@@ -602,7 +614,13 @@ export class EventsService {
    * Supprimer un événement (soft delete)
    */
   async deleteEvent(eventId: string, organisationId: string, userId: string, deleteSeries = false) {
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    const event = await this.prisma.event.findUnique({
+      where: { id: eventId },
+      omit: {
+        attendance_checkin_token: true,
+        attendance_checkin_token_expires_at: true,
+      },
+    });
 
     if (!event || event.deleted_at) {
       throw new NotFoundException('Événement non trouvé');
@@ -668,6 +686,10 @@ export class EventsService {
   async getEventWaitlist(eventId: string, organisationId: string, userId: string) {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
+      omit: {
+        attendance_checkin_token: true,
+        attendance_checkin_token_expires_at: true,
+      },
     });
 
     if (!event || event.deleted_at) {
@@ -777,6 +799,10 @@ export class EventsService {
   ) {
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
+      omit: {
+        attendance_checkin_token: true,
+        attendance_checkin_token_expires_at: true,
+      },
     });
 
     if (!event || event.deleted_at) {

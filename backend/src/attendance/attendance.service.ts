@@ -6,7 +6,7 @@ import {
   ForbiddenException,
   BadRequestException,
 } from '@nestjs/common';
-import { AttendanceStatus, AttendanceType } from '../generated/prisma/client';
+import { AttendanceStatus, AttendanceType, Prisma } from '../generated/prisma/client';
 
 import { AuditService } from '../auth/audit.service';
 import { PermissionsService } from '../auth/permissions.service';
@@ -62,6 +62,30 @@ export class AttendanceService {
     return timeDiff <= this.COACH_MODIFICATION_WINDOW;
   }
 
+  /**
+   * Lit l'état du QR de pointage sans exiger les colonnes Prisma sur `events`
+   * (évite erreur 500 si la migration QR n'est pas encore appliquée sur la base).
+   */
+  private async loadEventCheckinQrMeta(eventId: string): Promise<{
+    active: boolean;
+    expires_at: string | null;
+  }> {
+    try {
+      const rows = await this.prisma.$queryRaw<{ t: string | null; e: Date | null }[]>(
+        Prisma.sql`SELECT attendance_checkin_token AS t, attendance_checkin_token_expires_at AS e FROM events WHERE id = ${eventId}::uuid LIMIT 1`
+      );
+      const row = rows[0];
+      if (!row?.t || !row?.e) {
+        return { active: false, expires_at: null };
+      }
+      const now = Date.now();
+      const active = row.e.getTime() > now;
+      return { active, expires_at: active ? row.e.toISOString() : null };
+    } catch {
+      return { active: false, expires_at: null };
+    }
+  }
+
   async getEventAttendances(organisationId: string, eventId: string, userId: string) {
     const { role } = await this.checkOrganisationAccess(userId, organisationId);
 
@@ -77,6 +101,10 @@ export class AttendanceService {
 
     const event = await this.prisma.event.findUnique({
       where: { id: eventId },
+      omit: {
+        attendance_checkin_token: true,
+        attendance_checkin_token_expires_at: true,
+      },
       include: { organisation: true },
     });
 
@@ -87,6 +115,8 @@ export class AttendanceService {
     if (event.organisation_id !== organisationId) {
       throw new ForbiddenException("L'événement n'appartient pas à cette organisation");
     }
+
+    const qrMeta = await this.loadEventCheckinQrMeta(eventId);
 
     const reservations = await this.prisma.reservation.findMany({
       where: {
@@ -133,41 +163,52 @@ export class AttendanceService {
 
     const attendanceMap = new Map(attendances.map((a) => [a.user_id, a]));
 
+    const toAttendancePayload = (attendance: (typeof attendances)[0]) => ({
+      id: attendance.id,
+      status: attendance.status,
+      type: attendance.type,
+      comment: attendance.comment,
+      validated_at: attendance.validated_at,
+      correction_note: attendance.correction_note,
+      correction_date: attendance.correction_date,
+      corrected_by: attendance.corrector
+        ? {
+            id: attendance.corrector.id,
+            firstname: attendance.corrector.firstname,
+            lastname: attendance.corrector.lastname,
+          }
+        : null,
+      checked_by: attendance.checker
+        ? {
+            id: attendance.checker.id,
+            firstname: attendance.checker.firstname,
+            lastname: attendance.checker.lastname,
+          }
+        : null,
+      created_at: attendance.created_at,
+      updated_at: attendance.updated_at,
+    });
+
+    const reservedUserIds = new Set(reservations.map((r) => r.membership.user_id));
+
     const result = reservations.map((reservation) => {
       const memberId = reservation.membership.user_id;
       const attendance = attendanceMap.get(memberId);
       return {
         user: reservation.membership.user,
         reservation_id: reservation.id,
-        attendance: attendance
-          ? {
-              id: attendance.id,
-              status: attendance.status,
-              type: attendance.type,
-              comment: attendance.comment,
-              validated_at: attendance.validated_at,
-              correction_note: attendance.correction_note,
-              correction_date: attendance.correction_date,
-              corrected_by: attendance.corrector
-                ? {
-                    id: attendance.corrector.id,
-                    firstname: attendance.corrector.firstname,
-                    lastname: attendance.corrector.lastname,
-                  }
-                : null,
-              checked_by: attendance.checker
-                ? {
-                    id: attendance.checker.id,
-                    firstname: attendance.checker.firstname,
-                    lastname: attendance.checker.lastname,
-                  }
-                : null,
-              created_at: attendance.created_at,
-              updated_at: attendance.updated_at,
-            }
-          : null,
+        attendance: attendance ? toAttendancePayload(attendance) : null,
       };
     });
+
+    /** Pointages QR (ou autre) sans réservation : visibles pour le coach / gestionnaire. */
+    const extraFromAttendanceOnly = attendances
+      .filter((a) => !reservedUserIds.has(a.user_id))
+      .map((a) => ({
+        user: a.user,
+        reservation_id: null as string | null,
+        attendance: toAttendancePayload(a),
+      }));
 
     return {
       event: {
@@ -177,12 +218,13 @@ export class AttendanceService {
         end_date: event.end_time,
         status: event.status,
       },
-      attendances: result,
+      attendances: [...result, ...extraFromAttendanceOnly],
       can_modify:
         role.type === 'club_owner' || role.type === 'club_manager'
           ? true
           : this.canCoachModify(event.end_time, null),
       past_24h: !this.canCoachModify(event.end_time, null),
+      checkin_qr: qrMeta,
     };
   }
 
@@ -317,7 +359,12 @@ export class AttendanceService {
         },
       });
 
-      if (!reservation) continue;
+      if (!reservation) {
+        const existingAttendance = await this.prisma.attendance.findFirst({
+          where: { event_id: eventId, user_id: attendanceUpdate.user_id },
+        });
+        if (!existingAttendance) continue;
+      }
 
       const attendance = await this.prisma.attendance.upsert({
         where: {
@@ -400,6 +447,66 @@ export class AttendanceService {
     return { message: 'Présences validées avec succès', validated_at: now };
   }
 
+  async deleteEventAttendance(
+    organisationId: string,
+    eventId: string,
+    attendanceId: string,
+    userId: string
+  ) {
+    const { role } = await this.checkOrganisationAccess(userId, organisationId);
+
+    const hasManagePermission = await this.permissionsService.hasPermission(
+      userId,
+      { resource: 'attendance', action: 'manage', scope: 'organisation' },
+      organisationId
+    );
+
+    if (!hasManagePermission) {
+      throw new ForbiddenException("Vous n'avez pas la permission de gérer les présences");
+    }
+
+    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+
+    if (!event) throw new NotFoundException("L'événement n'existe pas");
+    if (event.organisation_id !== organisationId) {
+      throw new ForbiddenException("L'événement n'appartient pas à cette organisation");
+    }
+
+    const isCoach = role.type === 'coach';
+    if (isCoach && !this.canCoachModify(event.end_time, null)) {
+      throw new ForbiddenException(
+        'Le délai de modification (24h) est dépassé. Seul un administrateur peut modifier ces présences.'
+      );
+    }
+
+    const attendance = await this.prisma.attendance.findUnique({
+      where: { id: attendanceId },
+    });
+
+    if (!attendance) throw new NotFoundException("La présence n'existe pas");
+    if (attendance.event_id !== eventId) {
+      throw new BadRequestException("La présence n'appartient pas à cet événement");
+    }
+
+    await this.prisma.attendance.delete({
+      where: { id: attendanceId },
+    });
+
+    await this.auditService.logDelete(
+      userId,
+      'attendance',
+      attendanceId,
+      {
+        user_id: attendance.user_id,
+        event_id: attendance.event_id,
+        status: attendance.status,
+      },
+      { organisationId }
+    );
+
+    return { message: 'Présence supprimée' };
+  }
+
   async correctAttendance(
     organisationId: string,
     eventId: string,
@@ -457,7 +564,12 @@ export class AttendanceService {
     return updated;
   }
 
-  async generateEventQrCode(organisationId: string, eventId: string, userId: string) {
+  async generateEventQrCode(
+    organisationId: string,
+    eventId: string,
+    userId: string,
+    options?: { rotate?: boolean }
+  ) {
     await this.checkOrganisationAccess(userId, organisationId);
 
     const hasManagePermission = await this.permissionsService.hasPermission(
@@ -470,91 +582,258 @@ export class AttendanceService {
       throw new ForbiddenException("Vous n'avez pas la permission de gérer les présences");
     }
 
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
+    const event = await this.prisma.event.findFirst({
+      where: { id: eventId, organisation_id: organisationId, deleted_at: null },
+    });
 
     if (!event) throw new NotFoundException("L'événement n'existe pas");
-    if (event.organisation_id !== organisationId) {
-      throw new ForbiddenException("L'événement n'appartient pas à cette organisation");
+
+    const now = Date.now();
+    const rotate = options?.rotate === true;
+    const currentToken = event.attendance_checkin_token;
+    const currentExp = event.attendance_checkin_token_expires_at;
+    const stillValid =
+      !rotate && !!currentToken && !!currentExp && currentExp.getTime() > now;
+
+    if (stillValid && currentToken && currentExp) {
+      return {
+        qr_code: currentToken,
+        event_id: eventId,
+        expires_at: currentExp.toISOString(),
+        reused: true,
+      };
     }
 
-    const qrCode = crypto
-      .createHash('sha256')
-      .update(`${eventId}-${Date.now()}-${crypto.randomBytes(16).toString('hex')}`)
-      .digest('hex')
-      .substring(0, 32);
+    const qrCode = crypto.randomBytes(24).toString('hex');
+    const expiresAt = new Date(
+      Math.max(event.end_time.getTime() + 2 * 60 * 60 * 1000, now + 30 * 60 * 1000)
+    );
+
+    await this.prisma.event.update({
+      where: { id: eventId },
+      data: {
+        attendance_checkin_token: qrCode,
+        attendance_checkin_token_expires_at: expiresAt,
+      },
+    });
 
     await this.auditService.logCreate(
       userId,
       'qr_code',
       qrCode,
-      { event_id: eventId, action: 'generate' },
+      { event_id: eventId, action: rotate ? 'rotate' : 'generate' },
       { organisationId }
     );
 
     return {
       qr_code: qrCode,
       event_id: eventId,
-      expires_at: event.end_time || new Date(Date.now() + 24 * 60 * 60 * 1000),
+      expires_at: expiresAt.toISOString(),
+      reused: false,
     };
+  }
+
+  private async isEligibleForQrAttendance(
+    targetUserId: string,
+    event: { organisation_id: string; registration_required: boolean },
+    eventId: string
+  ): Promise<boolean> {
+    const reservation = await this.prisma.reservation.findFirst({
+      where: {
+        event_id: eventId,
+        membership: { user_id: targetUserId },
+        status: { in: ['confirmed', 'attended'] },
+      },
+    });
+    if (reservation) return true;
+    if (event.registration_required) return false;
+    const membership = await this.prisma.membership.findFirst({
+      where: {
+        user_id: targetUserId,
+        organisation_id: event.organisation_id,
+        left_at: null,
+        deleted_at: null,
+        status: 'active',
+      },
+    });
+    return !!membership;
+  }
+
+  private async buildQrAttendeeChoices(
+    scannerUserId: string,
+    event: { organisation_id: string; registration_required: boolean },
+    eventId: string
+  ): Promise<Array<{ user_id: string; firstname: string; lastname: string; relation: 'self' | 'child' }>> {
+    const choices: Array<{ user_id: string; firstname: string; lastname: string; relation: 'self' | 'child' }> =
+      [];
+    if (await this.isEligibleForQrAttendance(scannerUserId, event, eventId)) {
+      const u = await this.prisma.user.findUnique({
+        where: { id: scannerUserId },
+        select: { id: true, firstname: true, lastname: true },
+      });
+      if (u) {
+        choices.push({
+          user_id: u.id,
+          firstname: u.firstname,
+          lastname: u.lastname,
+          relation: 'self',
+        });
+      }
+    }
+    const links = await this.prisma.familyLink.findMany({
+      where: { parent_id: scannerUserId },
+      include: { child: { select: { id: true, firstname: true, lastname: true } } },
+    });
+    for (const link of links) {
+      const cid = link.child.id;
+      if (choices.some((c) => c.user_id === cid)) continue;
+      if (await this.isEligibleForQrAttendance(cid, event, eventId)) {
+        choices.push({
+          user_id: cid,
+          firstname: link.child.firstname,
+          lastname: link.child.lastname,
+          relation: 'child',
+        });
+      }
+    }
+    return choices;
   }
 
   async validateAttendanceByQrCode(
     organisationId: string,
     eventId: string,
-    userId: string,
+    scannerUserId: string,
     qrCodeDto: QrCodeAttendanceDto
   ) {
-    const event = await this.prisma.event.findUnique({ where: { id: eventId } });
-
-    if (!event) throw new NotFoundException("L'événement n'existe pas");
-    if (event.organisation_id !== organisationId) {
-      throw new ForbiddenException("L'événement n'appartient pas à cette organisation");
-    }
-
-    const reservation = await this.prisma.reservation.findFirst({
-      where: {
-        event_id: eventId,
-        membership: { user_id: userId },
-        status: { in: ['confirmed', 'attended'] },
-      },
+    const event = await this.prisma.event.findFirst({
+      where: { id: eventId, organisation_id: organisationId, deleted_at: null },
     });
 
-    if (!reservation) {
-      throw new BadRequestException("Vous n'avez pas de réservation pour cet événement");
+    if (!event) throw new NotFoundException("L'événement n'existe pas");
+
+    const serverToken = event.attendance_checkin_token;
+    const tokenExp = event.attendance_checkin_token_expires_at;
+    const nowMs = Date.now();
+
+    if (!serverToken || !tokenExp || tokenExp.getTime() <= nowMs) {
+      throw new BadRequestException(
+        "Aucun QR de pointage actif pour ce cours. Demandez au coach d'afficher ou de régénérer le QR."
+      );
     }
+
+    const provided = (qrCodeDto.qr_code || '').trim();
+    if (
+      provided.length !== serverToken.length ||
+      !crypto.timingSafeEqual(Buffer.from(provided, 'utf8'), Buffer.from(serverToken, 'utf8'))
+    ) {
+      throw new BadRequestException('QR code invalide ou expiré.');
+    }
+
+    const eventProps = {
+      organisation_id: event.organisation_id,
+      registration_required: event.registration_required,
+    };
+
+    const forUserIdRaw = qrCodeDto.for_user_id?.trim();
+    let targetUserId: string;
+
+    if (forUserIdRaw) {
+      targetUserId = forUserIdRaw;
+      if (targetUserId === scannerUserId) {
+        if (!(await this.isEligibleForQrAttendance(targetUserId, eventProps, eventId))) {
+          throw new BadRequestException(
+            event.registration_required
+              ? "Vous n'avez pas de réservation confirmée pour cet événement."
+              : "Vous n'êtes pas membre actif de ce club."
+          );
+        }
+      } else {
+        const link = await this.prisma.familyLink.findFirst({
+          where: { parent_id: scannerUserId, child_id: targetUserId },
+        });
+        if (!link) {
+          throw new ForbiddenException(
+            'Vous ne pouvez pas pointer la présence pour ce compte (lien famille requis).'
+          );
+        }
+        if (!(await this.isEligibleForQrAttendance(targetUserId, eventProps, eventId))) {
+          throw new BadRequestException(
+            "Cette personne n'est pas éligible à ce cours (réservation ou adhésion au club requise)."
+          );
+        }
+      }
+    } else {
+      const choices = await this.buildQrAttendeeChoices(scannerUserId, eventProps, eventId);
+      if (choices.length === 0) {
+        throw new BadRequestException(
+          event.registration_required
+            ? "Aucune personne de votre compte n'a de réservation confirmée pour ce cours."
+            : "Aucune personne de votre compte n'est membre actif de ce club pour ce pointage."
+        );
+      }
+      if (choices.length > 1) {
+        return {
+          result: 'choose_attendee' as const,
+          choices,
+        };
+      }
+      targetUserId = choices[0].user_id;
+    }
+
+    const attendanceType =
+      targetUserId === scannerUserId ? AttendanceType.self : AttendanceType.manual;
 
     const attendance = await this.prisma.attendance.upsert({
       where: {
         user_id_event_id: {
-          user_id: userId,
+          user_id: targetUserId,
           event_id: eventId,
         },
       },
       create: {
-        user_id: userId,
+        user_id: targetUserId,
         event_id: eventId,
         status: AttendanceStatus.present,
-        type: AttendanceType.self,
+        type: attendanceType,
         qr_code: qrCodeDto.qr_code,
-        checked_in_by: userId,
+        checked_in_by: scannerUserId,
       },
       update: {
         status: AttendanceStatus.present,
-        type: AttendanceType.self,
+        type: attendanceType,
         qr_code: qrCodeDto.qr_code,
+        checked_in_by: scannerUserId,
         updated_at: new Date(),
       },
     });
 
     await this.auditService.logCreate(
-      userId,
+      scannerUserId,
       'attendance',
       attendance.id,
-      { method: 'qr_code', qr_code: qrCodeDto.qr_code },
+      { method: 'qr_code', qr_code: qrCodeDto.qr_code, for_user_id: targetUserId },
       { organisationId }
     );
 
-    return attendance;
+    const attendee = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, firstname: true, lastname: true },
+    });
+
+    return {
+      result: 'completed' as const,
+      attendance: {
+        id: attendance.id,
+        user_id: attendance.user_id,
+        status: attendance.status,
+        type: attendance.type,
+        validated_at: attendance.validated_at,
+        updated_at: attendance.updated_at,
+      },
+      attendee: attendee
+        ? { id: attendee.id, firstname: attendee.firstname, lastname: attendee.lastname }
+        : { id: targetUserId, firstname: '', lastname: '' },
+    };
   }
 
   async getAttendanceSummaries(organisationId: string, userId: string) {
