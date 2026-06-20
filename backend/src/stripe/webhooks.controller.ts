@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 
 import { Public } from '../auth/decorators/public.decorator';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 import { StripeService } from './stripe.service';
@@ -20,7 +21,8 @@ export class WebhooksController {
   constructor(
     private readonly stripeService: StripeService,
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
+    private readonly notificationsService: NotificationsService
   ) {}
 
   @Public()
@@ -94,7 +96,16 @@ export class WebhooksController {
 
       const paid = await this.prisma.payment.findFirst({
         where: { stripe_session_id: session.id },
-        select: { id: true, membership_id: true, purpose: true },
+        select: {
+          id: true,
+          membership_id: true,
+          purpose: true,
+          user_id: true,
+          organisation_id: true,
+          amount: true,
+          currency: true,
+          paid_at: true,
+        },
       });
 
       if (paid?.purpose === 'membership_fee' && paid.membership_id) {
@@ -104,11 +115,13 @@ export class WebhooksController {
         });
       }
 
+      let eventTitle: string | undefined;
       if (paid?.purpose === 'event_participation') {
         const reservation = await this.prisma.reservation.findFirst({
           where: { payment_id: paid.id },
-          select: { id: true, status: true, event_id: true },
+          select: { id: true, status: true, event_id: true, event: { select: { title: true } } },
         });
+        eventTitle = reservation?.event.title;
         // FIX 4 — idempotence : skip silencieusement si déjà confirmé
         if (reservation && reservation.status !== 'confirmed') {
           await this.prisma.reservation.update({
@@ -117,6 +130,35 @@ export class WebhooksController {
           });
           console.log(`[Webhook] Event payment confirmed for event ${reservation.event_id}`);
         }
+      }
+
+      if (paid) {
+        const label = paid.purpose === 'event_participation' ? eventTitle || 'événement' : 'votre cotisation';
+        const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:5173').replace(/\/+$/, '');
+        const user = await this.prisma.user.findUnique({
+          where: { id: paid.user_id },
+          select: { firstname: true },
+        });
+        await this.notificationsService.notify({
+          userId: paid.user_id,
+          organisationId: paid.organisation_id ?? undefined,
+          type: 'payment_received',
+          title: 'Paiement confirmé',
+          body: `Votre paiement de ${paid.amount} ${paid.currency} pour ${label} a été confirmé.`,
+          link: paid.organisation_id ? `/club/${paid.organisation_id}/payment` : undefined,
+          sendEmail: true,
+          emailTemplate: 'PaymentReceivedEmail',
+          emailSubject: 'Paiement confirmé',
+          emailData: {
+            firstname: user?.firstname || '',
+            amount: `${paid.amount} ${paid.currency}`,
+            label,
+            date: (paid.paid_at ?? new Date()).toLocaleDateString('fr-FR'),
+            ctaUrl: paid.organisation_id
+              ? `${frontendUrl}/club/${paid.organisation_id}/payment`
+              : frontendUrl,
+          },
+        });
       }
     }
 

@@ -1,6 +1,8 @@
 import { Injectable, ForbiddenException, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 import { EmailService } from '../email/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 import { CreateOrganisationDto, UpdateOrganisationDto, InviteMemberDto } from './dto';
@@ -9,7 +11,9 @@ import { CreateOrganisationDto, UpdateOrganisationDto, InviteMemberDto } from '.
 export class OrganisationsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly emailService: EmailService
+    private readonly emailService: EmailService,
+    private readonly notificationsService: NotificationsService,
+    private readonly config: ConfigService
   ) {}
 
   /**
@@ -786,6 +790,46 @@ export class OrganisationsService {
       suspend: 'Membre suspendu',    archive: 'Membre archivé',
       reactivate: 'Membre réactivé',
     };
+
+    if (action === 'approve' || action === 'reject') {
+      const [user, organisation] = await Promise.all([
+        this.prisma.user.findUnique({ where: { id: target.user_id }, select: { firstname: true } }),
+        this.prisma.organisation.findUnique({ where: { id: organisationId }, select: { name: true } }),
+      ]);
+      const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:5173');
+      const organisationName = organisation?.name || 'votre club';
+
+      if (action === 'approve') {
+        await this.notificationsService.notify({
+          userId: target.user_id,
+          organisationId,
+          type: 'membership_approved',
+          title: 'Adhésion approuvée',
+          body: `Votre adhésion à ${organisationName} a été approuvée.`,
+          link: `/club/${organisationId}`,
+          sendEmail: true,
+          emailTemplate: 'WelcomeEmail',
+          emailSubject: `Bienvenue chez ${organisationName} !`,
+          emailData: {
+            firstname: user?.firstname || '',
+            organisationName,
+            ctaUrl: `${frontendUrl}/club/${organisationId}`,
+          },
+        });
+      } else {
+        await this.notificationsService.notify({
+          userId: target.user_id,
+          organisationId,
+          type: 'membership_rejected',
+          title: 'Adhésion refusée',
+          body: reason
+            ? `Votre demande d'adhésion à ${organisationName} a été refusée : ${reason}`
+            : `Votre demande d'adhésion à ${organisationName} a été refusée.`,
+          sendEmail: false,
+          sendPush: true,
+        });
+      }
+    }
     return { message: messages[action], membership: updated };
   }
 

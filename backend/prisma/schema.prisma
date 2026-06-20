@@ -63,8 +63,47 @@ model User {
   parentAuthorizations       ChildAuthorization[] @relation("ParentAuthorizations")
   member_documents           MemberDocument[]     @relation("MemberDocumentOwner")
   member_documents_reviewed  MemberDocument[]     @relation("MemberDocumentReviewer")
+  notifications              Notification[]
+  fcm_tokens                 String[]             @default([])
+  notificationPreference     NotificationPreference?
 
   @@map("users")
+}
+
+model NotificationPreference {
+  id                         String   @id @default(uuid())
+  user_id                    String   @unique
+  user                       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  email_payment_received     Boolean  @default(true)
+  email_document_decision    Boolean  @default(true)
+  email_event_reminder       Boolean  @default(true)
+  email_membership_decision  Boolean  @default(true)
+  email_renewal_invitation   Boolean  @default(true)
+  email_marketing            Boolean  @default(false)
+
+  push_enabled               Boolean  @default(true)
+
+  updated_at                 DateTime @updatedAt
+
+  @@map("notification_preferences")
+}
+
+model Notification {
+  id              String    @id @default(uuid())
+  user_id         String
+  user            User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  organisation_id String?
+  type            String
+  title           String
+  body            String
+  link            String?
+  read            Boolean   @default(false)
+  read_at         DateTime?
+  created_at      DateTime  @default(now())
+
+  @@index([user_id, read])
+  @@map("notifications")
 }
 
 model Role {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, X, Check, Lock, Loader2 } from 'lucide-react'
+import { ChevronRight, X, Check, Lock, Loader2, Bell } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { useAuth } from '../../contexts/AuthContext'
 import { api } from '../../lib/api'
@@ -192,6 +192,20 @@ const ProfilePage: React.FC = () => {
           </div>
           <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
         </button>
+      </div>
+
+      {/* ── Notifications ────────────────────────────────────────────────────── */}
+      <div className="bg-card border border-border rounded-2xl px-4 py-3">
+        <Link to="/account/notifications" className="w-full flex items-center gap-3 active:scale-[0.99] transition-transform">
+          <span className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <Bell className="w-4 h-4 text-primary" />
+          </span>
+          <div className="flex-1 text-left">
+            <p className="text-sm font-semibold text-foreground">Notifications</p>
+            <p className="text-xs text-muted-foreground">Gérer mes préférences d'email et de push</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+        </Link>
       </div>
 
       {/* ── Informations personnelles ────────────────────────────────────────── */}

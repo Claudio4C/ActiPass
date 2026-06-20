@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 import type { CreateSeasonDto, UpdateSeasonDto, CloseSeasonDto } from './dto/season.dto';
@@ -16,6 +17,7 @@ export class SeasonsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   // ── Role assertions ──────────────────────────────────────────────────────────
@@ -321,13 +323,33 @@ export class SeasonsService {
 
     const expiredMemberships = await this.prisma.membership.findMany({
       where: { organisation_id: orgId, season_id: seasonId, status: 'expired', deleted_at: null },
-      include: { user: { select: { email: true } } },
+      include: { user: { select: { id: true, firstname: true, email: true } } },
     });
 
+    const organisation = await this.prisma.organisation.findUnique({
+      where: { id: orgId },
+      select: { name: true },
+    });
+    const organisationName = organisation?.name || 'votre club';
+
     for (const m of expiredMemberships) {
-      console.log(
-        `[Season ${seasonId}] RENEWAL EMAIL would be sent to ${m.user.email} with link ${frontendUrl}/club/${orgId}/payment`
-      );
+      await this.notificationsService.notify({
+        userId: m.user.id,
+        organisationId: orgId,
+        type: 'renewal_invitation',
+        title: 'Renouvelez votre adhésion',
+        body: `La saison ${season.name} est terminée chez ${organisationName}. Pensez à renouveler votre adhésion.`,
+        link: `/club/${orgId}/payment`,
+        sendEmail: true,
+        emailTemplate: 'RenewalInvitationEmail',
+        emailSubject: `Renouvelez votre adhésion à ${organisationName}`,
+        emailData: {
+          firstname: m.user.firstname,
+          organisationName,
+          seasonName: season.name,
+          ctaUrl: `${frontendUrl}/club/${orgId}/payment`,
+        },
+      });
     }
 
     await this.prisma.renewalLog.create({

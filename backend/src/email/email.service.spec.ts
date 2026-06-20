@@ -3,6 +3,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 
 import { EmailService } from './email.service';
 
+// @react-email/render uses a dynamic `import('react-dom/server')` internally, which
+// Jest's CommonJS test environment can't resolve. Render with the classic sync API instead —
+// produces the same real HTML output without needing --experimental-vm-modules.
+jest.mock('@react-email/render', () => ({
+  render: async (node: unknown) => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const ReactDOMServer = require('react-dom/server');
+    return ReactDOMServer.renderToStaticMarkup(node);
+  },
+}));
+
 describe('EmailService', () => {
   let service: EmailService;
   let configService: ConfigService;
@@ -61,7 +72,6 @@ describe('EmailService', () => {
         to: email,
         subject: '🔐 Vérifiez votre compte Ikivio',
         html: expect.stringContaining('Ikivio'),
-        text: expect.stringContaining('Ikivio'),
       });
     });
 
@@ -76,7 +86,6 @@ describe('EmailService', () => {
 
       const callArgs = sendEmailSpy.mock.calls[0][0];
       expect(callArgs.html).toContain(`/verify-email/${userId}/${token}`);
-      expect(callArgs.text).toContain(`/verify-email/${userId}/${token}`);
     });
   });
 
@@ -94,7 +103,6 @@ describe('EmailService', () => {
         to: email,
         subject: '🔑 Réinitialisation de votre mot de passe Ikivio',
         html: expect.stringContaining('Ikivio'),
-        text: expect.stringContaining('Ikivio'),
       });
     });
 
@@ -108,7 +116,6 @@ describe('EmailService', () => {
 
       const callArgs = sendEmailSpy.mock.calls[0][0];
       expect(callArgs.html).toContain(`/reset-password?token=${token}`);
-      expect(callArgs.text).toContain(`/reset-password?token=${token}`);
     });
   });
 
@@ -126,7 +133,6 @@ describe('EmailService', () => {
         to: email,
         subject: '🎉 Bienvenue sur Ikivio !',
         html: expect.stringContaining('Ikivio'),
-        text: expect.stringContaining('Ikivio'),
       });
     });
 
@@ -140,7 +146,6 @@ describe('EmailService', () => {
 
       const callArgs = sendEmailSpy.mock.calls[0][0];
       expect(callArgs.html).toContain(firstname);
-      expect(callArgs.text).toContain(firstname);
     });
 
     it('should include dashboard URL in template', async () => {
@@ -153,7 +158,6 @@ describe('EmailService', () => {
 
       const callArgs = sendEmailSpy.mock.calls[0][0];
       expect(callArgs.html).toContain('/dashboard');
-      expect(callArgs.text).toContain('/dashboard');
     });
   });
 

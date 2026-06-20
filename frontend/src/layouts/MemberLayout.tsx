@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import {
-  CalendarDays, LayoutDashboard, Users2, User, Bell,
+  CalendarDays, LayoutDashboard, Users2, User,
   Moon, Sun, LogOut, Menu, Home, Baby, Building2, Plus,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useCurrentOrganisation } from '../hooks/useCurrentOrganisation'
 import { cn } from '../lib/utils'
+import NotificationBell from '../components/shared/NotificationBell'
 
 // ─── top tabs ────────────────────────────────────────────────────────────────
 
@@ -120,12 +121,7 @@ const MemberLayout: React.FC = () => {
             </button>
 
             {/* Notifications */}
-            <Link
-              to="/club/notifications"
-              className="relative w-8 h-8 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
-            >
-              <Bell className="w-4 h-4 shrink-0" />
-            </Link>
+            <NotificationBell />
 
             {/* User avatar menu */}
             <div id="member-user-menu" className="relative">

@@ -42,6 +42,7 @@ describe('AuthService', () => {
     two_factor_secret: null,
     is_super_admin: false,
     profile_mode: 'solo' as const,
+    fcm_tokens: [] as string[],
     created_at: new Date(),
     updated_at: new Date(),
     deleted_at: null,

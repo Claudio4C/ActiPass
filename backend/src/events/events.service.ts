@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { EventType, EventStatus } from '../generated/prisma/client';
 
+import { NotificationsService } from '../notifications/notifications.service';
 import { PermissionsService } from '../auth/permissions.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from '../stripe/stripe.service';
@@ -20,7 +21,8 @@ export class EventsService {
     private readonly prisma: PrismaService,
     private readonly permissionsService: PermissionsService,
     private readonly stripe: StripeService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
+    private readonly notificationsService: NotificationsService
   ) {}
 
   /**
@@ -597,10 +599,26 @@ export class EventsService {
       await this.refundPaidEventPayments([eventId], organisationId)
     }
 
-    // Notifications (à implémenter avec le service email)
     if (cancelEventDto.notify_participants !== false) {
-      // TODO: Envoyer des notifications aux participants
-      console.log('Notifications à implémenter');
+      for (const reservation of event.Reservation) {
+        await this.notificationsService.notify({
+          userId: reservation.membership.user.id,
+          organisationId,
+          type: 'system',
+          title: 'Événement annulé',
+          body: `L'événement "${event.title}" a été annulé.`,
+          link: `/club/events/${eventId}`,
+          sendEmail: true,
+          emailTemplate: 'EventReminderEmail',
+          emailSubject: `Annulation : ${event.title}`,
+          emailData: {
+            firstname: reservation.membership.user.firstname,
+            eventTitle: `${event.title} (annulé)`,
+            eventDate: 'Cet événement est annulé.',
+            ctaUrl: `${this.config.get<string>('FRONTEND_URL', 'http://localhost:5173')}/club/events/${eventId}`,
+          },
+        });
+      }
     }
 
     return {
@@ -937,13 +955,23 @@ export class EventsService {
       const nextPending = await this.prisma.reservation.findFirst({
         where: { event_id: eventId, status: 'pending', deleted_at: null },
         orderBy: { created_at: 'asc' },
+        include: { membership: { include: { user: true } } },
       });
       if (nextPending) {
         await this.prisma.reservation.update({
           where: { id: nextPending.id },
           data: { status: 'confirmed' },
         });
-        console.log(`[Waitlist] Auto-promoted reservation ${nextPending.id} on event ${eventId}`);
+        await this.notificationsService.notify({
+          userId: nextPending.membership.user.id,
+          organisationId,
+          type: 'waitlist_promoted',
+          title: 'Une place s’est libérée !',
+          body: `Vous êtes confirmé pour "${event.title}".`,
+          link: `/club/events/${eventId}`,
+          sendEmail: false,
+          sendPush: true,
+        });
       }
     }
 
@@ -1330,13 +1358,23 @@ export class EventsService {
       const nextPending = await this.prisma.reservation.findFirst({
         where: { event_id: eventId, status: 'pending', deleted_at: null },
         orderBy: { created_at: 'asc' },
+        include: { membership: { include: { user: true } } },
       });
       if (nextPending) {
         await this.prisma.reservation.update({
           where: { id: nextPending.id },
           data: { status: 'confirmed' },
         });
-        console.log(`[Waitlist] Auto-promoted reservation ${nextPending.id} on event ${eventId}`);
+        await this.notificationsService.notify({
+          userId: nextPending.membership.user.id,
+          organisationId,
+          type: 'waitlist_promoted',
+          title: 'Une place s’est libérée !',
+          body: `Vous êtes confirmé pour "${event.title}".`,
+          link: `/club/events/${eventId}`,
+          sendEmail: false,
+          sendPush: true,
+        });
       }
     }
 

@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Bell, LogOut, User, Moon, Sun, Menu, Search, Download, Calendar } from 'lucide-react'
+import { LogOut, User, Moon, Sun, Menu, Search, Download, Calendar } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { MUNICIPALITY } from '../../data/municipal/mockData'
+import NotificationBell from '../shared/NotificationBell'
 
 const MunicipalHeader: React.FC = () => {
   const { user, logout, isLoading } = useAuth()
@@ -81,13 +82,7 @@ const MunicipalHeader: React.FC = () => {
           {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
 
-        <button
-          type="button"
-          className="relative w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors"
-        >
-          <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-destructive rounded-full" />
-        </button>
+        <NotificationBell />
 
         <div className="relative" ref={menuRef}>
           <button

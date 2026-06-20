@@ -5,8 +5,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { addMonths } from 'date-fns'
 
+import { NotificationsService } from '../notifications/notifications.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { StorageService } from '../storage/storage.service'
 import { isAllowedMime, MAX_FILE_SIZE_BYTES } from '../storage/storage.constants'
@@ -19,6 +21,8 @@ export class MemberDocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly notificationsService: NotificationsService,
+    private readonly config: ConfigService,
   ) {}
 
   private async assertIsAdmin(orgId: string, userId: string): Promise<void> {
@@ -189,18 +193,23 @@ export class MemberDocumentsService {
       throw new BadRequestException('Un motif de refus est obligatoire.')
     }
 
-    let expiresAt = doc.expires_at
-    if (dto.action === 'approve' && !expiresAt) {
-      const requiredDoc = await this.prisma.requiredDocument.findUnique({
+    const [requiredDoc, docOwner] = await Promise.all([
+      this.prisma.requiredDocument.findUnique({
         where: { id: doc.required_document_id },
-        select: { expires_after_months: true },
-      })
-      if (requiredDoc?.expires_after_months) {
-        expiresAt = addMonths(new Date(), requiredDoc.expires_after_months)
-      }
+        select: { name: true, expires_after_months: true },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: doc.user_id },
+        select: { firstname: true },
+      }),
+    ])
+
+    let expiresAt = doc.expires_at
+    if (dto.action === 'approve' && !expiresAt && requiredDoc?.expires_after_months) {
+      expiresAt = addMonths(new Date(), requiredDoc.expires_after_months)
     }
 
-    return this.prisma.memberDocument.update({
+    const updated = await this.prisma.memberDocument.update({
       where: { id: docId },
       data: {
         status:           dto.action === 'approve' ? 'approved' : 'rejected',
@@ -210,6 +219,31 @@ export class MemberDocumentsService {
         ...(dto.action === 'approve' && expiresAt ? { expires_at: expiresAt } : {}),
       },
     })
+
+    const documentName = requiredDoc?.name || 'Document'
+    const approved = dto.action === 'approve'
+    await this.notificationsService.notify({
+      userId: doc.user_id,
+      organisationId: orgId,
+      type: approved ? 'document_validated' : 'document_rejected',
+      title: approved ? 'Document validé' : 'Document refusé',
+      body: approved
+        ? `Votre document "${documentName}" a été validé.`
+        : `Votre document "${documentName}" a été refusé.`,
+      link: '/club/famille',
+      sendEmail: true,
+      emailTemplate: 'DocumentDecisionEmail',
+      emailSubject: approved ? `Document validé : ${documentName}` : `Document refusé : ${documentName}`,
+      emailData: {
+        firstname: docOwner?.firstname || '',
+        documentName,
+        approved,
+        rejectionReason: dto.action === 'reject' ? dto.rejectionReason : undefined,
+        ctaUrl: `${this.config.get<string>('FRONTEND_URL', 'http://localhost:5173')}/club/famille`,
+      },
+    })
+
+    return updated
   }
 
   // ── Compliance ─────────────────────────────────────────────────────────────

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Bell, LogOut, User, Moon, Sun, Menu, ChevronRight, Settings } from 'lucide-react'
+import { LogOut, User, Moon, Sun, Menu, ChevronRight, Settings } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { api } from '../../lib/api'
+import NotificationBell from '../shared/NotificationBell'
 import type { Organisation } from '../../types'
 
 interface DashboardHeaderProps {
@@ -124,13 +125,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ organisationId }) => 
         </button>
 
         {/* Notifications */}
-        <Link
-          to={`/dashboard/${organisationId}/notifications`}
-          className="relative w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors active:scale-95 transition-transform"
-        >
-          <Bell className="w-4 h-4 shrink-0" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-destructive rounded-full" />
-        </Link>
+        <NotificationBell />
 
         {/* User menu */}
         <div className="relative" ref={menuRef}>

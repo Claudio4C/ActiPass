@@ -92,6 +92,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
               })
               .catch(() => {})
 
+            // Si la permission push a déjà été accordée précédemment, on (re)enregistre le token
+            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+              void import('../lib/firebase').then(({ registerPushToken }) => registerPushToken())
+            }
+
         } catch (error) {
             console.error('Login error:', error);
 

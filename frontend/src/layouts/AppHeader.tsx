@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { LogOut, User, Moon, Sun, Home, Menu, Baby, Building2, Users } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
+import NotificationBell from '../components/shared/NotificationBell'
 
 interface AppHeaderProps {
   badge?: string;
@@ -95,6 +96,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ badge, extra }) => {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
+          <NotificationBell />
           <button
             onClick={() => setIsDarkMode(d => !d)}
             className="w-9 h-9 rounded-xl flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors active:scale-95 transition-transform"

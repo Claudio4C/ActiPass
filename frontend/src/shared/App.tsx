@@ -20,6 +20,7 @@ import ResendVerification from '../pages/ResendVerification'
 import HomePage from '../pages/HomePage'
 import DiscoverPage from '../pages/DiscoverPage'
 import AccountSwitch from '../pages/AccountSwitch'
+import NotificationsPage from '../pages/NotificationsPage'
 import OnboardingPage from '../pages/OnboardingPage'
 
 // Club member space (org-specific)
@@ -36,8 +37,8 @@ import ComingSoon from '../components/shared/ComingSoon'
 // Club / member pages
 import ClubMembersPage from '../pages/club/MembersPage'
 import ProfilePage from '../pages/club/ProfilePage'
+import NotificationPreferencesPage from '../pages/account/NotificationPreferencesPage'
 import SubscriptionPage from '../pages/club/SubscriptionPage'
-import NotificationsPage from '../pages/club/NotificationsPage'
 import TeachersPage from '../pages/club/TeachersPage'
 import DisciplinesPage from '../pages/club/DisciplinesPage'
 import VideoLessonsPage from '../pages/club/VideoLessonsPage'
@@ -179,6 +180,7 @@ const AppContent: React.FC<{
         >
           <Route path="/home" element={<HomePage />} />
           <Route path="/accounts" element={<AccountSwitch />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
         </Route>
 
         {/* Onboarding — logo seul, sans navigation */}
@@ -215,13 +217,14 @@ const AppContent: React.FC<{
           <Route path="/club/famille" element={<FamilyPage />} />
           <Route path="/club/famille/planning" element={<FamilyDashboardPage />} />
           <Route path="/club/famille/:childId" element={<ChildDetailPage />} />
-          <Route path="/club/notifications" element={<NotificationsPage />} />
+          <Route path="/club/notifications" element={<Navigate to="/notifications" replace />} />
           <Route path="/club/loyalty" element={<LoyaltyPage />} />
           <Route path="/club/professeurs" element={<TeachersPage />} />
           <Route path="/club/disciplines" element={<DisciplinesPage />} />
           <Route path="/club/cours-video" element={<VideoLessonsPage />} />
           <Route path="/account/profile" element={<ProfilePage />} />
           <Route path="/account/subscriptions" element={<SubscriptionPage />} />
+          <Route path="/account/notifications" element={<NotificationPreferencesPage />} />
         </Route>
 
         {/* ═══════════════════════════════════════
@@ -242,7 +245,7 @@ const AppContent: React.FC<{
           <Route path="/club/:orgId/famille" element={<FamilyPage />} />
           <Route path="/club/:orgId/coaches" element={<ComingSoon title="Coachs" description="L'annuaire des coachs sera disponible prochainement." />} />
           <Route path="/club/:orgId/deplacements" element={<ComingSoon title="Déplacements" description="La gestion des déplacements sera disponible prochainement." />} />
-          <Route path="/club/:orgId/notifications" element={<ComingSoon title="Notifications" description="Vos notifications seront disponibles prochainement." />} />
+          <Route path="/club/:orgId/notifications" element={<Navigate to="/notifications" replace />} />
           <Route path="/club/:orgId/payment" element={<PaymentPage />} />
           <Route path="/club/:orgId/payment/success" element={<PaymentSuccessPage />} />
           <Route path="/club/:orgId/events/:eventId/payment-success" element={<EventPaymentSuccessPage />} />

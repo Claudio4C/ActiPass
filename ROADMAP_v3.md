@@ -161,10 +161,10 @@
 
 | ID | User Story | Critères d'acceptation | Front | Back |
 |----|-----------|------------------------|-------|------|
-| P3-6 | Pointer les présences manuellement (coach) | Liste inscrits + case à cocher, absent/présent/retard, temps réel. | ✅ | ✅ |
-| P3-7 | Générer un QR code de séance (coach) | QR unique par event, valable pendant la durée. | ✅ | ✅ |
-| P3-8 | Scanner le QR code (membre) | Page scan, confirmation visuelle immédiate. | ✅ | ✅ |
-| P3-9 | Statistiques de présence (admin) | Taux par membre/cours/période, export CSV. | ✅ | ✅ |
+| P3-6 | Pointer les présences manuellement (coach) | Liste inscrits + case à cocher, absent/présent/retard, temps réel. | — | — |
+| P3-7 | Générer un QR code de séance (coach) | QR unique par event, valable pendant la durée. | — | ✅ |
+| P3-8 | Scanner le QR code (membre) | Page scan, confirmation visuelle immédiate. | — | ✅ |
+| P3-9 | Statistiques de présence (admin) | Taux par membre/cours/période, export CSV. | — | — |
 
 ---
 
@@ -239,9 +239,9 @@
 - [x] Gestion des saisons (Epic 2.1)
 - [x] Stripe Connect + cotisations + dashboard financier (Epic 2.2/2.3)
 - [x] Renouvellement annuel + relances impayés + reçus Stripe + remboursements (Epic 2.3)
-- [ ] Événements récurrents + réservation (Epic 3.1) ← suivant
-- [ ] Liste d'attente (Epic 3.2)
-- [ ] Présences manuelles + QR code front (Epic 3.3)
+- [x] Événements récurrents + réservation (Epic 3.1) ← suivant
+- [x] Liste d'attente (Epic 3.2)
+- [x] Présences manuelles + QR code front (Epic 3.3)
 - [ ] Notifications email de base (Epic 4.1)
 
 **Ordre de priorité : 3.1 → 3.2 → 3.3 → 4.1**

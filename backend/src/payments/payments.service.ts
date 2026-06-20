@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { EmailService } from '../email/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from '../stripe/stripe.service';
 
@@ -18,7 +20,9 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stripe: StripeService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
+    private readonly emailService: EmailService,
+    private readonly notificationsService: NotificationsService
   ) {}
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -245,16 +249,37 @@ export class PaymentsService {
 
     const member = await this.prisma.user.findUnique({
       where: { id: targetUserId },
-      select: { email: true },
+      select: { firstname: true, email: true },
     });
     if (!member) {
       throw new NotFoundException('Membre introuvable.');
     }
 
+    const organisation = await this.prisma.organisation.findUnique({
+      where: { id: orgId },
+      select: { name: true },
+    });
+    const organisationName = organisation?.name || 'votre club';
+
     const frontendUrl = this.config.getOrThrow<string>('FRONTEND_URL').replace(/\/+$/, '');
-    console.log(
-      `[Reminder] REMINDER EMAIL would be sent to ${member.email} with link ${frontendUrl}/club/${orgId}/payment`
-    );
+    const paymentUrl = `${frontendUrl}/club/${orgId}/payment`;
+
+    await this.notificationsService.notify({
+      userId: targetUserId,
+      organisationId: orgId,
+      type: 'system',
+      title: 'Cotisation en attente',
+      body: `Un paiement est en attente chez ${organisationName}.`,
+      link: `/club/${orgId}/payment`,
+      sendEmail: false,
+      sendPush: true,
+    });
+
+    await this.emailService.sendEmail({
+      to: member.email,
+      subject: `Rappel de paiement — ${organisationName}`,
+      html: `<p>Bonjour ${member.firstname},</p><p>Nous vous rappelons qu'un paiement est en attente pour votre adhésion à <strong>${organisationName}</strong>.</p><p><a href="${paymentUrl}">Régler ma cotisation</a></p>`,
+    });
 
     return { reminded: true, email: member.email };
   }

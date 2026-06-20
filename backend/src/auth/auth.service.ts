@@ -139,6 +139,7 @@ export class AuthService {
           : null,
         email_verification_token: verificationToken,
         email_verification_expires: expiresAt,
+        notificationPreference: { create: {} },
       },
     });
 

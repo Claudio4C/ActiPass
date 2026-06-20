@@ -1,12 +1,14 @@
-import { Controller, Get, Put, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Delete, Body, Param, UseGuards, Req } from '@nestjs/common';
 import { Request } from 'express';
 
 import { SuperAdminOrPermissions } from '../auth/decorators/super-admin-or-permissions.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SuperAdminOrPermissionsGuard } from '../auth/guards/super-admin-or-permissions.guard';
 import { SuperAdminService } from '../auth/super-admin.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { UpdateNotificationPreferencesDto } from '../notifications/dto';
 
-import { UpdateUserDto } from './dto';
+import { AddFcmTokenDto, UpdateUserDto } from './dto';
 import { UsersService } from './users.service';
 
 @Controller('users')
@@ -14,7 +16,8 @@ import { UsersService } from './users.service';
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
-    private readonly superAdminService: SuperAdminService
+    private readonly superAdminService: SuperAdminService,
+    private readonly notificationsService: NotificationsService
   ) {}
 
   /**
@@ -63,6 +66,46 @@ export class UsersController {
       throw new Error('Utilisateur non authentifié');
     }
     return this.usersService.getUserPermissions(userId);
+  }
+
+  /**
+   * Enregistrer un token FCM (push) pour l'utilisateur connecté
+   */
+  @Post('me/fcm-token')
+  async addFcmToken(@Body() body: AddFcmTokenDto, @Req() req: Request) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) {
+      throw new Error('Utilisateur non authentifié');
+    }
+    await this.usersService.addFcmToken(userId, body.token);
+    return { success: true };
+  }
+
+  /**
+   * Récupérer mes préférences de notifications (créées par défaut si inexistantes)
+   */
+  @Get('me/notification-preferences')
+  async getMyNotificationPreferences(@Req() req: Request) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) {
+      throw new Error('Utilisateur non authentifié');
+    }
+    return this.notificationsService.getOrCreatePreferences(userId);
+  }
+
+  /**
+   * Modifier mes préférences de notifications
+   */
+  @Patch('me/notification-preferences')
+  async updateMyNotificationPreferences(
+    @Body() body: UpdateNotificationPreferencesDto,
+    @Req() req: Request
+  ) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) {
+      throw new Error('Utilisateur non authentifié');
+    }
+    return this.notificationsService.updatePreferences(userId, body);
   }
 
   /**

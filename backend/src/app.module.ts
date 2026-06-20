@@ -22,6 +22,8 @@ import { SeasonsModule } from './seasons/seasons.module';
 import { StripeModule } from './stripe/stripe.module';
 import { SubscriptionPlansModule } from './subscription-plans/subscription-plans.module';
 import { PaymentsModule } from './payments/payments.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { PushModule } from './push/push.module';
 
 @Module({
   imports: [
@@ -46,6 +48,8 @@ import { PaymentsModule } from './payments/payments.module';
     StripeModule,
     SubscriptionPlansModule,
     PaymentsModule,
+    PushModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [

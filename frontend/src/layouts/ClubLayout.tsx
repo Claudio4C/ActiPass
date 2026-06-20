@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
 import { cn } from '../lib/utils'
 import { useMemberDocumentsAlert } from '../hooks/useMemberDocumentsAlert'
+import { useUnreadCount } from '../hooks/useUnreadCount'
 import type { RoleType } from '../types'
 
 // ─── types ───────────────────────────────────────────────────────────────────
@@ -45,7 +46,7 @@ const makeNav = (orgId: string) => [
   { path: `/club/${orgId}/famille`,       icon: Baby,            label: 'Ma famille' },
   { path: `/club/${orgId}/coaches`,       icon: Users2,          label: 'Coachs' },
   { path: `/club/${orgId}/deplacements`,  icon: Car,             label: 'Déplacements' },
-  { path: `/club/${orgId}/notifications`, icon: Bell,            label: 'Notifications', badge: 0 },
+  { path: '/notifications',               icon: Bell,            label: 'Notifications', badge: 0 },
   { path: `/club/${orgId}/payment`,        icon: CreditCard,      label: 'Cotisation' },
   { path: `/club/${orgId}/fidelite`,      icon: Sparkles,        label: 'Fidélité' },
   { path: `/club/${orgId}/documents`,     icon: FileText,        label: 'Documents' },
@@ -70,6 +71,7 @@ const ClubLayout: React.FC = () => {
 
   // Must be called unconditionally — before any early return
   const { alertCount: docAlertCount } = useMemberDocumentsAlert(orgId)
+  const { count: unreadCount } = useUnreadCount()
 
   useEffect(() => {
     const root = document.documentElement
@@ -308,7 +310,8 @@ const ClubLayout: React.FC = () => {
       {nav.map(({ path, icon: Icon, label, badge, end }) => {
         const active = isActive(path, end)
         const isDocsLink = path === `/club/${orgId}/documents`
-        const effectiveBadge = isDocsLink ? docAlertCount : badge
+        const isNotifLink = path === '/notifications'
+        const effectiveBadge = isDocsLink ? docAlertCount : isNotifLink ? unreadCount : badge
         return (
           <Link
             key={path}
