@@ -1028,4 +1028,129 @@ export class AttendanceService {
       monthly_no_show_rate: monthlyNoShowRate,
     };
   }
+
+  private buildExportCsvFilename(organisationName: string, suffix: string): string {
+    const slug =
+      organisationName
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .replace(/[\u0000-\u001f:*?"<>|]+/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') || 'organisation';
+    return `${slug.slice(0, 120)}-${suffix}.csv`;
+  }
+
+  async exportAttendanceStatsToCSV(
+    organisationId: string,
+    userId: string,
+    filters?: {
+      startDate?: Date;
+      endDate?: Date;
+      coachId?: string;
+    }
+  ) {
+    await this.checkOrganisationAccess(userId, organisationId);
+
+    const hasReadPermission = await this.permissionsService.hasPermission(
+      userId,
+      { resource: 'attendance', action: 'read', scope: 'organisation' },
+      organisationId
+    );
+    if (!hasReadPermission) {
+      throw new ForbiddenException("Vous n'avez pas la permission de lire les statistiques");
+    }
+
+    const orgMeta = await this.prisma.organisation.findUnique({
+      where: { id: organisationId },
+      select: { name: true },
+    });
+    if (!orgMeta) {
+      throw new NotFoundException('Organisation introuvable');
+    }
+
+    const where: {
+      event: {
+        organisation_id: string;
+        start_time?: { gte?: Date; lte?: Date };
+        created_by_id?: string;
+      };
+    } = {
+      event: { organisation_id: organisationId },
+    };
+
+    if (filters?.startDate || filters?.endDate) {
+      where.event.start_time = {};
+      if (filters.startDate) where.event.start_time.gte = filters.startDate;
+      if (filters.endDate) where.event.start_time.lte = filters.endDate;
+    }
+
+    if (filters?.coachId) {
+      where.event.created_by_id = filters.coachId;
+    }
+
+    const attendances = await this.prisma.attendance.findMany({
+      where,
+      include: {
+        event: { select: { title: true, start_time: true } },
+        user: { select: { firstname: true, lastname: true, email: true } },
+        checker: { select: { firstname: true, lastname: true } },
+      },
+      orderBy: { event: { start_time: 'asc' } },
+    });
+
+    const csvCell = (v: unknown) => {
+      if (v === null || v === undefined) return '""';
+      const s = String(v).replace(/"/g, '""');
+      return `"${s}"`;
+    };
+
+    const fmtDateTime = (d: Date | null | undefined) =>
+      d ? new Date(d).toLocaleString('fr-FR') : '';
+
+    const statusLabels: Record<string, string> = {
+      present: 'Présent',
+      late: 'En retard',
+      absent: 'Absent',
+      excused: 'Excusé',
+    };
+    const typeLabels: Record<string, string> = {
+      manual: 'Manuel',
+      self: 'QR (membre)',
+      automatic: 'Automatique',
+    };
+
+    const headers = [
+      'Date du cours',
+      'Événement',
+      'Membre',
+      'Email',
+      'Statut',
+      'Type de pointage',
+      'Pointé par',
+      'Note',
+    ];
+
+    const rows = attendances.map((a) => [
+      fmtDateTime(a.event.start_time),
+      a.event.title,
+      `${a.user.firstname} ${a.user.lastname}`,
+      a.user.email,
+      statusLabels[a.status] || a.status,
+      typeLabels[a.type] || a.type,
+      a.checker ? `${a.checker.firstname} ${a.checker.lastname}` : '',
+      a.comment || '',
+    ]);
+
+    const csvContent = [
+      headers.map(csvCell).join(','),
+      ...rows.map((row) => row.map(csvCell).join(',')),
+    ].join('\n');
+
+    return {
+      csv: csvContent,
+      filename: this.buildExportCsvFilename(orgMeta.name, 'presences'),
+    };
+  }
 }

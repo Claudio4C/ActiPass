@@ -221,7 +221,7 @@ const AttendanceDetailPage: React.FC = () => {
       )
       setQrCode(data.qr_code)
       setCheckInUrl(
-        `${window.location.origin}/dashboard/${organisationId}/attendance/${eventId}/check-in?t=${encodeURIComponent(data.qr_code)}`,
+        `${window.location.origin}/attendance/${organisationId}/${eventId}/check-in?t=${encodeURIComponent(data.qr_code)}`,
       )
       setShowQrModal(true)
       setQrCopied(false)
@@ -243,7 +243,7 @@ const AttendanceDetailPage: React.FC = () => {
       )
       setQrCode(data.qr_code)
       setCheckInUrl(
-        `${window.location.origin}/dashboard/${organisationId}/attendance/${eventId}/check-in?t=${encodeURIComponent(data.qr_code)}`,
+        `${window.location.origin}/attendance/${organisationId}/${eventId}/check-in?t=${encodeURIComponent(data.qr_code)}`,
       )
       setQrCopied(false)
       showNotif('success', 'Nouveau QR généré : les anciens codes ne sont plus valides.')

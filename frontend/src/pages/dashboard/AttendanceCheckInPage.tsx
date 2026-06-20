@@ -23,7 +23,7 @@ type ValidateResponse =
     }
 
 /**
- * Pointage par QR : /dashboard/:organisationId/attendance/:eventId/check-in?t=TOKEN
+ * Pointage par QR : /attendance/:organisationId/:eventId/check-in?t=TOKEN
  * Connexion obligatoire. Si plusieurs personnes éligibles (vous + enfants), choix puis validation.
  */
 const AttendanceCheckInPage: React.FC = () => {

@@ -161,10 +161,10 @@
 
 | ID | User Story | Critères d'acceptation | Front | Back |
 |----|-----------|------------------------|-------|------|
-| P3-6 | Pointer les présences manuellement (coach) | Liste inscrits + case à cocher, absent/présent/retard, temps réel. | — | — |
-| P3-7 | Générer un QR code de séance (coach) | QR unique par event, valable pendant la durée. | — | ✅ |
-| P3-8 | Scanner le QR code (membre) | Page scan, confirmation visuelle immédiate. | — | ✅ |
-| P3-9 | Statistiques de présence (admin) | Taux par membre/cours/période, export CSV. | — | — |
+| P3-6 | Pointer les présences manuellement (coach) | Liste inscrits + case à cocher, absent/présent/retard, temps réel. | ✅ | ✅ |
+| P3-7 | Générer un QR code de séance (coach) | QR unique par event, valable pendant la durée. | ✅ | ✅ |
+| P3-8 | Scanner le QR code (membre) | Page scan, confirmation visuelle immédiate. | ✅ | ✅ |
+| P3-9 | Statistiques de présence (admin) | Taux par membre/cours/période, export CSV. | ✅ | ✅ |
 
 ---
 

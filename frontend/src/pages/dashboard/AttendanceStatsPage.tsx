@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { BarChart3, TrendingUp, Users, Calendar, Filter, ArrowLeft, AlertCircle } from 'lucide-react'
+import { BarChart3, TrendingUp, Users, Calendar, Filter, ArrowLeft, AlertCircle, Download, Loader2 } from 'lucide-react'
 import { api } from '../../lib/api'
+import { getErrorMessage } from '../../lib/errors'
 
 interface AttendanceStats {
   global_rate: number;
@@ -38,6 +39,7 @@ const AttendanceStatsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [filters, setFilters] = useState<Filters>({ startDate: '', endDate: '' })
   const [pendingFilters, setPendingFilters] = useState<Filters>({ startDate: '', endDate: '' })
+  const [exportLoading, setExportLoading] = useState(false)
 
   const loadStats = useCallback(async (activeFilters: Filters) => {
     if (!organisationId) { return }
@@ -79,6 +81,32 @@ const AttendanceStatsPage: React.FC = () => {
 
   const hasActiveFilters = filters.startDate || filters.endDate
 
+  const handleExportCsv = async () => {
+    if (!organisationId) { return }
+    try {
+      setExportLoading(true)
+      const params: Record<string, string> = {}
+      if (filters.startDate) { params.startDate = filters.startDate }
+      if (filters.endDate) { params.endDate = filters.endDate }
+      const res = await api.get<{ csv: string; filename: string }>(
+        `/organisations/${organisationId}/attendance/stats/export`,
+        params,
+        { useCache: false },
+      )
+      const blob = new Blob([`﻿${res.csv}`], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = res.filename || 'presences.csv'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert(getErrorMessage(err instanceof Error ? err : new Error(String(err))))
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
   const formatMonth = (month: string) => {
     const [year, monthNum] = month.split('-')
     return new Date(parseInt(year), parseInt(monthNum) - 1).toLocaleDateString('fr-FR', {
@@ -99,10 +127,18 @@ const AttendanceStatsPage: React.FC = () => {
         >
           <ArrowLeft className="w-4 h-4 shrink-0" />
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="font-display text-2xl font-bold text-foreground">Statistiques de présence</h1>
           <p className="text-sm text-muted-foreground mt-1">Analysez l'assiduité de vos adhérents</p>
         </div>
+        <button
+          onClick={handleExportCsv}
+          disabled={exportLoading || !stats || stats.total_attendances === 0}
+          className="h-10 px-4 inline-flex items-center gap-2 rounded-xl border border-border bg-card text-sm font-semibold text-foreground hover:border-primary/40 transition-colors disabled:opacity-50"
+        >
+          {exportLoading ? <Loader2 className="w-4 h-4 animate-spin shrink-0" /> : <Download className="w-4 h-4 shrink-0" />}
+          Export CSV
+        </button>
       </div>
 
       {/* Filtres */}

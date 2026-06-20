@@ -219,4 +219,26 @@ export class AttendanceStatsController {
 
     return this.attendanceService.getAttendanceStats(organisationId, userId, filters);
   }
+
+  @Get('stats/export')
+  @RequireRead('attendance', 'organisation')
+  @UseInterceptors(AuditInterceptor)
+  @Audit({ action: 'export', resourceType: 'attendance_stats', logOnSuccess: true })
+  async exportAttendanceStats(
+    @Param('organisationId') organisationId: string,
+    @Req() req: Request,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('coachId') coachId?: string
+  ) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) throw new Error('Utilisateur non authentifié');
+
+    const filters: { startDate?: Date; endDate?: Date; coachId?: string } = {};
+    if (startDate) filters.startDate = new Date(startDate);
+    if (endDate) filters.endDate = new Date(endDate);
+    if (coachId) filters.coachId = coachId;
+
+    return this.attendanceService.exportAttendanceStatsToCSV(organisationId, userId, filters);
+  }
 }

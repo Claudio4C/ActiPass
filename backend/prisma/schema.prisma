@@ -550,7 +550,7 @@ model Attendance {
   correction_note   String?
   validated_at      DateTime?
   updated_at        DateTime         @updatedAt
-  qr_code           String?          @unique
+  qr_code           String?
   created_at        DateTime         @default(now())
   checker           User?            @relation("AttendanceCheckedBy", fields: [checked_in_by], references: [id])
   corrector         User?            @relation("AttendanceCorrectedBy", fields: [correction_by], references: [id])
