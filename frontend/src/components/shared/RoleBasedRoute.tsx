@@ -14,7 +14,7 @@ interface RoleBasedRouteProps {
 const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({
   children,
   allowedRoles,
-  fallbackPath = '/accounts',
+  fallbackPath = '/home',
 }) => {
   const { user } = useAuth();
   const { organisationId } = useParams<{ organisationId: string }>();

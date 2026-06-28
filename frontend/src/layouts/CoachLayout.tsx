@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import {
     Award, Calendar, MessageSquare, MapPin, DollarSign,
-    User, Menu, X, ArrowLeftRight,
+    User, Menu, X, LayoutDashboard, TrendingUp,
 } from 'lucide-react';
 import AppHeader from './AppHeader';
 import { useCurrentOrganisation } from '../hooks/useCurrentOrganisation';
@@ -14,12 +14,13 @@ interface NavItem {
 }
 
 const coachNav: NavItem[] = [
+    { icon: LayoutDashboard, label: 'Tableau de bord',   path: '/coach/dashboard' },
     { icon: Calendar,       label: 'Mon planning',       path: '/coach/planning' },
+    { icon: TrendingUp,     label: 'Progression',        path: '/coach/progression' },
     { icon: MessageSquare,  label: 'Messages',           path: '/coach/messages' },
     { icon: MapPin,         label: 'Candidatures',       path: '/coach/applications' },
     { icon: DollarSign,     label: 'Remunerations',      path: '/coach/billing' },
     { icon: User,           label: 'Mon profil',         path: '/coach/profile' },
-    { icon: ArrowLeftRight, label: 'Changer de compte',  path: '/accounts' },
 ];
 
 const CoachLayout: React.FC = () => {
@@ -87,13 +88,6 @@ const CoachLayout: React.FC = () => {
                 badgeClass="bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300"
                 logoClass="bg-emerald-600"
                 LogoIcon={Award}
-                extra={
-                    organisation?.name ? (
-                        <span className="hidden sm:inline text-sm font-medium text-gray-500 dark:text-slate-400">
-                            {organisation.name}
-                        </span>
-                    ) : null
-                }
             />
 
             <div className="flex flex-1" style={{ minHeight: 'calc(100vh - 3.5rem)' }}>

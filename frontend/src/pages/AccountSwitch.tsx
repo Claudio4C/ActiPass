@@ -2,6 +2,11 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapPin, Loader2, AlertCircle, Building2, UserPlus, BadgeCheck, ChevronRight } from 'lucide-react';
 import { api } from '../lib/api';
+import {
+    getOrganisationDestination,
+    persistOrganisationSelection,
+    type MyOrganisationItem,
+} from '../lib/workspace';
 import type { RoleType } from '../types';
 
 type Organisation = {
@@ -80,22 +85,7 @@ const AccountSwitch: React.FC = () => {
             try {
                 setLoading(true);
                 setError(null);
-                const data = await api.get<Array<{
-                    organisation: {
-                        id: string;
-                        name: string;
-                        type: 'club' | 'association' | null;
-                        description: string | null;
-                    };
-                    role: {
-                        id: string;
-                        name: string;
-                        type: RoleType;
-                        level: number;
-                    };
-                    joined_at: string;
-                    status: 'pending' | 'active' | 'banned';
-                }>>('/organisations/my', {}, { useCache: true, cacheTTL: 60000 });
+                const data = await api.get<MyOrganisationItem[]>('/organisations/my', {}, { useCache: true, cacheTTL: 60000 });
 
                 const mappedOrgs: Organisation[] = data.map((item) => ({
                     id: item.organisation.id,
@@ -105,7 +95,7 @@ const AccountSwitch: React.FC = () => {
                     roleName: item.role.name,
                     type: item.organisation.type || 'club',
                     description: item.organisation.description || undefined,
-                    membershipStatus: item.status || 'active',
+                    membershipStatus: (item.status as Organisation['membershipStatus']) || 'active',
                 }));
 
                 setOrganisations(mappedOrgs);
@@ -143,20 +133,16 @@ const AccountSwitch: React.FC = () => {
     }, [organisations, search, roleFilter, typeFilter]);
 
     const handleSelect = (org: Organisation) => {
-        localStorage.setItem('selectedOrganisation', JSON.stringify({
+        persistOrganisationSelection({
             id: org.id,
             name: org.name,
             type: org.type,
-            role: org.role,
             roleType: org.roleType,
             roleName: org.roleName,
             membershipStatus: org.membershipStatus,
-        }));
+        });
         setLastSelectedId(org.id);
-        if (typeof window !== 'undefined') {
-            window.dispatchEvent(new Event('organisation:updated'));
-        }
-        navigate('/club/members');
+        navigate(getOrganisationDestination(org.roleType, org.id));
     };
 
     const getInitials = (name: string) => {

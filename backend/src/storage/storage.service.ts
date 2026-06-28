@@ -16,21 +16,53 @@ import { SIGNED_URL_EXPIRY_SECONDS } from './storage.constants'
 @Injectable()
 export class StorageService {
   private readonly logger = new Logger(StorageService.name)
-  private readonly client: S3Client
-  private readonly bucket: string
+  private readonly client: S3Client | null
+  private readonly bucket: string | null
+  private readonly enabled: boolean
 
   constructor(private readonly config: ConfigService) {
-    this.bucket  = config.getOrThrow<string>('OVH_S3_BUCKET')
+    const bucket = config.get<string>('OVH_S3_BUCKET')
+    const region = config.get<string>('OVH_S3_REGION')
+    const endpoint = config.get<string>('OVH_S3_ENDPOINT')
+    const accessKeyId = config.get<string>('OVH_S3_ACCESS_KEY')
+    const secretAccessKey = config.get<string>('OVH_S3_SECRET_KEY')
 
+    const isConfigured =
+      Boolean(bucket && region && endpoint && accessKeyId && secretAccessKey)
+
+    if (!isConfigured) {
+      this.enabled = false
+      this.client = null
+      this.bucket = null
+      if (config.get<string>('NODE_ENV') === 'production') {
+        throw new Error(
+          'Configuration OVH S3 incomplète : OVH_S3_BUCKET, OVH_S3_REGION, OVH_S3_ENDPOINT, OVH_S3_ACCESS_KEY et OVH_S3_SECRET_KEY sont requis.',
+        )
+      }
+      this.logger.warn(
+        'OVH S3 non configuré — uploads de documents désactivés en local. ' +
+          'Copiez les variables OVH_S3_* depuis .env.example vers .env.',
+      )
+      return
+    }
+
+    this.enabled = true
+    this.bucket = bucket!
     this.client = new S3Client({
-      region:   config.getOrThrow<string>('OVH_S3_REGION'),
-      endpoint: config.getOrThrow<string>('OVH_S3_ENDPOINT'),
-      credentials: {
-        accessKeyId:     config.getOrThrow<string>('OVH_S3_ACCESS_KEY'),
-        secretAccessKey: config.getOrThrow<string>('OVH_S3_SECRET_KEY'),
-      },
+      region,
+      endpoint,
+      credentials: { accessKeyId: accessKeyId!, secretAccessKey: secretAccessKey! },
       forcePathStyle: true,
     })
+  }
+
+  private requireStorage(): { client: S3Client; bucket: string } {
+    if (!this.enabled || !this.client || !this.bucket) {
+      throw new InternalServerErrorException(
+        'Stockage fichiers indisponible — configurez OVH_S3_* dans .env (voir .env.example).',
+      )
+    }
+    return { client: this.client, bucket: this.bucket }
   }
 
   /**
@@ -42,10 +74,11 @@ export class StorageService {
     key: string,
     mimeType: string,
   ): Promise<string> {
+    const { client, bucket } = this.requireStorage()
     try {
-      await this.client.send(
+      await client.send(
         new PutObjectCommand({
-          Bucket:             this.bucket,
+          Bucket:             bucket,
           Key:                key,
           Body:               buffer,
           ContentType:        mimeType,
@@ -68,10 +101,11 @@ export class StorageService {
     key: string,
     expiresIn: number = SIGNED_URL_EXPIRY_SECONDS,
   ): Promise<string> {
+    const { client, bucket } = this.requireStorage()
     try {
       return await getSignedUrl(
-        this.client,
-        new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+        client,
+        new GetObjectCommand({ Bucket: bucket, Key: key }),
         { expiresIn },
       )
     } catch (err) {
@@ -85,9 +119,10 @@ export class StorageService {
    * S3-compatible stores return success even if the key doesn't exist — safe to call idempotently.
    */
   async deleteFile(key: string): Promise<void> {
+    const { client, bucket } = this.requireStorage()
     try {
-      await this.client.send(
-        new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+      await client.send(
+        new DeleteObjectCommand({ Bucket: bucket, Key: key }),
       )
     } catch (err) {
       this.logger.error(`deleteFile failed for key="${key}"`, err)

@@ -5,7 +5,8 @@ type StoredOrganisation = {
     name?: string;
     subtitle?: string;
     description?: string;
-    role?: 'membre' | 'coach' | 'gestionnaire' | 'independant';
+    role?: 'membre' | 'coach' | 'gestionnaire' | 'propriétaire' | 'trésorier' | 'independant';
+    roleType?: 'club_owner' | 'club_manager' | 'treasurer' | 'coach' | 'member';
     type?: 'club' | 'association' | 'independant';
 };
 
@@ -52,10 +53,13 @@ const getMetadata = (organisation: StoredOrganisation | null): OrganisationMetad
     };
 };
 
-const mapRole = (role?: StoredOrganisation['role']): OrganisationRole => {
-    if (role === 'coach') return 'coach';
-    if (role === 'gestionnaire') return 'manager';
-    if (role === 'independant') return 'freelance';
+const mapRole = (org?: StoredOrganisation | null): OrganisationRole => {
+    if (org?.roleType === 'club_owner' || org?.roleType === 'club_manager' || org?.roleType === 'treasurer') {
+        return 'manager';
+    }
+    if (org?.roleType === 'coach' || org?.role === 'coach') return 'coach';
+    if (org?.role === 'gestionnaire' || org?.role === 'propriétaire' || org?.role === 'trésorier') return 'manager';
+    if (org?.role === 'independant') return 'freelance';
     return 'member';
 };
 
@@ -76,7 +80,7 @@ const readOrganisation = (): { organisation: StoredOrganisation | null; metadata
         return {
             organisation: parsed,
             metadata,
-            role: mapRole(parsed.role),
+            role: mapRole(parsed),
         };
     } catch (error) {
         console.error('Impossible de lire selectedOrganisation', error);

@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { Bell, LogOut, User, Moon, Sun, Menu, ChevronRight, Settings } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { api } from '../../lib/api'
-import type { Organisation } from '../../types'
+import WorkspaceSwitcher from './WorkspaceSwitcher'
 
 interface DashboardHeaderProps {
   organisationId: string;
@@ -11,7 +10,6 @@ interface DashboardHeaderProps {
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = ({ organisationId }) => {
   const { user, logout, isLoading } = useAuth()
-  const [organisation, setOrganisation] = useState<(Organisation & { logo_url?: string | null }) | null>(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(
     () => localStorage.getItem('user_avatar_url'),
@@ -39,22 +37,6 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ organisationId }) => 
       localStorage.setItem('theme', 'light')
     }
   }, [isDarkMode])
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const data = await api.get<{ organisation: Organisation & { logo_url?: string | null } }>(
-          `/organisations/${organisationId}`,
-          undefined,
-          { useCache: true, cacheTTL: 300000 },
-        )
-        setOrganisation(data.organisation)
-      } catch {
-        // silently fail — name stays null
-      }
-    }
-    load()
-  }, [organisationId])
 
   const closeMenu = useCallback(() => setIsMenuOpen(false), [])
 
@@ -98,18 +80,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ organisationId }) => 
           </span>
         </Link>
         <ChevronRight className="w-4 h-4 text-muted-foreground hidden sm:block shrink-0" />
-        <div className="flex items-center gap-2 min-w-0">
-          {organisation?.logo_url ? (
-            <img
-              src={organisation.logo_url}
-              alt={organisation.name}
-              className="w-7 h-7 rounded-lg object-cover shrink-0 border border-border"
-            />
-          ) : null}
-          <h1 className="font-display text-base font-bold text-foreground truncate">
-            {organisation?.name ?? 'Organisation'}
-          </h1>
-        </div>
+        <WorkspaceSwitcher compact className="min-w-0 max-w-xs" />
       </div>
 
       {/* Right: Actions */}
@@ -175,12 +146,12 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ organisationId }) => 
                     Mon profil
                   </Link>
                   <Link
-                    to="/accounts"
+                    to="/home"
                     onClick={closeMenu}
                     className="flex items-center gap-3 px-4 py-2.5 text-foreground hover:bg-muted transition-colors"
                   >
                     <Settings className="w-4 h-4 text-muted-foreground shrink-0" />
-                    Changer d'organisation
+                    Tous mes espaces
                   </Link>
                   <button
                     onClick={handleLogout}
