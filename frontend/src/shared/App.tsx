@@ -58,8 +58,10 @@ import ChildDetailPage from '../pages/club/ChildDetailPage'
 import CoachesDirectoryPage from '../pages/club/CoachesDirectoryPage'
 
 // Coach pages
+import CoachDashboardPage from '../pages/coach/DashboardPage'
 import CoachPlanningPage from '../pages/coach/PlanningPage'
 import CoachProfilePage from '../pages/coach/ProfilePage'
+import CoachMemberProgressPage from '../pages/coach/MemberProgressPage'
 import CoachApplicationsPage from '../pages/coach/ApplicationsPage'
 import CoachBillingPage from '../pages/coach/BillingPage'
 import CoachMessagesPage from '../pages/coach/MessagesPage'
@@ -244,7 +246,7 @@ const AppContent: React.FC<{
           <Route path="/club/:orgId/planning" element={<ClubPlanningPage />} />
           <Route path="/club/:orgId/events" element={<ClubOrgEventsPage />} />
           <Route path="/club/:orgId/famille" element={<FamilyPage />} />
-          <Route path="/club/:orgId/coaches" element={<ComingSoon title="Coachs" description="L'annuaire des coachs sera disponible prochainement." />} />
+          <Route path="/club/:orgId/coaches" element={<CoachesDirectoryPage />} />
           <Route path="/club/:orgId/deplacements" element={<ComingSoon title="Déplacements" description="La gestion des déplacements sera disponible prochainement." />} />
           <Route path="/club/:orgId/notifications" element={<Navigate to="/notifications" replace />} />
           <Route path="/club/:orgId/payment" element={<PaymentPage />} />
@@ -273,7 +275,10 @@ const AppContent: React.FC<{
             </ProtectedRoute>
           }
         >
+          <Route path="/coach" element={<Navigate to="/coach/dashboard" replace />} />
+          <Route path="/coach/dashboard" element={<CoachDashboardPage />} />
           <Route path="/coach/planning" element={<CoachPlanningPage />} />
+          <Route path="/coach/progression" element={<CoachMemberProgressPage />} />
           <Route path="/coach/profile" element={<CoachProfilePage />} />
           <Route path="/coach/messages" element={<CoachMessagesPage />} />
           <Route path="/coach/messages/:messageId" element={<CoachMessageDetailPage />} />

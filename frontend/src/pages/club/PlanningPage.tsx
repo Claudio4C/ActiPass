@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { Clock, MapPin, User, Dumbbell, Music, Trophy, Users, Bookmark, ChevronLeft, ChevronRight, CalendarPlus, Bell, X, Search } from 'lucide-react'
+import { Clock, MapPin, User, Dumbbell, Music, Trophy, Users, Bookmark, ChevronLeft, ChevronRight, CalendarPlus, Bell, X, Search, Sparkles } from 'lucide-react'
 import { useCurrentOrganisation } from '../../hooks/useCurrentOrganisation'
 import { useAuth } from '../../contexts/AuthContext'
+import { useBookedPrivateCourses } from '../../hooks/useBookedPrivateCourses'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/utils'
 import type { Event, EventType } from '../../types'
@@ -56,6 +57,8 @@ interface DisplayEvent {
   myReservation?: { id: string; status: string } | null;
   capacity?: number;
   price?: number;
+  isPrivateCourse?: boolean;
+  coachName?: string;
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -112,7 +115,9 @@ const URGENCY_CLS: Record<UrgencyTone, string> = {
 const WeekCard: React.FC<{ event: DisplayEvent; isToday: boolean; showMember: boolean; onClick: () => void }> = ({
   event, isToday, showMember, onClick,
 }) => {
-  const meta = EVENT_META[event.event_type] ?? EVENT_META.other
+  const meta = event.isPrivateCourse
+    ? { Icon: Sparkles, bg: 'bg-emerald-500/15', text: 'text-emerald-700' }
+    : (EVENT_META[event.event_type] ?? EVENT_META.other)
   const Icon = meta.Icon
 
   return (
@@ -135,6 +140,9 @@ const WeekCard: React.FC<{ event: DisplayEvent; isToday: boolean; showMember: bo
         })()}
       </div>
       <p className="font-display font-bold text-sm text-foreground leading-snug">{event.title}</p>
+      {event.isPrivateCourse && event.coachName && (
+        <p className="text-[10px] font-bold text-emerald-700">Coach · {event.coachName}</p>
+      )}
       <div className="space-y-1">
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Clock className="w-3 h-3 shrink-0" />
@@ -228,6 +236,7 @@ const FamilyMemberCard: React.FC<{
 const PlanningPage: React.FC = () => {
   const { organisation } = useCurrentOrganisation()
   const { user } = useAuth()
+  const { courses: privateCourses } = useBookedPrivateCourses()
   const orgId = organisation?.id
 
   const [myEvents,       setMyEvents]       = useState<Event[]>([])
@@ -322,8 +331,27 @@ const PlanningPage: React.FC = () => {
         }
       })
     })
+
+    privateCourses.forEach((pc) => {
+      result.push({
+        id: pc.id,
+        title: pc.title,
+        start_time: pc.startTime,
+        end_time: pc.endTime,
+        location: pc.location,
+        event_type: 'other',
+        memberId: 'me',
+        memberName: firstName,
+        memberColor: MEMBER_COLORS[0],
+        memberAvatarUrl: localStorage.getItem('user_avatar_url') ?? null,
+        isPrivateCourse: true,
+        coachName: pc.coachName,
+        price: pc.price,
+      })
+    })
+
     return result
-  }, [myEvents, children, firstName, orgId])
+  }, [myEvents, children, firstName, orgId, privateCourses])
 
   const filteredEvents = useMemo(() => {
     if (activeId === 'all') { return allDisplayEvents }
@@ -436,11 +464,20 @@ const PlanningPage: React.FC = () => {
     <div className="space-y-6">
 
       {/* Header */}
-      <div>
-        <h1 className="font-display text-3xl font-bold text-foreground">Planning hebdomadaire</h1>
-        <p className="text-muted-foreground mt-1">
-          Filtrez par membre pour voir leurs activités
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl font-bold text-foreground">Planning hebdomadaire</h1>
+          <p className="text-muted-foreground mt-1">
+            Club, famille et cours privés réservés via la marketplace
+          </p>
+        </div>
+        <Link
+          to="/club/coaches"
+          className="inline-flex items-center gap-2 h-10 px-4 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-800 text-sm font-bold hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300 shrink-0"
+        >
+          <Sparkles className="w-4 h-4" />
+          Trouver un coach
+        </Link>
       </div>
 
       {/* Bannière événement urgent */}

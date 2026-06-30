@@ -1,0 +1,266 @@
+import type {
+  CoachClub,
+  CoachKpi,
+  CoachPublicProfile,
+  CoachSession,
+  MemberProgress,
+  TeamMessage,
+} from '../../types/coach'
+
+export const COACH_PROFILE: CoachPublicProfile = {
+  id: 'coach-marie',
+  firstName: 'Marie',
+  lastName: 'Dupont',
+  bio: 'Coach certifiée DE JEPS avec 12 ans d\'expérience en judo et préparation physique. Accompagnement des jeunes compétiteurs et des adultes débutants.',
+  specialties: ['Judo', 'Préparation physique', 'Renforcement'],
+  qualifications: ['DE JEPS Judo', 'BPJEPS APT', 'Premiers secours'],
+  clubs: [
+    { id: 'club-judo-paris', name: 'Judo Club Paris 15', city: 'Paris' },
+    { id: 'club-fitness-lyon', name: 'Fitness Lyon Confluence', city: 'Lyon' },
+  ],
+  serviceArea: 'Paris & Île-de-France, Lyon métropole',
+  isPublished: true,
+  rating: 4.8,
+  reviewsCount: 36,
+}
+
+export const coachClubs: CoachClub[] = [
+  {
+    id: 'club-judo-paris',
+    name: 'Judo Club Paris 15',
+    city: 'Paris',
+    role: 'employee',
+    disciplines: ['Judo', 'Préparation physique'],
+    membersCount: 84,
+    attendanceRate: 91,
+  },
+  {
+    id: 'club-fitness-lyon',
+    name: 'Fitness Lyon Confluence',
+    city: 'Lyon',
+    role: 'freelance',
+    disciplines: ['Renforcement', 'Cross-training'],
+    membersCount: 42,
+    attendanceRate: 87,
+  },
+  {
+    id: 'club-natation-bdx',
+    name: 'AS Natation Bordeaux',
+    city: 'Bordeaux',
+    role: 'freelance',
+    disciplines: ['Natation technique'],
+    membersCount: 28,
+    attendanceRate: 94,
+  },
+]
+
+export const coachKpis: CoachKpi[] = [
+  { id: 'sessions', label: 'Séances cette semaine', value: '12', sublabel: '3 clubs' },
+  { id: 'enrolled', label: 'Inscrits total', value: '156', sublabel: 'Tous clubs confondus' },
+  { id: 'attendance', label: 'Taux de présence', value: '89%', sublabel: '30 derniers jours', href: '/coach/progression' },
+  { id: 'followups', label: 'Suivis à publier', value: '2', sublabel: 'Commentaires post-séance', href: '/coach/planning' },
+]
+
+const weekBase = '2026-06-16'
+
+export const coachSessions: CoachSession[] = [
+  {
+    id: 'sess-1',
+    clubId: 'club-judo-paris',
+    clubName: 'Judo Club Paris 15',
+    title: 'Judo minimes — technique',
+    discipline: 'Judo',
+    date: weekBase,
+    startTime: '17:00',
+    endTime: '18:30',
+    location: 'Dojo principal',
+    status: 'confirmed',
+    capacity: 18,
+    enrollees: [
+      { id: 'm1', name: 'Léa Martin', age: 12, parentName: 'Sophie Martin', attendance: 'present' },
+      { id: 'm2', name: 'Tom Bernard', age: 11, parentName: 'Marc Bernard', attendance: 'present' },
+      { id: 'm3', name: 'Inès Dubois', age: 12, parentName: 'Claire Dubois', attendance: 'late' },
+      { id: 'm4', name: 'Noah Petit', age: 11, parentName: 'Julie Petit', attendance: 'absent' },
+    ],
+    followUpComment: 'Bonne séance sur les projections. Léa progresse sur l\'ashi-waza. Tom à revoir sur la posture.',
+    followUpPublishedAt: '2026-06-16T19:00:00',
+  },
+  {
+    id: 'sess-2',
+    clubId: 'club-judo-paris',
+    clubName: 'Judo Club Paris 15',
+    title: 'Prépa physique compétiteurs',
+    discipline: 'Préparation physique',
+    date: '2026-06-17',
+    startTime: '19:00',
+    endTime: '20:00',
+    location: 'Salle muscu',
+    status: 'confirmed',
+    capacity: 12,
+    enrollees: [
+      { id: 'm5', name: 'Hugo Fernandes', age: 16, attendance: 'unknown' },
+      { id: 'm6', name: 'Emma Laurent', age: 15, attendance: 'unknown' },
+    ],
+  },
+  {
+    id: 'sess-3',
+    clubId: 'club-fitness-lyon',
+    clubName: 'Fitness Lyon Confluence',
+    title: 'Cross-training intermédiaire',
+    discipline: 'Cross-training',
+    date: '2026-06-18',
+    startTime: '12:00',
+    endTime: '13:00',
+    location: 'Box fonctionnelle',
+    status: 'confirmed',
+    capacity: 20,
+    enrollees: [
+      { id: 'm7', name: 'Paul Rousseau', attendance: 'unknown' },
+      { id: 'm8', name: 'Camille Girard', attendance: 'unknown' },
+      { id: 'm9', name: 'Lucas Moreau', attendance: 'unknown' },
+    ],
+  },
+  {
+    id: 'sess-4',
+    clubId: 'club-natation-bdx',
+    clubName: 'AS Natation Bordeaux',
+    title: 'Technique crawl adultes',
+    discipline: 'Natation',
+    date: '2026-06-19',
+    startTime: '07:30',
+    endTime: '08:30',
+    location: 'Piscine olympique',
+    status: 'pending',
+    capacity: 8,
+    enrollees: [
+      { id: 'm10', name: 'Anne Lefèvre', attendance: 'unknown' },
+    ],
+  },
+  {
+    id: 'sess-5',
+    clubId: 'club-judo-paris',
+    clubName: 'Judo Club Paris 15',
+    title: 'Judo cadets — randori',
+    discipline: 'Judo',
+    date: '2026-06-20',
+    startTime: '18:00',
+    endTime: '19:30',
+    location: 'Dojo principal',
+    status: 'confirmed',
+    capacity: 16,
+    enrollees: [],
+  },
+]
+
+export const memberProgressList: MemberProgress[] = [
+  {
+    id: 'prog-1',
+    memberId: 'm1',
+    memberName: 'Léa Martin',
+    clubId: 'club-judo-paris',
+    clubName: 'Judo Club Paris 15',
+    discipline: 'Judo',
+    fields: [
+      { id: 'ceinture', label: 'Ceinture', type: 'level' },
+      { id: 'niveau', label: 'Niveau technique', type: 'text' },
+      { id: 'objectif', label: 'Objectif saison', type: 'text' },
+    ],
+    values: { ceinture: 'Orange', niveau: 'Intermédiaire', objectif: 'Passage ceinture verte — mars 2027' },
+    lastUpdated: '2026-06-10',
+    coachNote: 'Très motivée, travaille bien les chutes.',
+  },
+  {
+    id: 'prog-2',
+    memberId: 'm2',
+    memberName: 'Tom Bernard',
+    clubId: 'club-judo-paris',
+    clubName: 'Judo Club Paris 15',
+    discipline: 'Judo',
+    fields: [
+      { id: 'ceinture', label: 'Ceinture', type: 'level' },
+      { id: 'niveau', label: 'Niveau technique', type: 'text' },
+      { id: 'objectif', label: 'Objectif saison', type: 'text' },
+    ],
+    values: { ceinture: 'Jaune', niveau: 'Débutant+', objectif: 'Améliorer la garde et les déplacements' },
+    lastUpdated: '2026-06-08',
+  },
+  {
+    id: 'prog-3',
+    memberId: 'm5',
+    memberName: 'Hugo Fernandes',
+    clubId: 'club-judo-paris',
+    clubName: 'Judo Club Paris 15',
+    discipline: 'Préparation physique',
+    fields: [
+      { id: 'vma', label: 'VMA', type: 'number', unit: 'km/h' },
+      { id: 'chrono-5k', label: 'Chrono 5 km', type: 'time' },
+      { id: 'objectif', label: 'Objectif compétition', type: 'text' },
+    ],
+    values: { vma: '16.2', 'chrono-5k': '19:45', objectif: 'Championnat régional — novembre 2026' },
+    lastUpdated: '2026-06-14',
+    coachNote: 'Progression VMA +0.4 depuis janvier.',
+  },
+  {
+    id: 'prog-4',
+    memberId: 'm7',
+    memberName: 'Paul Rousseau',
+    clubId: 'club-fitness-lyon',
+    clubName: 'Fitness Lyon Confluence',
+    discipline: 'Cross-training',
+    fields: [
+      { id: 'niveau', label: 'Niveau WOD', type: 'level' },
+      { id: 'squat-1rm', label: 'Squat 1RM', type: 'number', unit: 'kg' },
+      { id: 'objectif', label: 'Objectif', type: 'text' },
+    ],
+    values: { niveau: 'Rx', 'squat-1rm': '120', objectif: 'Qualifier Open 2027' },
+    lastUpdated: '2026-06-12',
+  },
+]
+
+export const teamMessages: TeamMessage[] = [
+  {
+    id: 'msg-1',
+    sessionId: 'sess-2',
+    sessionTitle: 'Prépa physique compétiteurs',
+    clubName: 'Judo Club Paris 15',
+    subject: 'Rappel — apporter chaussures trail',
+    body: 'Bonjour à tous, pensez à apporter vos chaussures de trail pour la séance de demain. Séance en extérieur si météo OK.',
+    sentAt: '2026-06-16T10:30:00',
+    recipientCount: 12,
+    channels: ['in_app', 'email'],
+  },
+  {
+    id: 'msg-2',
+    sessionId: 'sess-3',
+    sessionTitle: 'Cross-training intermédiaire',
+    clubName: 'Fitness Lyon Confluence',
+    subject: 'Changement de salle — jeudi',
+    body: 'La séance de jeudi aura lieu en box 2 (étage) au lieu de la box habituelle.',
+    sentAt: '2026-06-15T14:00:00',
+    recipientCount: 18,
+    channels: ['in_app'],
+  },
+]
+
+export const progressFieldTemplates: Record<string, Array<{ id: string; label: string; type: 'text' | 'level' | 'time' | 'number'; unit?: string }>> = {
+  Judo: [
+    { id: 'ceinture', label: 'Ceinture', type: 'level' },
+    { id: 'niveau', label: 'Niveau technique', type: 'text' },
+    { id: 'objectif', label: 'Objectif saison', type: 'text' },
+  ],
+  Natation: [
+    { id: 'niveau', label: 'Niveau', type: 'level' },
+    { id: 'chrono-50m', label: 'Chrono 50 m', type: 'time' },
+    { id: 'objectif', label: 'Objectif', type: 'text' },
+  ],
+  'Cross-training': [
+    { id: 'niveau', label: 'Niveau WOD', type: 'level' },
+    { id: 'squat-1rm', label: 'Squat 1RM', type: 'number', unit: 'kg' },
+    { id: 'objectif', label: 'Objectif', type: 'text' },
+  ],
+  'Préparation physique': [
+    { id: 'vma', label: 'VMA', type: 'number', unit: 'km/h' },
+    { id: 'chrono-5k', label: 'Chrono 5 km', type: 'time' },
+    { id: 'objectif', label: 'Objectif compétition', type: 'text' },
+  ],
+}

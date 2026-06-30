@@ -5,7 +5,7 @@ import {
   Moon, Sun, LogOut, Menu, Home, Baby, Building2, Plus,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { useCurrentOrganisation } from '../hooks/useCurrentOrganisation'
+import WorkspaceSwitcher from '../components/layout/WorkspaceSwitcher'
 import { cn } from '../lib/utils'
 import NotificationBell from '../components/shared/NotificationBell'
 
@@ -23,7 +23,6 @@ const TABS = [
 const MemberLayout: React.FC = () => {
   const location = useLocation()
   const { user, logout } = useAuth()
-  const { organisation } = useCurrentOrganisation()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -75,15 +74,8 @@ const MemberLayout: React.FC = () => {
       <header className="border-b border-border bg-background sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
 
-          {/* Left: logo + org name */}
-          <Link to="/club/members" className="flex items-center gap-2.5 shrink-0 hover:opacity-80 transition-opacity">
-            <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-sm shrink-0">
-              <CalendarDays className="w-4 h-4 text-primary-foreground shrink-0" />
-            </div>
-            <span className="font-display font-bold text-foreground hidden sm:block truncate max-w-[180px]">
-              {organisation?.name || 'Mon Club Sport'}
-            </span>
-          </Link>
+          {/* Left: switcher d'espace */}
+          <WorkspaceSwitcher compact className="shrink-0 max-w-[200px] sm:max-w-[240px]" />
 
           {/* Center: tabs */}
           <nav className="flex items-center gap-1">
@@ -168,6 +160,14 @@ const MemberLayout: React.FC = () => {
                       className="flex items-center gap-3 px-4 py-2.5 text-foreground hover:bg-muted transition-colors"
                     >
                       <LayoutDashboard className="w-4 h-4 text-primary shrink-0" /> Mon activité
+                    </Link>
+                    <Link
+                      to="/club/coaches"
+                      onClick={closeMenu}
+                      className="flex items-center gap-3 px-4 py-2.5 text-foreground hover:bg-muted transition-colors"
+                    >
+                      <Users className="w-4 h-4 text-emerald-600 shrink-0" />
+                      Marketplace coachs
                     </Link>
                     <Link
                       to="/club/famille"

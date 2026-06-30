@@ -4,6 +4,11 @@ import { Users, Building2, UserPlus, Plus, ChevronRight, Dumbbell, Music, ArrowR
 import { useAuth } from '../contexts/AuthContext'
 import { api } from '../lib/api'
 import { cn } from '../lib/utils'
+import {
+  getOrganisationDestination,
+  persistOrganisationSelection,
+  type MyOrganisationItem,
+} from '../lib/workspace'
 import type { RoleType } from '../types'
 import GettingStartedCard from '../components/GettingStartedCard'
 
@@ -16,14 +21,6 @@ type Organisation = {
   logo_url?: string | null;
 };
 
-const getRoleDashboardPath = (roleType: RoleType, orgId: string) => {
-  if (roleType === 'club_owner' || roleType === 'club_manager' || roleType === 'treasurer') {
-    return `/dashboard/${orgId}/overview`
-  }
-  // members & coaches → espace membre spécifique au club
-  return `/club/${orgId}`
-}
-
 const ROLE_LABELS: Partial<Record<RoleType, string>> = {
   club_owner: 'Propriétaire',
   club_manager: 'Gestionnaire',
@@ -31,6 +28,8 @@ const ROLE_LABELS: Partial<Record<RoleType, string>> = {
   coach: 'Coach',
   member: 'Membre',
 }
+
+// getRoleDashboardPath → lib/workspace.getOrganisationDestination
 
 const HomePage: React.FC = () => {
   const { user } = useAuth()
@@ -48,13 +47,7 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await api.get<
-          Array<{
-            organisation: { id: string; name: string; type: 'club' | 'association' | null; logo_url?: string | null };
-            role: { name: string; type: RoleType };
-            status: string;
-          }>
-        >('/organisations/my', {}, { useCache: false })
+        const data = await api.get<MyOrganisationItem[]>('/organisations/my', {}, { useCache: false })
 
         setOrganisations(
           data
@@ -78,22 +71,14 @@ const HomePage: React.FC = () => {
   }, [])
 
   const handleOrgSelect = (org: Organisation) => {
-    const storedRole =
-      org.roleType === 'club_owner' || org.roleType === 'club_manager' || org.roleType === 'treasurer'
-        ? 'gestionnaire'
-        : org.roleType === 'coach'
-          ? 'coach'
-          : 'membre'
-
-    // Vider tout le cache API au switch d'organisation pour éviter les données obsolètes
-    api.clearCache()
-
-    localStorage.setItem(
-      'selectedOrganisation',
-      JSON.stringify({ id: org.id, name: org.name, type: org.type, role: storedRole }),
-    )
-    window.dispatchEvent(new Event('organisation:updated'))
-    navigate(getRoleDashboardPath(org.roleType, org.id))
+    persistOrganisationSelection({
+      id: org.id,
+      name: org.name,
+      type: org.type,
+      roleType: org.roleType,
+      roleName: org.roleName,
+    })
+    navigate(getOrganisationDestination(org.roleType, org.id))
   }
 
   const today = new Date().toLocaleDateString('fr-FR', {
@@ -142,7 +127,7 @@ const HomePage: React.FC = () => {
             Bonjour, {user?.firstName || 'Utilisateur'} 👋
           </h1>
           <p className="text-sm text-primary-foreground/80 mt-1">
-            Gérez vos clubs, associations et activités depuis un seul endroit.
+            Utilisez le menu en haut pour basculer entre club, gestion, coach ou famille.
           </p>
           <div className="flex flex-wrap gap-2 mt-5">
             <Link
@@ -160,6 +145,13 @@ const HomePage: React.FC = () => {
               Ma famille
             </Link>
             <Link
+              to="/club/coaches"
+              className="inline-flex items-center gap-2 bg-primary-foreground/15 text-primary-foreground text-sm font-bold px-3.5 py-2.5 rounded-full active:scale-95 transition-transform border border-primary-foreground/20"
+            >
+              <Users className="w-4 h-4 shrink-0" />
+              Coachs privés
+            </Link>
+            <Link
               to="/clubs"
               className="inline-flex items-center gap-2 bg-primary-foreground/15 text-primary-foreground text-sm font-bold px-3.5 py-2.5 rounded-full active:scale-95 transition-transform border border-primary-foreground/20"
             >
@@ -174,7 +166,7 @@ const HomePage: React.FC = () => {
       <section>
         <div className="flex items-center justify-between mb-3">
           <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">
-            Mes associations
+            Mes espaces
           </p>
           {organisations.length > 0 && (
             <span className="text-xs text-muted-foreground">
@@ -231,7 +223,7 @@ const HomePage: React.FC = () => {
             </p>
             <div className="flex flex-wrap gap-3 justify-center pt-2">
               <Link
-                to="/accounts?intent=create-organisation"
+                to="/onboarding"
                 className="inline-flex items-center gap-2 bg-primary text-primary-foreground text-sm font-bold px-4 py-2.5 rounded-full active:scale-95 transition-transform"
               >
                 <Plus className="w-4 h-4 shrink-0" />

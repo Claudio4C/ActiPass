@@ -4,6 +4,7 @@ import { LogOut, User, Moon, Sun, Home, Menu, Baby, Building2, Users } from 'luc
 import { useAuth } from '../contexts/AuthContext'
 import { cn } from '../lib/utils'
 import NotificationBell from '../components/shared/NotificationBell'
+import WorkspaceSwitcher from '../components/layout/WorkspaceSwitcher'
 
 interface AppHeaderProps {
   badge?: string;
@@ -94,6 +95,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({ badge, extra }) => {
           {extra}
         </div>
 
+        {/* Centre : switcher d'espace */}
+        <div className="flex-1 flex justify-center px-2 min-w-0">
+          <WorkspaceSwitcher compact />
+        </div>
+
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
           <NotificationBell />
@@ -157,6 +163,14 @@ const AppHeader: React.FC<AppHeaderProps> = ({ badge, extra }) => {
                   >
                     <Users className="w-4 h-4 text-primary shrink-0" />
                     Mon activité
+                  </Link>
+                  <Link
+                    to="/club/coaches"
+                    onClick={closeMenu}
+                    className="flex items-center gap-3 px-4 py-2.5 text-foreground hover:bg-muted transition-colors"
+                  >
+                    <Users className="w-4 h-4 text-emerald-600 shrink-0" />
+                    Marketplace coachs
                   </Link>
                   <Link
                     to="/club/famille"

@@ -189,6 +189,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
             localStorage.removeItem('user');
             localStorage.removeItem('user_avatar_url');
             localStorage.removeItem('ikivio_last_user_id');
+            localStorage.removeItem('selectedOrganisation');
+            localStorage.removeItem('activeWorkspaceId');
             // ikivio_onboarding_type et ikivio_welcome_seen appartiennent à l'appareil — non effacés
         }
     }, []);
