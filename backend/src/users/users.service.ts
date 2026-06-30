@@ -55,6 +55,18 @@ export class UsersService {
     });
   }
 
+  async removeFcmToken(userId: string, token: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { fcm_tokens: true },
+    });
+    if (!user || !user.fcm_tokens.includes(token)) { return; }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { fcm_tokens: user.fcm_tokens.filter((t) => t !== token) },
+    });
+  }
+
   sanitizeUser(user: User): SafeUser {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...sanitizedUser } = user;

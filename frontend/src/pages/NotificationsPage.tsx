@@ -4,7 +4,7 @@ import { Bell, BellRing, X } from 'lucide-react'
 
 import { useUnreadCount } from '../hooks/useUnreadCount'
 import { api } from '../lib/api'
-import { isPushSupportedAndConfigured, requestPushPermission } from '../lib/firebase'
+import { isPushSupportedAndConfigured, requestPushPermission, listenForegroundMessages } from '../lib/firebase'
 import { cn } from '../lib/utils'
 import {
   fmtRelativeDate,
@@ -71,6 +71,7 @@ const NotificationsPage: React.FC = () => {
   const handleEnablePush = async () => {
     setPushStatus('loading')
     const ok = await requestPushPermission()
+    if (ok) { listenForegroundMessages() }
     setPushStatus(ok ? 'granted' : 'denied')
   }
 

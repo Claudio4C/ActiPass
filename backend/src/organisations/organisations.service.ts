@@ -705,6 +705,43 @@ export class OrganisationsService {
       },
     });
 
+    const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:5173');
+
+    // Notifier le demandeur
+    await this.notificationsService.notify({
+      userId,
+      organisationId,
+      type: 'system',
+      title: 'Demande envoyée',
+      body: `Votre demande d'adhésion à ${organisation.name} a bien été reçue. Vous recevrez une réponse prochainement.`,
+      link: `/club`,
+      sendPush: true,
+    });
+
+    // Notifier tous les admins du club
+    const admins = await this.prisma.membership.findMany({
+      where: {
+        organisation_id: organisationId,
+        role: { type: { in: ['club_owner', 'club_manager'] } },
+        status: 'active',
+        deleted_at: null,
+        left_at: null,
+      },
+      select: { user_id: true },
+    });
+
+    for (const admin of admins) {
+      await this.notificationsService.notify({
+        userId: admin.user_id,
+        organisationId,
+        type: 'system',
+        title: 'Nouvelle demande d\'adhésion',
+        body: `${membership.user.firstname} ${membership.user.lastname} souhaite rejoindre votre club.`,
+        link: `/dashboard/${organisationId}/requests`,
+        sendPush: true,
+      });
+    }
+
     return {
       message: "Demande d'adhésion envoyée avec succès",
       membership,
@@ -825,8 +862,17 @@ export class OrganisationsService {
           body: reason
             ? `Votre demande d'adhésion à ${organisationName} a été refusée : ${reason}`
             : `Votre demande d'adhésion à ${organisationName} a été refusée.`,
-          sendEmail: false,
+          link: `/club`,
+          sendEmail: true,
           sendPush: true,
+          emailTemplate: 'MembershipRejectedEmail',
+          emailSubject: `Votre demande d'adhésion à ${organisationName}`,
+          emailData: {
+            firstname: user?.firstname || '',
+            organisationName,
+            reason: reason || undefined,
+            ctaUrl: `${frontendUrl}/club`,
+          },
         });
       }
     }

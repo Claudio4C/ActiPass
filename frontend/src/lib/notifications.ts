@@ -1,8 +1,10 @@
 import {
   Bell,
   Calendar,
+  CalendarX,
   CheckCircle2,
   CreditCard,
+  MessageSquare,
   RefreshCw,
   Sparkles,
   UserCheck,
@@ -25,7 +27,9 @@ export interface AppNotification {
 }
 
 export const notificationIconByType: Record<string, LucideIcon> = {
+  admin_broadcast: MessageSquare,
   event_reminder: Calendar,
+  event_cancelled: CalendarX,
   payment_received: CreditCard,
   document_validated: CheckCircle2,
   document_rejected: XCircle,
@@ -37,7 +41,9 @@ export const notificationIconByType: Record<string, LucideIcon> = {
 }
 
 export const notificationIconClassByType: Record<string, string> = {
+  admin_broadcast: 'bg-primary/10 text-primary',
   event_reminder: 'bg-primary/10 text-primary',
+  event_cancelled: 'bg-destructive/10 text-destructive',
   payment_received: 'bg-emerald-500/10 text-emerald-700',
   document_validated: 'bg-emerald-500/10 text-emerald-700',
   document_rejected: 'bg-destructive/10 text-destructive',

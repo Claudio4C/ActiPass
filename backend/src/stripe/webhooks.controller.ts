@@ -137,8 +137,10 @@ export class WebhooksController {
         const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:5173').replace(/\/+$/, '');
         const user = await this.prisma.user.findUnique({
           where: { id: paid.user_id },
-          select: { firstname: true },
+          select: { firstname: true, lastname: true },
         });
+
+        // Notif membre
         await this.notificationsService.notify({
           userId: paid.user_id,
           organisationId: paid.organisation_id ?? undefined,
@@ -159,6 +161,37 @@ export class WebhooksController {
               : frontendUrl,
           },
         });
+
+        // Notif admins
+        if (paid.organisation_id) {
+          const admins = await this.prisma.membership.findMany({
+            where: {
+              organisation_id: paid.organisation_id,
+              role: { type: { in: ['club_owner', 'club_manager', 'treasurer'] } },
+              status: 'active',
+              deleted_at: null,
+              left_at: null,
+            },
+            select: { user_id: true },
+          });
+          const payerName = user ? `${user.firstname} ${user.lastname}` : 'Un membre';
+          const adminLabel = paid.purpose === 'event_participation'
+            ? `inscription à "${eventTitle || 'un événement'}"`
+            : 'cotisation';
+          for (const admin of admins) {
+            if (admin.user_id !== paid.user_id) {
+              await this.notificationsService.notify({
+                userId: admin.user_id,
+                organisationId: paid.organisation_id,
+                type: 'payment_received',
+                title: 'Paiement reçu',
+                body: `${payerName} a réglé ${paid.amount} ${paid.currency} (${adminLabel}).`,
+                link: `/dashboard/${paid.organisation_id}/payments`,
+                sendPush: true,
+              });
+            }
+          }
+        }
       }
     }
 

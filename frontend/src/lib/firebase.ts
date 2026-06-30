@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app'
-import { getMessaging, getToken, isSupported } from 'firebase/messaging'
+import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging'
 
 import { api } from './api'
 
@@ -56,6 +56,21 @@ export const registerPushToken = async (): Promise<boolean> => {
   }
 }
 
+export const unregisterPushToken = async (): Promise<void> => {
+  if (!isFirebaseConfigured) { return }
+  const app = getFirebaseApp()
+  if (!app) { return }
+  const supported = await isSupported().catch(() => false)
+  if (!supported) { return }
+  try {
+    const messaging = getMessaging(app)
+    const token = await getToken(messaging, { vapidKey }).catch(() => null)
+    if (token) {
+      await api.post('/users/me/fcm-token/remove', { token })
+    }
+  } catch { /* silently ignore */ }
+}
+
 export const requestPushPermission = async (): Promise<boolean> => {
   if (typeof window === 'undefined' || !('Notification' in window)) { return false }
 
@@ -67,3 +82,25 @@ export const requestPushPermission = async (): Promise<boolean> => {
 
 export const isPushSupportedAndConfigured = (): boolean =>
   isFirebaseConfigured && typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator
+
+let foregroundListenerActive = false
+
+export const listenForegroundMessages = (): void => {
+  if (foregroundListenerActive || !isFirebaseConfigured) { return }
+  if (typeof window === 'undefined' || !('Notification' in window)) { return }
+
+  isSupported().then((supported) => {
+    if (!supported) { return }
+    const app = getFirebaseApp()
+    if (!app) { return }
+    const messaging = getMessaging(app)
+    foregroundListenerActive = true
+    onMessage(messaging, (payload) => {
+      const title = payload.notification?.title ?? 'Actipass'
+      const body  = payload.notification?.body  ?? ''
+      if (Notification.permission === 'granted') {
+        new Notification(title, { body, icon: '/vite.svg' })
+      }
+    })
+  }).catch(() => {})
+}

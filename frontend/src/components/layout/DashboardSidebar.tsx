@@ -29,6 +29,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
   const [orgInfo, setOrgInfo] = useState<{ name: string; logo_url: string | null } | null>(null)
   const [loading, setLoading] = useState(true)
   const [pendingCount, setPendingCount] = useState(0)
+  const [pendingDocCount, setPendingDocCount] = useState(0)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(
     () => localStorage.getItem('user_avatar_url'),
   )
@@ -55,14 +56,22 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
         })
         setOrgInfo({ name: data.organisation.name, logo_url: data.organisation.logo_url ?? null })
 
-        // Fetch pending memberships count (only for managers)
+        // Fetch pending memberships + documents count (only for managers)
         if (['club_owner', 'club_manager'].includes(data.myRole.type)) {
-          api.get<{ length: number } | unknown[]>(
+          api.get<unknown[]>(
             `/organisations/${organisationId}/memberships`,
             { status: 'pending' },
             { useCache: false },
           ).then((res) => {
             setPendingCount(Array.isArray(res) ? res.length : 0)
+          }).catch(() => {})
+
+          api.get<unknown[]>(
+            `/organisations/${organisationId}/documents`,
+            { status: 'pending' },
+            { useCache: false },
+          ).then((res) => {
+            setPendingDocCount(Array.isArray(res) ? res.length : 0)
           }).catch(() => {})
         }
       } catch {
@@ -83,7 +92,7 @@ const DashboardSidebar: React.FC<DashboardSidebarProps> = ({ organisationId }) =
     { icon: Calendar,        label: 'Événements',      path: `/dashboard/${organisationId}/events`,         roles: ['club_owner', 'club_manager'] },
     { icon: ClipboardCheck,  label: 'Présences',       path: `/dashboard/${organisationId}/attendance`,     roles: ['club_owner', 'club_manager'] },
     { icon: Euro,            label: 'Finances',        path: `/dashboard/${organisationId}/payments`,       roles: ['club_owner', 'club_manager', 'treasurer'] },
-    { icon: FileText,        label: 'Documents',       path: `/dashboard/${organisationId}/documents`,      roles: ['club_owner', 'club_manager'] },
+    { icon: FileText,        label: 'Documents',       path: `/dashboard/${organisationId}/documents`,      roles: ['club_owner', 'club_manager'], badge: pendingDocCount > 0 ? pendingDocCount : null },
     { icon: CalendarRange,   label: 'Saisons',         path: `/dashboard/${organisationId}/seasons`,        roles: ['club_owner', 'club_manager'] },
     { icon: MessageSquare,   label: 'Communication',   path: `/dashboard/${organisationId}/communication`,  roles: ['club_owner', 'club_manager'] },
     { icon: UserCog,         label: 'Équipe',          path: `/dashboard/${organisationId}/settings/team`,  roles: ['club_owner', 'club_manager'] },

@@ -24,6 +24,7 @@ import { SubscriptionPlansModule } from './subscription-plans/subscription-plans
 import { PaymentsModule } from './payments/payments.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PushModule } from './push/push.module';
+import { CommunicationsModule } from './communications/communications.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { PushModule } from './push/push.module';
     PaymentsModule,
     PushModule,
     NotificationsModule,
+    CommunicationsModule,
   ],
   controllers: [AppController],
   providers: [

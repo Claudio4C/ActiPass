@@ -13,7 +13,7 @@ import type { Event, EventType } from '../../types'
 // ─── types ───────────────────────────────────────────────────────────────────
 
 interface EventWithRegistration extends Event {
-  myReservation?: { id: string; status: 'confirmed' | 'pending' | 'cancelled'; waitlist_position?: number | null }
+  myReservation?: { id: string; status: 'confirmed' | 'pending' | 'cancelled'; waitlist_position?: number | null; is_payment_pending?: boolean }
   current_registrations?: number
   available_spots?: number | null
 }
@@ -227,6 +227,8 @@ const EventDetailPage: React.FC = () => {
     if (!ev.myReservation) { return null }
     const s = ev.myReservation.status
     if (s === 'confirmed') { return { label: 'Inscrit', icon: CheckCircle2, cls: 'text-accent bg-accent/10' } }
+    // pending avec paiement Stripe en cours → la section paiement gère l'affichage
+    if (s === 'pending' && ev.myReservation.is_payment_pending) { return null }
     if (s === 'pending') { return { label: 'En attente', icon: Clock3, cls: 'text-amber-600 bg-amber-500/10' } }
     return { label: 'Annulé', icon: XCircle, cls: 'text-muted-foreground bg-muted' }
   }
@@ -400,7 +402,7 @@ const EventDetailPage: React.FC = () => {
                     <StatusIcon className="w-3.5 h-3.5 shrink-0" />
                     {regStatus.label}
                   </div>
-                  {event.myReservation?.status === 'pending' && event.myReservation.waitlist_position && (
+                  {event.myReservation?.status === 'pending' && event.myReservation.waitlist_position && !event.myReservation.is_payment_pending && (
                     <p className="text-[10px] text-amber-700 font-semibold mt-1.5 ml-1">
                       Position #{event.myReservation.waitlist_position} dans la file d'attente
                     </p>

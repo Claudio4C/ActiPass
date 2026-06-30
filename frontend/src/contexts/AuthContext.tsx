@@ -92,9 +92,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
               })
               .catch(() => {})
 
-            // Si la permission push a déjà été accordée précédemment, on (re)enregistre le token
+            // Si la permission push a déjà été accordée précédemment, on (re)enregistre le token + écoute foreground
             if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-              void import('../lib/firebase').then(({ registerPushToken }) => registerPushToken())
+              void import('../lib/firebase').then(({ registerPushToken, listenForegroundMessages }) => {
+                registerPushToken()
+                listenForegroundMessages()
+              })
             }
 
         } catch (error) {
@@ -170,6 +173,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     }, []);
 
     const logout = useCallback(async (): Promise<void> => {
+        // Retirer le token FCM avant de se déconnecter
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            void import('../lib/firebase').then(({ unregisterPushToken }) =>
+              unregisterPushToken().catch(() => {})
+            ).catch(() => {})
+        }
         try {
             await authService.logout();
         } catch (error) {

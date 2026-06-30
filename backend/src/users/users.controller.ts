@@ -82,6 +82,17 @@ export class UsersController {
   }
 
   /**
+   * Retirer un token FCM (push) à la déconnexion
+   */
+  @Post('me/fcm-token/remove')
+  async removeFcmToken(@Body() body: AddFcmTokenDto, @Req() req: Request) {
+    const userId = req.user?.['sub'] as string;
+    if (!userId) { throw new Error('Utilisateur non authentifié'); }
+    await this.usersService.removeFcmToken(userId, body.token);
+    return { success: true };
+  }
+
+  /**
    * Récupérer mes préférences de notifications (créées par défaut si inexistantes)
    */
   @Get('me/notification-preferences')

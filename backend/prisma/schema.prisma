@@ -1092,3 +1092,17 @@ model MemberDocument {
   @@index([user_id, organisation_id])
   @@map("member_documents")
 }
+
+model BroadcastLog {
+  id               String   @id @default(cuid())
+  organisation_id  String
+  sent_by          String
+  target           String
+  subject          String
+  message          String
+  recipients_count Int
+  created_at       DateTime @default(now())
+
+  @@index([organisation_id, created_at])
+  @@map("broadcast_logs")
+}

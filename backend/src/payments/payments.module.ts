@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 
-import { EmailModule } from '../email/email.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { StripeModule } from '../stripe/stripe.module';
@@ -10,7 +9,7 @@ import { OrgPaymentsController } from './org-payments.controller';
 import { PaymentsService } from './payments.service';
 
 @Module({
-  imports: [PrismaModule, StripeModule, EmailModule, NotificationsModule],
+  imports: [PrismaModule, StripeModule, NotificationsModule],
   controllers: [PaymentsController, OrgPaymentsController],
   providers: [PaymentsService],
 })

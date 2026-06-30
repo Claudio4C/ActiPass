@@ -23,7 +23,7 @@
 | **Phase 1** | Gestion des membres 360° | Comptes parents/enfants, adhésion, documents, profils | ✅ **Terminé** |
 | **Phase 2** | Paiements & Finance | Stripe Connect, cotisations, saisons, renouvellement | ✅ **Terminé** |
 | **Phase 3** | Planning avancé | Récurrence, réservation, liste d'attente, QR code, présences | ⏳ À faire |
-| **Phase 4** | Communication | Notifications ciblées, messagerie, emails auto | ⏳ À faire |
+| **Phase 4** | Communication | Notifications ciblées, messagerie, emails auto | 🔄 En cours |
 | **Phase 5** | Espace Coach | Dashboard coach, multi-club, profil public | ⏳ À faire |
 | **Phase 6** | Portail Municipal | Dashboard mairie, conventions, subventions, statistiques | ⏳ À faire |
 | **Phase 7** | Nice to Have | CRM, marketplace, fidélité, pass corpo, PWA, QR adhérent | ⏳ Continu |
@@ -168,15 +168,15 @@
 
 ---
 
-# 🔔 Phase 4 — Communication & Notifications ⏳
+# 🔔 Phase 4 — Communication & Notifications 🔄
 
 | ID | User Story | Critères d'acceptation | Front | Back |
 |----|-----------|------------------------|-------|------|
-| P4-1 | Notification ciblée (admin) | Tous membres / section / sans document / impayés. Email + in-app. | — | — |
+| P4-1 | Notification ciblée (admin) | Tous membres / section / sans document / impayés. Email + in-app. | ✅ | ✅ |
 | P4-2 | Emails automatiques planifiés | Rappel 24h avant entraînement, relance cotisation, renouvellement saison. | — | — |
-| P4-3 | Centre de notifications in-app | Cloche + badge navbar, marquer comme lu. | — | — |
+| P4-3 | Centre de notifications in-app | Cloche + badge navbar, marquer comme lu, préférences RGPD, push Firebase. | ✅ | ✅ |
 | P4-4 | Message équipe (coach) | Message groupé aux inscrits d'un cours. In-app + email. | — | — |
-| P4-5 | Emails transactionnels | Bienvenue, paiement reçu, document validé/refusé, place disponible. | — | — |
+| P4-5 | Emails transactionnels | Bienvenue, paiement reçu, document validé/refusé, place disponible, adhésion refusée, rappel cotisation, annulation événement, renouvellement saison. | ✅ | ✅ |
 
 ---
 
@@ -242,6 +242,6 @@
 - [x] Événements récurrents + réservation (Epic 3.1) ← suivant
 - [x] Liste d'attente (Epic 3.2)
 - [x] Présences manuelles + QR code front (Epic 3.3)
-- [ ] Notifications email de base (Epic 4.1)
+- [x] Notifications in-app + emails transactionnels (P4-3, P4-5)
 
 **Ordre de priorité : 3.1 → 3.2 → 3.3 → 4.1**

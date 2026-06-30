@@ -357,13 +357,18 @@ export class EventsService {
       (r) => allMembershipIds.includes(r.membership_id) && r.status !== 'cancelled',
     ) ?? null;
 
-    const confirmedCount = event.Reservation.filter((r) => r.status === 'confirmed').length;
+    // Réservations qui occupent une place : confirmées + en attente de paiement Stripe
+    const confirmedCount = event.Reservation.filter(
+      (r) => r.status === 'confirmed' || (r.status === 'pending' && r.payment_id != null),
+    ).length;
 
-    // Compute waitlist position if member is pending
+    // pending sans payment_id = vraie liste d'attente capacité
+    const isPaymentPending = myReservation?.status === 'pending' && myReservation.payment_id != null;
+
     let waitlistPosition: number | null = null;
-    if (myReservation?.status === 'pending') {
+    if (myReservation?.status === 'pending' && !isPaymentPending) {
       const sortedPending = event.Reservation
-        .filter(r => r.status === 'pending')
+        .filter(r => r.status === 'pending' && r.payment_id == null)
         .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
       const idx = sortedPending.findIndex(r => r.id === myReservation.id);
       waitlistPosition = idx >= 0 ? idx + 1 : null;
@@ -374,7 +379,12 @@ export class EventsService {
       current_registrations: confirmedCount,
       available_spots: event.capacity ? event.capacity - confirmedCount : null,
       myReservation: myReservation
-        ? { id: myReservation.id, status: myReservation.status, waitlist_position: waitlistPosition }
+        ? {
+            id: myReservation.id,
+            status: myReservation.status,
+            waitlist_position: waitlistPosition,
+            is_payment_pending: isPaymentPending,
+          }
         : null,
     };
   }
@@ -604,18 +614,20 @@ export class EventsService {
         await this.notificationsService.notify({
           userId: reservation.membership.user.id,
           organisationId,
-          type: 'system',
+          type: 'event_cancelled',
           title: 'Événement annulé',
           body: `L'événement "${event.title}" a été annulé.`,
-          link: `/club/events/${eventId}`,
+          link: `/club/${organisationId}/events/${eventId}`,
           sendEmail: true,
-          emailTemplate: 'EventReminderEmail',
+          emailTemplate: 'EventCancelledEmail',
           emailSubject: `Annulation : ${event.title}`,
           emailData: {
             firstname: reservation.membership.user.firstname,
-            eventTitle: `${event.title} (annulé)`,
-            eventDate: 'Cet événement est annulé.',
-            ctaUrl: `${this.config.get<string>('FRONTEND_URL', 'http://localhost:5173')}/club/events/${eventId}`,
+            eventTitle: event.title,
+            eventDate: new Date(event.start_time).toLocaleDateString('fr-FR', {
+              weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+            }),
+            refunded: !!cancelEventDto.refund_automatically,
           },
         });
       }
@@ -962,15 +974,27 @@ export class EventsService {
           where: { id: nextPending.id },
           data: { status: 'confirmed' },
         });
+        const promotedDate = new Date(event.start_time).toLocaleDateString('fr-FR', {
+          weekday: 'long', day: 'numeric', month: 'long',
+        });
         await this.notificationsService.notify({
           userId: nextPending.membership.user.id,
           organisationId,
           type: 'waitlist_promoted',
-          title: 'Une place s’est libérée !',
-          body: `Vous êtes confirmé pour "${event.title}".`,
-          link: `/club/events/${eventId}`,
-          sendEmail: false,
+          title: 'Place confirmée !',
+          body: `Une place s'est libérée pour "${event.title}" — vous êtes maintenant confirmé(e).`,
+          link: `/club/${organisationId}/events/${eventId}`,
+          sendEmail: true,
           sendPush: true,
+          emailTemplate: 'WaitlistPromotedEmail',
+          emailSubject: `Place confirmée : ${event.title}`,
+          emailData: {
+            firstname: nextPending.membership.user.firstname,
+            eventTitle: event.title,
+            eventDate: promotedDate,
+            location: event.location ?? undefined,
+            ctaUrl: `${this.config.get<string>('FRONTEND_URL', 'http://localhost:5173')}/club/${organisationId}/events/${eventId}`,
+          },
         });
       }
     }
@@ -1038,8 +1062,10 @@ export class EventsService {
       throw new BadRequestException('Vous êtes déjà inscrit à cet événement');
     }
 
-    // Calcul du statut selon la capacité
-    const confirmedCount = event.Reservation.filter((r) => r.status === 'confirmed').length;
+    // Calcul du statut selon la capacité (confirmé + paiement en cours = place occupée)
+    const confirmedCount = event.Reservation.filter(
+      (r) => r.status === 'confirmed' || (r.status === 'pending' && r.payment_id != null),
+    ).length;
     const reservationStatus: 'confirmed' | 'pending' =
       event.capacity && event.capacity > 0 && confirmedCount >= event.capacity
         ? 'pending'
@@ -1061,6 +1087,68 @@ export class EventsService {
           data: { event_id: eventId, membership_id: membership.id, status: reservationStatus },
           include,
         });
+
+    const frontendUrl = this.config.get<string>('FRONTEND_URL', 'http://localhost:5173');
+    const eventDate = new Date(event.start_time).toLocaleDateString('fr-FR', {
+      weekday: 'long', day: 'numeric', month: 'long',
+    });
+
+    if (reservationStatus === 'confirmed') {
+      await this.notificationsService.notify({
+        userId,
+        organisationId,
+        type: 'system',
+        title: 'Inscription confirmée',
+        body: `Votre inscription à "${event.title}" le ${eventDate} est confirmée.`,
+        link: `/club/${organisationId}/events/${eventId}`,
+        sendPush: true,
+        sendEmail: true,
+        emailTemplate: 'EventReminderEmail',
+        emailSubject: `Inscription confirmée : ${event.title}`,
+        emailData: {
+          firstname: reservation.membership.user.firstname,
+          eventTitle: event.title,
+          eventDate,
+          location: event.location ?? undefined,
+          ctaUrl: `${frontendUrl}/club/${organisationId}/events/${eventId}`,
+        },
+      });
+    } else {
+      await this.notificationsService.notify({
+        userId,
+        organisationId,
+        type: 'system',
+        title: 'Liste d\'attente',
+        body: `Vous êtes en liste d'attente pour "${event.title}". Vous serez notifié si une place se libère.`,
+        link: `/club/${organisationId}/events/${eventId}`,
+        sendPush: true,
+      });
+    }
+
+    // Notifier les admins de la nouvelle inscription
+    const admins = await this.prisma.membership.findMany({
+      where: {
+        organisation_id: organisationId,
+        role: { type: { in: ['club_owner', 'club_manager'] } },
+        status: 'active',
+        deleted_at: null,
+        left_at: null,
+      },
+      select: { user_id: true },
+    });
+    for (const admin of admins) {
+      if (admin.user_id !== userId) {
+        await this.notificationsService.notify({
+          userId: admin.user_id,
+          organisationId,
+          type: 'system',
+          title: 'Nouvelle inscription',
+          body: `${reservation.membership.user.firstname} ${reservation.membership.user.lastname} s'est inscrit à "${event.title}".`,
+          link: `/dashboard/${organisationId}/events/${eventId}`,
+          sendPush: true,
+        });
+      }
+    }
 
     return {
       message: reservationStatus === 'confirmed' ? 'Inscription confirmée' : "Vous êtes sur la liste d'attente",
@@ -1121,8 +1209,10 @@ export class EventsService {
       throw new ConflictException('Vous avez déjà payé votre place pour cet événement.');
     }
 
-    // Capacité
-    const confirmedCount = event.Reservation.filter((r) => r.status === 'confirmed').length;
+    // Capacité (confirmé + paiement Stripe en cours = place occupée)
+    const confirmedCount = event.Reservation.filter(
+      (r) => r.status === 'confirmed' || (r.status === 'pending' && r.payment_id != null),
+    ).length;
     if (event.capacity && event.capacity > 0 && confirmedCount >= event.capacity) {
       throw new BadRequestException("Cet événement est complet.");
     }
@@ -1365,15 +1455,27 @@ export class EventsService {
           where: { id: nextPending.id },
           data: { status: 'confirmed' },
         });
+        const promotedDate = new Date(event.start_time).toLocaleDateString('fr-FR', {
+          weekday: 'long', day: 'numeric', month: 'long',
+        });
         await this.notificationsService.notify({
           userId: nextPending.membership.user.id,
           organisationId,
           type: 'waitlist_promoted',
-          title: 'Une place s’est libérée !',
-          body: `Vous êtes confirmé pour "${event.title}".`,
-          link: `/club/events/${eventId}`,
-          sendEmail: false,
+          title: 'Place confirmée !',
+          body: `Une place s'est libérée pour "${event.title}" — vous êtes maintenant confirmé(e).`,
+          link: `/club/${organisationId}/events/${eventId}`,
+          sendEmail: true,
           sendPush: true,
+          emailTemplate: 'WaitlistPromotedEmail',
+          emailSubject: `Place confirmée : ${event.title}`,
+          emailData: {
+            firstname: nextPending.membership.user.firstname,
+            eventTitle: event.title,
+            eventDate: promotedDate,
+            location: event.location ?? undefined,
+            ctaUrl: `${this.config.get<string>('FRONTEND_URL', 'http://localhost:5173')}/club/${organisationId}/events/${eventId}`,
+          },
         });
       }
     }

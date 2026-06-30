@@ -8,7 +8,6 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { EmailService } from '../email/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from '../stripe/stripe.service';
@@ -21,7 +20,6 @@ export class PaymentsService {
     private readonly prisma: PrismaService,
     private readonly stripe: StripeService,
     private readonly config: ConfigService,
-    private readonly emailService: EmailService,
     private readonly notificationsService: NotificationsService
   ) {}
 
@@ -271,14 +269,15 @@ export class PaymentsService {
       title: 'Cotisation en attente',
       body: `Un paiement est en attente chez ${organisationName}.`,
       link: `/club/${orgId}/payment`,
-      sendEmail: false,
+      sendEmail: true,
       sendPush: true,
-    });
-
-    await this.emailService.sendEmail({
-      to: member.email,
-      subject: `Rappel de paiement — ${organisationName}`,
-      html: `<p>Bonjour ${member.firstname},</p><p>Nous vous rappelons qu'un paiement est en attente pour votre adhésion à <strong>${organisationName}</strong>.</p><p><a href="${paymentUrl}">Régler ma cotisation</a></p>`,
+      emailTemplate: 'PaymentReminderEmail',
+      emailSubject: `Rappel de paiement — ${organisationName}`,
+      emailData: {
+        firstname: member.firstname,
+        organisationName,
+        ctaUrl: paymentUrl,
+      },
     });
 
     return { reminded: true, email: member.email };

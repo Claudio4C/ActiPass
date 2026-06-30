@@ -331,12 +331,23 @@ const ClubEventsPage: React.FC = () => {
                   onClick={() => navigate(`/club/events/${ev.id}`)}
                   className="p-5 space-y-3 cursor-pointer active:scale-[0.99] transition-transform"
                 >
-                  {/* Top row: type badge + availability + recurring badge */}
+                  {/* Top row: type badge + price + full + recurring + availability */}
                   <div className="flex items-start justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className={cn('text-[11px] font-bold uppercase px-2.5 py-1 rounded-full', type.badge)}>
                         {type.label}
                       </span>
+                      {ev.price > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-700">
+                          <Euro className="w-2.5 h-2.5 shrink-0" />
+                          {ev.price.toFixed(2)} €
+                        </span>
+                      )}
+                      {isFull && (
+                        <span className="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full bg-destructive/10 text-destructive">
+                          Complet
+                        </span>
+                      )}
                       {isRecurring && (
                         <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase px-2.5 py-1 rounded-full bg-primary/8 text-primary">
                           <RefreshCw className="w-2.5 h-2.5 shrink-0" />
@@ -344,13 +355,8 @@ const ClubEventsPage: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    {avail && (
-                      <span
-                        className={cn(
-                          'text-xs font-semibold shrink-0',
-                          isFull ? 'text-amber-600' : 'text-muted-foreground',
-                        )}
-                      >
+                    {avail && !isFull && (
+                      <span className="text-xs font-semibold shrink-0 text-muted-foreground">
                         {avail}
                       </span>
                     )}

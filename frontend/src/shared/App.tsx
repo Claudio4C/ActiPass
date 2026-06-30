@@ -83,6 +83,7 @@ import AdminRequests from '../pages/dashboard/AdminRequests'
 import AdminDocumentsPage from '../pages/dashboard/AdminDocumentsPage'
 import AdminSeasonsPage from '../pages/dashboard/AdminSeasonsPage'
 import AdminFinancePage from '../pages/dashboard/AdminFinancePage'
+import CommunicationsPage from '../pages/dashboard/CommunicationsPage'
 
 // Municipal dashboard
 import MunicipalDashboardLayout from '../layouts/MunicipalDashboardLayout'
@@ -309,6 +310,7 @@ const AppContent: React.FC<{
           <Route path="/dashboard/:organisationId/documents" element={<AdminDocumentsPage />} />
           <Route path="/dashboard/:organisationId/seasons" element={<AdminSeasonsPage />} />
           <Route path="/dashboard/:organisationId/payments" element={<AdminFinancePage />} />
+          <Route path="/dashboard/:organisationId/communication" element={<CommunicationsPage />} />
         </Route>
 
         {/* ═══════════════════════════════════════

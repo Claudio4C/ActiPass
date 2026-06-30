@@ -104,18 +104,48 @@ export class MemberDocumentsService {
       ? addMonths(new Date(), requiredDoc.expires_after_months)
       : null
 
-    return this.prisma.memberDocument.create({
-      data: {
-        organisation_id:      orgId,
-        user_id:              userId,
-        required_document_id: requiredDocumentId,
-        storage_key:          key,
-        original_name:        file.originalname,
-        mime_type:            file.mimetype,
-        size_bytes:           file.size,
-        expires_at:           expiresAt,
+    const [created, uploader] = await Promise.all([
+      this.prisma.memberDocument.create({
+        data: {
+          organisation_id:      orgId,
+          user_id:              userId,
+          required_document_id: requiredDocumentId,
+          storage_key:          key,
+          original_name:        file.originalname,
+          mime_type:            file.mimetype,
+          size_bytes:           file.size,
+          expires_at:           expiresAt,
+        },
+      }),
+      this.prisma.user.findUnique({ where: { id: userId }, select: { firstname: true, lastname: true } }),
+    ])
+
+    // Notifier les admins qu'un document est en attente de validation
+    const admins = await this.prisma.membership.findMany({
+      where: {
+        organisation_id: orgId,
+        role: { type: { in: ['club_owner', 'club_manager'] } },
+        status: 'active',
+        deleted_at: null,
+        left_at: null,
       },
+      select: { user_id: true },
     })
+
+    const uploaderName = uploader ? `${uploader.firstname} ${uploader.lastname}` : 'Un membre'
+    for (const admin of admins) {
+      await this.notificationsService.notify({
+        userId: admin.user_id,
+        organisationId: orgId,
+        type: 'system',
+        title: 'Document à valider',
+        body: `${uploaderName} a soumis "${requiredDoc.name}".`,
+        link: `/dashboard/${orgId}/documents`,
+        sendPush: true,
+      })
+    }
+
+    return created
   }
 
   // ── Member: list own documents ─────────────────────────────────────────────
@@ -200,7 +230,7 @@ export class MemberDocumentsService {
       }),
       this.prisma.user.findUnique({
         where: { id: doc.user_id },
-        select: { firstname: true },
+        select: { firstname: true, is_minor: true },
       }),
     ])
 
@@ -230,7 +260,7 @@ export class MemberDocumentsService {
       body: approved
         ? `Votre document "${documentName}" a été validé.`
         : `Votre document "${documentName}" a été refusé.`,
-      link: '/club/famille',
+      link: docOwner?.is_minor ? '/club/famille' : `/club/${orgId}/documents`,
       sendEmail: true,
       emailTemplate: 'DocumentDecisionEmail',
       emailSubject: approved ? `Document validé : ${documentName}` : `Document refusé : ${documentName}`,
@@ -239,7 +269,9 @@ export class MemberDocumentsService {
         documentName,
         approved,
         rejectionReason: dto.action === 'reject' ? dto.rejectionReason : undefined,
-        ctaUrl: `${this.config.get<string>('FRONTEND_URL', 'http://localhost:5173')}/club/famille`,
+        ctaUrl: docOwner?.is_minor
+          ? `${this.config.get<string>('FRONTEND_URL', 'http://localhost:5173')}/club/famille`
+          : `${this.config.get<string>('FRONTEND_URL', 'http://localhost:5173')}/club/${orgId}/documents`,
       },
     })
 

@@ -8,6 +8,11 @@ import { RenewalInvitationEmail, RenewalInvitationEmailProps } from './RenewalIn
 import { VerificationEmail, VerificationEmailProps } from './VerificationEmail';
 import { PasswordResetEmail, PasswordResetEmailProps } from './PasswordResetEmail';
 import { AccountWelcomeEmail, AccountWelcomeEmailProps } from './AccountWelcomeEmail';
+import { MembershipRejectedEmail, MembershipRejectedEmailProps } from './MembershipRejectedEmail';
+import { PaymentReminderEmail, PaymentReminderEmailProps } from './PaymentReminderEmail';
+import { EventCancelledEmail, EventCancelledEmailProps } from './EventCancelledEmail';
+import { WaitlistPromotedEmail, WaitlistPromotedEmailProps } from './WaitlistPromotedEmail';
+import { BroadcastEmail, BroadcastEmailProps } from './BroadcastEmail';
 
 export {
   WelcomeEmail,
@@ -18,6 +23,11 @@ export {
   VerificationEmail,
   PasswordResetEmail,
   AccountWelcomeEmail,
+  MembershipRejectedEmail,
+  PaymentReminderEmail,
+  EventCancelledEmail,
+  WaitlistPromotedEmail,
+  BroadcastEmail,
 };
 
 export interface EmailTemplateDataMap {
@@ -29,6 +39,11 @@ export interface EmailTemplateDataMap {
   VerificationEmail: VerificationEmailProps;
   PasswordResetEmail: PasswordResetEmailProps;
   AccountWelcomeEmail: AccountWelcomeEmailProps;
+  MembershipRejectedEmail: MembershipRejectedEmailProps;
+  PaymentReminderEmail: PaymentReminderEmailProps;
+  EventCancelledEmail: EventCancelledEmailProps;
+  WaitlistPromotedEmail: WaitlistPromotedEmailProps;
+  BroadcastEmail: BroadcastEmailProps;
 }
 
 export type EmailTemplateName = keyof EmailTemplateDataMap;
@@ -44,4 +59,9 @@ export const emailTemplateComponents: {
   VerificationEmail,
   PasswordResetEmail,
   AccountWelcomeEmail,
+  MembershipRejectedEmail,
+  PaymentReminderEmail,
+  EventCancelledEmail,
+  WaitlistPromotedEmail,
+  BroadcastEmail,
 };
